@@ -11,7 +11,9 @@
 ![Side](https://img.shields.io/badge/Side-Server%20only-6b7280)
 ![License](https://img.shields.io/badge/License-GPL--3.0-3b82f6)
 
-[Русский](README_RU.md)
+**English** · [Русский](README_RU.md)
+
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -180,26 +182,23 @@ Both `/region` and `/rg` work. Region ids are single words.
 
 ## Permissions
 
-With LuckPerms installed it is the sole authority (OP levels are ignored once a user is loaded). Without it, the listed OP level applies.
+With LuckPerms installed it is the sole authority (OP levels are ignored once a user is loaded). Without it, each node maps to an OP level. Note the defaults are **permissive for basic use** — claiming, viewing and deleting your own regions are OP 0 (everyone), while management and admin actions require higher tiers.
 
 | Node | Default | Purpose |
 | --- | --- | --- |
-| `worldguardneo.region.claim` | OP 2 | Claim regions |
+| `worldguardneo.region.claim` | OP 0 | Claim regions |
+| `worldguardneo.region.delete` | OP 0 | Delete your own regions |
+| `worldguardneo.region.info` / `.list` | OP 0 | View / list your regions |
+| `worldguardneo.region.teleport` | OP 0 | Teleport to regions |
+| `worldguardneo.selection.use` | OP 0 | `/rg select` + receive the `//wand` |
 | `worldguardneo.region.redefine` | OP 2 | Resize regions |
-| `worldguardneo.region.delete` | OP 2 | Delete own regions |
-| `worldguardneo.region.delete.others` | OP 3 | Delete anyone's regions |
-| `worldguardneo.region.flag` | OP 2 | Set flags on own regions |
-| `worldguardneo.region.flag.others` | OP 3 | Set flags on anyone's regions |
-| `worldguardneo.region.flag.bypass` | OP 3 | Bypass flag-group restrictions |
-| `worldguardneo.region.flag.group` | OP 2 | Use `-g <group>` on flags |
-| `worldguardneo.region.bypass` | OP 4 | Bypass region protection entirely |
-| `worldguardneo.region.info` / `.others` / `.global` | OP 2 / 3 / 4 | Region info scopes |
+| `worldguardneo.region.flag` | OP 2 | Set flags |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Manage members / owners |
-| `worldguardneo.region.teleport` | OP 2 | Teleport to regions |
-| `worldguardneo.selection.use` | OP 0 | Use `/rg select` |
-| `worldguardneo.backup` | OP 4 | Manual backups |
-| `worldguardneo.reload` | OP 4 | Reload config |
-| `worldguardneo.notify` | OP 2 | Receive violation notifications |
+| `worldguardneo.region.delete.others` | OP 3 | Delete anyone's regions |
+| `worldguardneo.region.bypass` | **OP 5** | Bypass protection (LuckPerms only — never by OP) |
+| `worldguardneo.backup` / `reload` | OP 4 | Manual backup / reload config |
+
+**See [PERMISSIONS.md](PERMISSIONS.md) for the complete list** of all nodes, exact OP levels, and LuckPerms examples.
 
 ## Flags
 
