@@ -11,7 +11,9 @@
 ![Side](https://img.shields.io/badge/Сторона-Только%20сервер-6b7280)
 ![License](https://img.shields.io/badge/Лицензия-GPL--3.0-3b82f6)
 
-[English](README.md)
+[English](README.md) · **Русский**
+
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -180,26 +182,23 @@ vertical-expand-up = 0     # для режима "fixed"
 
 ## Права
 
-При установленном LuckPerms он — единственный источник прав (уровни OP игнорируются после загрузки игрока). Без него применяется указанный уровень OP.
+При установленном LuckPerms он — единственный источник прав (уровни OP игнорируются после загрузки игрока). Без него каждый узел маппится на уровень OP. Дефолты **щадящие для базового использования**: создание, просмотр и удаление своих регионов — OP 0 (все), а управление и админ-действия требуют более высоких уровней.
 
 | Узел | По умолчанию | Назначение |
 | --- | --- | --- |
-| `worldguardneo.region.claim` | OP 2 | Регистрация регионов |
+| `worldguardneo.region.claim` | OP 0 | Регистрация регионов |
+| `worldguardneo.region.delete` | OP 0 | Удаление своих регионов |
+| `worldguardneo.region.info` / `.list` | OP 0 | Просмотр / список своих регионов |
+| `worldguardneo.region.teleport` | OP 0 | Телепорт к регионам |
+| `worldguardneo.selection.use` | OP 0 | `/rg select` + получение `//wand` |
 | `worldguardneo.region.redefine` | OP 2 | Изменение размера |
-| `worldguardneo.region.delete` | OP 2 | Удаление своих регионов |
-| `worldguardneo.region.delete.others` | OP 3 | Удаление чужих регионов |
-| `worldguardneo.region.flag` | OP 2 | Флаги на своих регионах |
-| `worldguardneo.region.flag.others` | OP 3 | Флаги на чужих регионах |
-| `worldguardneo.region.flag.bypass` | OP 3 | Обход ограничений групп флагов |
-| `worldguardneo.region.flag.group` | OP 2 | Использование `-g <группа>` |
-| `worldguardneo.region.bypass` | OP 4 | Полный обход защиты регионов |
-| `worldguardneo.region.info` / `.others` / `.global` | OP 2 / 3 / 4 | Области видимости info |
+| `worldguardneo.region.flag` | OP 2 | Установка флагов |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Управление участниками / владельцами |
-| `worldguardneo.region.teleport` | OP 2 | Телепорт к регионам |
-| `worldguardneo.selection.use` | OP 0 | Использование `/rg select` |
-| `worldguardneo.backup` | OP 4 | Ручные бэкапы |
-| `worldguardneo.reload` | OP 4 | Перезагрузка конфига |
-| `worldguardneo.notify` | OP 2 | Получение уведомлений о нарушениях |
+| `worldguardneo.region.delete.others` | OP 3 | Удаление чужих регионов |
+| `worldguardneo.region.bypass` | **OP 5** | Обход защиты (только LuckPerms — по OP не выдаётся) |
+| `worldguardneo.backup` / `reload` | OP 4 | Ручной бэкап / перезагрузка |
+
+**Полный список** всех узлов, точные уровни OP и примеры LuckPerms — в [PERMISSIONS_RU.md](PERMISSIONS_RU.md).
 
 ## Флаги
 
