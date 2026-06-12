@@ -77,13 +77,15 @@ public final class WorldEventHandler {
         RegionManager mgr = mod.regions().get(lvl);
         // FluidPlaceBlockEvent fires when a flowing fluid converts to a solid block:
         //   water + lava → cobblestone / stone / obsidian / basalt
-        // We can't read the *source* fluid type from the event payload reliably, so we infer
-        // from the resulting block: obsidian/basalt → lava was involved (LAVA_FLOW); anything
-        // else (cobblestone/stone) → water-flow. Both flags can disable creation entirely.
+        // Every vanilla solidification involves lava, so all known products gate under
+        // LAVA_FLOW — previously cobblestone (the most common product!) fell into the
+        // water-flow branch, so "lava-flow deny" failed to stop the bread-and-butter
+        // cobble generator case. WATER_FLOW remains the fallback for modded products.
         BlockState newState = e.getNewState();
         boolean lavaInvolved = newState.is(Blocks.OBSIDIAN)
                 || newState.is(Blocks.BASALT)
-                || newState.is(Blocks.STONE);
+                || newState.is(Blocks.STONE)
+                || newState.is(Blocks.COBBLESTONE);
         StateFlag flag = lavaInvolved ? Flags.LAVA_FLOW : Flags.WATER_FLOW;
         if (!test(mgr, flag, e.getPos())) e.setCanceled(true);
     }
