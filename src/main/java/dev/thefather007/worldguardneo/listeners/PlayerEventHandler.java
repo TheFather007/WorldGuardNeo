@@ -70,6 +70,16 @@ public final class PlayerEventHandler {
          */
         boolean deathKeepInv = false;
         boolean deathKeepXp  = false;
+        /**
+         * Tick-flag relevance cache. {@code tickFlagsRelevant} answers "does any region in the
+         * current applicable chain (incl. parents) or the global region set ANY flag values?".
+         * When false, the whole per-tick flag cascade (entry/exit tests, game-mode, heal, feed,
+         * hunger, speed, time/weather — a dozen resolutions) is provably a no-op and is skipped.
+         * Recomputed when the region set changes or {@link ProtectedRegion#flagEpoch()} moves
+         * (any flag/parent/priority edit anywhere), so admin changes apply on the next tick.
+         */
+        long    flagEpochSeen    = -1L;
+        boolean tickFlagsRelevant = true;
     }
 
     private final Map<UUID, PlayerState> states = new HashMap<>();
@@ -116,6 +126,28 @@ public final class PlayerEventHandler {
                 if (!st.lastRegions.contains(here.get(i).id())) { unchanged = false; break; }
             }
         }
+
+        // Steady-state shortcut: most regions are membership-only claims with no flag values at
+        // all. For a player standing inside one, every per-tick resolution below (entry/exit,
+        // game-mode, heal, feed, hunger, speed, time/weather — ~12 flag walks) provably yields
+        // the defaults. Cache "any flags anywhere in the chain?" per player and skip the whole
+        // cascade while it stays false. Invalidation: region-set change (transition) or the
+        // global flag epoch moving (any flag/parent/priority edit on any region).
+        long epoch = ProtectedRegion.flagEpoch();
+        if (!unchanged || st.flagEpochSeen != epoch) {
+            st.flagEpochSeen = epoch;
+            st.tickFlagsRelevant = anyFlagsInChain(here, mgr);
+        }
+        if (unchanged && !st.tickFlagsRelevant
+                // Live client-side overrides must be unwound before we may go dormant:
+                // a previously applied time/weather lock or speed override still needs its
+                // restore path below to run until it has reset.
+                && !st.timeLockActive && !st.weatherLockActive
+                && Double.isNaN(st.origSpeedBase)) {
+            st.lastSafeX = x; st.lastSafeY = y; st.lastSafeZ = z; st.lastSafeValid = true;
+            return;
+        }
+
         Set<String> current;
         if (unchanged) {
             // No greeting/farewell work needed. Still update lastSafe and check live flags
@@ -422,6 +454,23 @@ public final class PlayerEventHandler {
             holder[0] = canBypass(p) ? 1 : 2;
         }
         return holder[0] == 1;
+    }
+
+    /**
+     * True if any region in the applicable list (walking parent chains, bounded) or the global
+     * region sets at least one flag value. When false, every flag resolution at this position
+     * returns its default — callers can skip whole resolution cascades.
+     */
+    private static boolean anyFlagsInChain(List<ProtectedRegion> here, RegionManager mgr) {
+        if (mgr.globalRegion().hasFlags()) return true;
+        for (int i = 0, n = here.size(); i < n; i++) {
+            ProtectedRegion cur = here.get(i);
+            for (int hops = 0; cur != null && hops < 32; hops++) {
+                if (cur.hasFlags()) return true;
+                cur = cur.parent();
+            }
+        }
+        return false;
     }
 
     /** Walk parent chain looking for a state-flag value. Bounded at 32 hops. */

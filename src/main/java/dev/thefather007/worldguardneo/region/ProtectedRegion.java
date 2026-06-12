@@ -19,6 +19,19 @@ import java.util.*;
  */
 public abstract class ProtectedRegion {
 
+    /**
+     * Global mutation epoch, bumped on every flag/group/parent/priority change on ANY region.
+     * Consumers (e.g. the per-player tick cache in PlayerEventHandler) compare a stored epoch
+     * against this to know whether previously computed flag-derived state is still valid —
+     * a single volatile read instead of re-resolving a dozen flags every tick.
+     *
+     * <p>Single-writer: all mutations happen on the server thread, so the unguarded volatile
+     * increment is race-free; same-thread readers always observe the latest value.
+     */
+    private static volatile long flagEpoch;
+    public  static long flagEpoch()     { return flagEpoch; }
+    private static void bumpFlagEpoch() { flagEpoch++; }
+
     private final String id;
     private int priority = 0;
     private ProtectedRegion parent;
@@ -56,7 +69,7 @@ public abstract class ProtectedRegion {
 
     public final String id()                       { return id; }
     public final int    priority()                 { return priority; }
-    public final void   setPriority(int p)         { this.priority = p; }
+    public final void   setPriority(int p)         { this.priority = p; bumpFlagEpoch(); }
     public final ProtectedRegion parent()          { return parent; }
     public final void   setParent(ProtectedRegion p) {
         // Cycle check, bounded at 32 hops to defend against pre-corrupted data.
@@ -66,7 +79,11 @@ public abstract class ProtectedRegion {
             cursor = cursor.parent;
         }
         this.parent = p;
+        bumpFlagEpoch();
     }
+
+    /** Allocation-free "does this region set any flag values?" probe for cache relevance. */
+    public final boolean hasFlags() { return flagValues != null && !flagValues.isEmpty(); }
 
     /**
      * Mutable owners set. Lazy-allocated — the first call to this method materializes the
@@ -122,6 +139,7 @@ public abstract class ProtectedRegion {
             if (flagValues == null) flagValues = new LinkedHashMap<>(4);
             flagValues.put(flag, value);
         }
+        bumpFlagEpoch();
     }
     /**
      * Set the group filter for a flag. Setting a group on a flag with no value is harmless
@@ -136,6 +154,7 @@ public abstract class ProtectedRegion {
             if (flagGroups == null) flagGroups = new LinkedHashMap<>(2);
             flagGroups.put(flag, g);
         }
+        bumpFlagEpoch();
     }
     public final Map<Flag<?>, Object>      flagsRaw()     {
         return flagValues == null ? Collections.emptyMap() : Collections.unmodifiableMap(flagValues);
@@ -158,6 +177,7 @@ public abstract class ProtectedRegion {
             if (flagGroups == null) flagGroups = new LinkedHashMap<>(other.flagGroups.size());
             flagGroups.putAll(other.flagGroups);
         }
+        bumpFlagEpoch();
     }
     public final Map<Flag<?>, RegionGroup> flagGroupsRaw(){
         return flagGroups == null ? Collections.emptyMap() : Collections.unmodifiableMap(flagGroups);

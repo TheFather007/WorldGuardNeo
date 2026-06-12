@@ -48,11 +48,14 @@ List<ProtectedRegion> mine  = WorldGuardNeoAPI.getOwnedRegions(level, player.get
 
 ```java
 boolean canBuild        = WorldGuardNeoAPI.canBuild(player, pos);
+boolean canPlace        = WorldGuardNeoAPI.canPlace(player, pos);
 boolean canInteract     = WorldGuardNeoAPI.canInteract(player, pos);
 boolean canAccessChests = WorldGuardNeoAPI.canAccessChests(player, pos);
 boolean canPvP          = WorldGuardNeoAPI.canPvP(player, pos);
 boolean isAdmin         = WorldGuardNeoAPI.hasBypass(player);
 ```
+
+These mirror the mod's own event handlers exactly, including the implicit membership protection: inside a claimed region with no explicit flags, strangers get `false` while owners/members get `true` — the same verdict the break/place/interact handlers enforce.
 
 ### Arbitrary flags
 
@@ -96,7 +99,7 @@ Fired when a flag denies an action (e.g. a build attempt blocked by the `build` 
 
 ### `RegionModifyEvent`
 
-Fired when a region is created, redefined, or deleted. Carries the level, region, a `ModifyType` (`CREATED` / `REDEFINED` / `DELETED`), and the actor (may be null for programmatic changes).
+Fired when a region is created, redefined, or deleted. Carries the level, region, a `ModifyType` (`CREATED` / `UPDATED` / `DELETED`), and the actor (may be null for programmatic changes).
 
 ```java
 @SubscribeEvent
@@ -109,11 +112,13 @@ public void onRegionModify(RegionModifyEvent event) {
 
 ## Registering custom flags
 
-Other mods can register their own flags during setup. Register early (before regions load) so flags resolve from storage. Use the same flag types WorldGuardNeo uses (`StateFlag`, `StringFlag`, `IntFlag`, `DoubleFlag`, `SetFlag`, …) and add a matching `flag.<name>.desc` lang entry so the flag shows a description in-game.
+Other mods can register their own flags during setup. Register early (before regions load) so flags resolve from storage. Use the same flag types WorldGuardNeo uses (`StateFlag`, `StringFlag`, `IntegerFlag`, `DoubleFlag`, `BooleanFlag`, `SetFlag`) and add a matching `flag.<name>.desc` lang entry so the flag shows a description in-game.
+
+Flag names must match `[a-z][a-z0-9-]*` (lowercase, digits, dashes — no dots), so prefix with your mod name dash-style to avoid collisions:
 
 ```java
-// during common setup
-StateFlag MY_FLAG = new StateFlag("my-custom-flag");
+// during common setup; second StateFlag argument is the default (true = allow when unset)
+StateFlag MY_FLAG = new StateFlag("mymod-no-magic", true);
 WorldGuardNeoAPI.registerFlag(MY_FLAG);
 ```
 

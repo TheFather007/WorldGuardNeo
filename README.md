@@ -168,17 +168,19 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg select <id>` | Load a region's bounds into your WorldEdit selection |
 | `/rg info [id]` | Show a region's owners, members, flags |
 | `/rg list [player]` | List regions (optionally for a player) |
-| `/rg lists <radius>` | List regions near you |
+| `/rg lists [radius]` | List regions near you (default radius 50) |
 | `/rg flag <id> <flag> [-g group] [value]` | Set/clear a flag (omit value to clear) |
-| `/rg flags <id>` | List a region's set flags |
-| `/rg priority <id> <n>` | Set region priority |
-| `/rg setparent <id> [parent]` | Set/clear a region's parent |
+| `/rg flags` | List every available flag with its value hint and description |
+| `/rg priority <id> <n>` | Set region priority (owner or admin only) |
+| `/rg setparent <id> [parent]` | Set/clear a region's parent (owner or admin only) |
 | `/rg addmember/removemember <id> <player>` | Manage members |
 | `/rg addowner/removeowner <id> <player>` | Manage owners |
 | `/rg teleport <id>` | Teleport to a region's `teleport` flag location |
-| `/rg backup` | Create a region backup now |
+| `/rg backup [label]` | Create a region backup now (optional name suffix) |
+| `/rg backup list` | List existing backups, newest first |
 | `/rg save` | Flush regions to storage |
 | `/rg reload` | Reload config and language |
+| `/rg debug` | Diagnostics: spatial-index stats, active integrations |
 
 ## Permissions
 
@@ -202,7 +204,7 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 
 ## Flags
 
-WorldGuardNeo ships 80+ flags. Each is documented in-game — run `/rg flags <id>` to see what's set, and use tab-completion on `/rg flag <id> <…>` to browse them. Build-type flags (build, block-break, block-place, interact, use, chest-access) follow the membership model; the rest are environmental state flags (allow/deny) or value flags (greetings, locks, limits).
+WorldGuardNeo ships 80+ flags. Each is documented in-game — run `/rg flags` to list every flag with its value hint and description, and `/rg info <id>` to see what's set on a region. Build-type flags (build, block-break, block-place, interact, use, chest-access) follow the membership model; the rest are environmental state flags (allow/deny) or value flags (greetings, locks, limits).
 
 ## Building
 

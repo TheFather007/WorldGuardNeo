@@ -56,9 +56,9 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.flag.others` | OP 2 | Флаги на чужих регионах. |
 | `worldguardneo.region.flag.bypass` | OP 3 | Обход проверки групповых ограничений флага. |
 | `worldguardneo.region.flag.group` | OP 2 | Использование синтаксиса `-g <группа>`. |
-| `worldguardneo.region.flag.priority` | OP 2 | `/rg priority` — задать приоритет региона. |
-| `worldguardneo.region.flag.parent` | OP 2 | `/rg setparent` — задать родителя региона. |
-| `worldguardneo.region.flags.list` | OP 2 | `/rg flags` — список установленных флагов. |
+| `worldguardneo.region.flag.priority` | OP 2 | `/rg priority` — задать приоритет региона. Дополнительно нужно быть владельцем региона (или иметь `flag.others`/`bypass`). |
+| `worldguardneo.region.flag.parent` | OP 2 | `/rg setparent` — задать родителя региона. То же требование владения, что и у `flag.priority`. |
+| `worldguardneo.region.flags.list` | OP 2 | `/rg flags` — список всех доступных флагов с подсказками и описаниями. |
 
 ## Узлы выделения и администрирования
 
@@ -69,7 +69,7 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |
 | `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. |
-| `worldguardneo.notify` | OP 2 | Получение уведомлений о нарушениях. |
+| `worldguardneo.notify` | OP 2 | Получение оповещений, когда игроки пересекают регионы с флагами `notify-enter` / `notify-leave`. |
 
 ## Примеры LuckPerms
 

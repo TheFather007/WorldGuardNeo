@@ -56,9 +56,9 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.flag.others` | OP 2 | Set flags on foreign regions. |
 | `worldguardneo.region.flag.bypass` | OP 3 | Skip the per-flag group restriction check. |
 | `worldguardneo.region.flag.group` | OP 2 | Use the `-g <group>` flag syntax. |
-| `worldguardneo.region.flag.priority` | OP 2 | `/rg priority` — set region priority. |
-| `worldguardneo.region.flag.parent` | OP 2 | `/rg setparent` — set a region's parent. |
-| `worldguardneo.region.flags.list` | OP 2 | `/rg flags` — list a region's set flags. |
+| `worldguardneo.region.flag.priority` | OP 2 | `/rg priority` — set region priority. Additionally requires being an owner of the region (or `flag.others`/`bypass`). |
+| `worldguardneo.region.flag.parent` | OP 2 | `/rg setparent` — set a region's parent. Same ownership requirement as `flag.priority`. |
+| `worldguardneo.region.flags.list` | OP 2 | `/rg flags` — list every available flag with its value hint and description. |
 
 ## Selection & admin nodes
 
@@ -69,7 +69,7 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |
 | `worldguardneo.reload` | OP 4 | `/rg reload` — reload config & language. |
-| `worldguardneo.notify` | OP 2 | Receive violation notifications. |
+| `worldguardneo.notify` | OP 2 | Receive broadcast messages when players cross regions flagged `notify-enter` / `notify-leave`. |
 
 ## LuckPerms examples
 

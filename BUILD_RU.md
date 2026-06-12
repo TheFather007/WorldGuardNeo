@@ -47,8 +47,7 @@ worldguardneo/
         ├── META-INF/neoforge.mods.toml
         ├── assets/worldguardneo/lang/   # en_us, ru_ru
         ├── worldguardneo.mixins.json
-        ├── pack.mcmeta
-        └── logo.png
+        └── pack.mcmeta
 ```
 
 ## Зависимости
