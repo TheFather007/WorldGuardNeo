@@ -115,10 +115,6 @@ public final class WGCommands {
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 1000))
                                 .executes(c -> listInRadius(c.getSource(),
                                         IntegerArgumentType.getInteger(c, "radius"), mod))))
-                .then(Commands.literal("select")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(c -> selectRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
                 .then(Commands.literal("teleport")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.teleport"))
                         .then(Commands.argument("id", StringArgumentType.word())
@@ -648,38 +644,55 @@ public final class WGCommands {
      */
     private static void printRegion(CommandSourceStack src, WorldGuardNeo mod, ProtectedRegion r) {
         var server = src.getServer();
-        src.sendSuccess(() -> Component.literal("§7━━ §6" + r.id() + "§7 ━━"), false);
-        src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.type",     "type", r.type())), false);
-        src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.priority", "value", r.priority())), false);
-        // Coordinates: AABB center (rounded to int blocks). Helps players locate their own
-        // regions and helps admins find which house an id refers to. Skipped for global since
-        // it has Integer.MIN/MAX bounds — useless to display.
+        var i18n = mod.i18n();
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.info.header", "id", r.id())), false);
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.info.type",     "type", r.type())), false);
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.info.priority", "value", r.priority())), false);
+        // Geometry block — size (dimensions + block count) and bounds. Skipped for the global
+        // region, whose Integer.MIN/MAX bounds would print nonsense.
         if (!(r instanceof GlobalRegion)) {
             Vec3 mn = r.minimumBound(), mx = r.maximumBound();
-            int cx = (mn.x() + mx.x()) / 2;
-            int cy = (mn.y() + mx.y()) / 2;
-            int cz = (mn.z() + mx.z()) / 2;
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.coord",
+            int dx = mx.x() - mn.x() + 1, dy = mx.y() - mn.y() + 1, dz = mx.z() - mn.z() + 1;
+            src.sendSuccess(() -> Component.literal(i18n.format("msg.info.size",
+                    "w", dx, "h", dy, "l", dz, "blocks", r.volume())), false);
+            src.sendSuccess(() -> Component.literal(i18n.format("msg.info.bounds",
+                    "min", mn.x() + "," + mn.y() + "," + mn.z(),
+                    "max", mx.x() + "," + mx.y() + "," + mx.z())), false);
+            int cx = (mn.x() + mx.x()) / 2, cy = (mn.y() + mx.y()) / 2, cz = (mn.z() + mx.z()) / 2;
+            src.sendSuccess(() -> Component.literal(i18n.format("msg.info.coord",
                     "x", cx, "y", cy, "z", cz)), false);
         }
         if (r.parent() != null)
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.parent", "parent", r.parent().id())), false);
+            src.sendSuccess(() -> Component.literal(i18n.format("msg.info.parent", "parent", r.parent().id())), false);
         // Resolve UUIDs to player names where possible (online or cached). Falls back to UUID
         // string for truly unknown profiles so admins still see SOMETHING actionable.
         // *View() reads avoid lazy-init allocation for regions with no owners/members.
-        src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.owners",
-                "list", r.ownersView().stream()
-                        .map(u -> dev.thefather007.worldguardneo.util.UuidResolver.nameOf(server, u))
-                        .collect(Collectors.joining(", ")))), false);
-        src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.members",
-                "list", r.membersView().stream()
-                        .map(u -> dev.thefather007.worldguardneo.util.UuidResolver.nameOf(server, u))
-                        .collect(Collectors.joining(", ")))), false);
-        String flagDump = r.flagsRaw().entrySet().stream().map(e -> {
+        String none = i18n.raw("msg.info.none");
+        String owners = r.ownersView().isEmpty() ? none : r.ownersView().stream()
+                .map(u -> dev.thefather007.worldguardneo.util.UuidResolver.nameOf(server, u))
+                .collect(Collectors.joining(", "));
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.info.owners", "list", owners)), false);
+        String members = r.membersView().isEmpty() ? none : r.membersView().stream()
+                .map(u -> dev.thefather007.worldguardneo.util.UuidResolver.nameOf(server, u))
+                .collect(Collectors.joining(", "));
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.info.members", "list", members)), false);
+        String flagDump = r.flagsRaw().isEmpty() ? none : r.flagsRaw().entrySet().stream().map(e -> {
             Flag<?> f = e.getKey();
             return f.name() + "=" + f.displayRaw(e.getValue());
         }).collect(Collectors.joining(", "));
-        src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.info.flags", "list", flagDump)), false);
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.info.flags", "list", flagDump)), false);
+
+        // Show the region outline to the player via WorldEdit's selection (WECUI renders it).
+        // This replaces the old standalone /rg select command — viewing a region now also
+        // highlights it. No-op for console senders and the geometry-less global region.
+        ServerPlayer viewer = src.getPlayer();
+        if (viewer != null && !(r instanceof GlobalRegion)) {
+            if (r instanceof CuboidRegion c) {
+                mod.worldEdit().selectCuboid(viewer, c.minimumBound(), c.maximumBound());
+            } else if (r instanceof PolygonalRegion poly) {
+                mod.worldEdit().selectPolygon(viewer, poly.points(), poly.minY(), poly.maxY());
+            }
+        }
     }
 
     /* =========================================================================
@@ -841,29 +854,6 @@ public final class WGCommands {
             src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.truncated",
                     "hidden", hidden)), false);
         }
-        return 1;
-    }
-
-    /** Make the player's current selection match an existing region's geometry. */
-    private static int selectRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
-        ServerPlayer p = src.getPlayerOrException();
-        var ropt = mod.regions().get(p.serverLevel()).get(id);
-        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
-        ProtectedRegion r = ropt.get();
-        if (r instanceof CuboidRegion c) {
-            // Push the region's bounds into the player's WorldEdit selection. /rg redefine then
-            // reads them straight back from WE. WorldEdit renders the selection (WECUI) itself.
-            mod.worldEdit().selectCuboid(p, c.minimumBound(), c.maximumBound());
-        } else if (r instanceof PolygonalRegion poly) {
-            mod.worldEdit().selectPolygon(p, poly.points(), poly.minY(), poly.maxY());
-        } else {
-            // Global region — no geometry to select, just tell the player.
-            ok(src, mod, "msg.region.global-select", "id", id);
-            return 1;
-        }
-        // Compact size info — useful to know what was selected without an extra /rg info.
-        ok(src, mod, "msg.selection.from-region",
-                "id", id, "type", r.type(), "volume", r.volume());
         return 1;
     }
 
