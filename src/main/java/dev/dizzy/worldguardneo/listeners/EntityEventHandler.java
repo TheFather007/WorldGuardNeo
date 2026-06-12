@@ -36,6 +36,7 @@ public final class EntityEventHandler {
     @SubscribeEvent
     public void onMobSpawn(FinalizeSpawnEvent e) {
         if (!(e.getLevel() instanceof ServerLevel sl)) return;
+        if (!mod.isProtectionActive(sl)) return;
         RegionManager mgr = mod.regions().get(sl);
         String entityId = null;  // lazily resolved — many spawns don't need it
 
@@ -46,20 +47,28 @@ public final class EntityEventHandler {
         try {
             var ws = mod.config().worldOrGlobal(sl);
             if (ws != null && ws.blockedEntities != null && !ws.blockedEntities.isEmpty()) {
-                entityId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
-                        .getKey(e.getEntity().getType()).toString();
-                String action = ws.blockedEntities.get(entityId);
-                if (action == null && entityId.startsWith("minecraft:")) {
-                    // Try the bare form too — admins often write just "zombie" in config.
-                    action = ws.blockedEntities.get(entityId.substring("minecraft:".length()));
-                }
-                if ("deny".equalsIgnoreCase(action)) {
-                    e.setSpawnCancelled(true);
-                    return;
+                // getKey can return null for entities without a registry mapping (some modded
+                // mobs). Guard it: a null key here previously threw an NPE that the surrounding
+                // catch swallowed, silently skipping the hostile-mob suppressor below too.
+                var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                        .getKey(e.getEntity().getType());
+                if (key != null) {
+                    entityId = key.toString();
+                    String action = ws.blockedEntities.get(entityId);
+                    if (action == null && entityId.startsWith("minecraft:")) {
+                        // Try the bare form too — admins often write just "zombie" in config.
+                        action = ws.blockedEntities.get(entityId.substring("minecraft:".length()));
+                    }
+                    if ("deny".equalsIgnoreCase(action)) {
+                        e.setSpawnCancelled(true);
+                        return;
+                    }
                 }
             }
             // Global hostile-mob suppressor: any monster gets cancelled if config wants it.
-            // Useful for peaceful-mode subworlds without disabling difficulty globally.
+            // Useful for peaceful-mode subworlds without disabling difficulty globally. Runs
+            // independently of the registry-key lookup above so a keyless modded mob can't
+            // slip past it.
             if (mod.config().global().blockedEntityHostile
                     && e.getEntity() instanceof net.minecraft.world.entity.monster.Monster) {
                 e.setSpawnCancelled(true);
@@ -79,8 +88,10 @@ public final class EntityEventHandler {
             try {
                 // Reuse entityId if we already resolved it above.
                 if (entityId == null) {
-                    entityId = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
-                            .getKey(e.getEntity().getType()).toString();
+                    var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(e.getEntity().getType());
+                    if (key == null) return; // unregistered entity — can't match the deny-spawn set
+                    entityId = key.toString();
                 }
                 if (denied.contains(entityId)) {
                     e.setSpawnCancelled(true);
@@ -106,6 +117,7 @@ public final class EntityEventHandler {
         Entity target = e.getTarget();
         if (target == null) return;
         ServerLevel lvl = attacker.serverLevel();
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         double x = target.getX(), y = target.getY(), z = target.getZ();
         // Single spatial-index lookup reused across all three state-flag tests below.
@@ -298,6 +310,7 @@ public final class EntityEventHandler {
         if (!(victim instanceof ServerPlayer sp)) return;
         Level levelObj = victim.level();
         if (levelObj.isClientSide()) return;
+        if (!mod.isProtectionActive(levelObj)) return;
 
         // Cache the manager once for use across world-config and per-region paths below.
         RegionManager mgr = mod.regions().get(levelObj);
