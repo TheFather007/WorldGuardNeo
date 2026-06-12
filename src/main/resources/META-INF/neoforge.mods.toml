@@ -1,0 +1,66 @@
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="${mod_license}"
+issueTrackerURL="https://example.com/worldguardneo/issues"
+
+# Mixin configuration. Loads WorldGuardNeo's random-tick gating mixins for ice/snow/grass/etc.
+[[mixins]]
+config="worldguardneo.mixins.json"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+authors="${mod_authors}"
+description='''${mod_description}'''
+logoFile="logo.png"
+logoBlur=false
+displayURL="https://example.com/worldguardneo"
+
+# NeoForge + Minecraft — server-side mod, so SERVER side.
+[[dependencies.${mod_id}]]
+modId="neoforge"
+type="required"
+versionRange="${neo_version_range}"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.${mod_id}]]
+modId="minecraft"
+type="required"
+versionRange="${minecraft_version_range}"
+ordering="NONE"
+side="SERVER"
+
+# WorldEdit — REQUIRED. Regions are created exclusively from WorldEdit selections
+# (//wand, //pos1/2, //sel poly). The mod will not load without it.
+[[dependencies.${mod_id}]]
+modId="worldedit"
+type="required"
+versionRange="[7.3,)"
+ordering="AFTER"
+side="SERVER"
+
+# LuckPerms — optional permission backend; falls back to OP levels if missing.
+[[dependencies.${mod_id}]]
+modId="luckperms"
+type="optional"
+versionRange="[5.4,)"
+ordering="AFTER"
+side="SERVER"
+
+# Bluemap — optional 3D web-map integration. WGN regions render as ShapeMarkers if present.
+[[dependencies.${mod_id}]]
+modId="bluemap"
+type="optional"
+versionRange="*"
+ordering="AFTER"
+side="SERVER"
+
+# Squaremap — optional 2D web-map integration. WGN regions render as a marker layer if present.
+[[dependencies.${mod_id}]]
+modId="squaremap"
+type="optional"
+versionRange="*"
+ordering="AFTER"
+side="SERVER"
