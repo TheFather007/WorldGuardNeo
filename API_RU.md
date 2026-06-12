@@ -50,7 +50,7 @@ if (ModList.get().isLoaded("worldguardneo")
 
 ## Запросы — `WorldGuardNeoAPI`
 
-Все методы статические в `dev.dizzy.worldguardneo.api.WorldGuardNeoAPI`. Все NULL-safe и thread-safe для использования с server thread.
+Все методы статические в `dev.thefather007.worldguardneo.api.WorldGuardNeoAPI`. Все NULL-safe и thread-safe для использования с server thread.
 
 ### Поиск регионов
 
@@ -110,7 +110,7 @@ boolean isMember = WorldGuardNeoAPI.isMember(r, uuid);  // includes owners
 
 ## События
 
-Все события находятся в пакете `dev.dizzy.worldguardneo.api.events`. Постятся в `NeoForge.EVENT_BUS`. Подписка стандартная:
+Все события находятся в пакете `dev.thefather007.worldguardneo.api.events`. Постятся в `NeoForge.EVENT_BUS`. Подписка стандартная:
 
 ```java
 @SubscribeEvent
@@ -221,7 +221,7 @@ boolean allowed = WorldGuardNeoAPI.queryFlag(level, MY_MAGIC_PROTECTION, uuid, p
 - `StringFlag` — строка
 - `SetFlag<String>` — множество строк
 
-Все находятся в `dev.dizzy.worldguardneo.flags`.
+Все находятся в `dev.thefather007.worldguardneo.flags`.
 
 **Naming convention:** используй namespace своего мода. `mymod.no-magic` — хорошо. `cool-flag` — конфликт с базовыми флагами и другими модами.
 

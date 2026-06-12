@@ -21,7 +21,7 @@
 
 ## Getting the API
 
-WorldGuardNeo exposes a static facade at `dev.dizzy.worldguardneo.api.WorldGuardNeoAPI`. Make WorldGuardNeo a soft/optional dependency of your mod and guard your hooks behind a presence check:
+WorldGuardNeo exposes a static facade at `dev.thefather007.worldguardneo.api.WorldGuardNeoAPI`. Make WorldGuardNeo a soft/optional dependency of your mod and guard your hooks behind a presence check:
 
 ```java
 if (ModList.get().isLoaded("worldguardneo")

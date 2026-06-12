@@ -99,7 +99,7 @@ Java-файлов: 60.
 
 **ИСПРАВЛЕНО (ошибка компиляции):** `WGConfig` использовался в новых методах WGCommands,
 но не был импортирован (`region.*` покрывал только регионы). Добавлен
-`import dev.dizzy.worldguardneo.config.WGConfig;`.
+`import dev.thefather007.worldguardneo.config.WGConfig;`.
 
 **1. Авто-флаги при создании (на мир):**
 - В `[defaults]` и `worlds/<dim>.toml` добавлен `auto-flags = ["pvp=deny", ...]` — список

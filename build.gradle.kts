@@ -88,11 +88,11 @@ tasks.named<Jar>("jar") {
     manifest {
         attributes(
             "Specification-Title"    to modId,
-            "Specification-Vendor"   to "Dizzy",
+            "Specification-Vendor"   to "TheFather007",
             "Specification-Version"  to "1",
             "Implementation-Title"   to project.name,
             "Implementation-Version" to project.version,
-            "Implementation-Vendor"  to "Dizzy"
+            "Implementation-Vendor"  to "TheFather007"
         )
     }
 }
