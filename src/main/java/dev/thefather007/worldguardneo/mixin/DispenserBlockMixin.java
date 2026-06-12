@@ -64,14 +64,22 @@ public abstract class DispenserBlockMixin {
                 // If FACING can't be read for some reason, fall back to the dispenser's own cell.
             }
 
-            // Fast path: nothing region-related at either the dispenser or its target → vanilla.
+            // Fast path: nothing region-related at either the dispenser or its target AND the
+            // global region has no opinion → vanilla. (The global check keeps a world-wide
+            // "dispenser-output deny" effective in wilderness, matching MixinFlagBridge.)
             boolean nearDispenser = mgr.hasAnyAt(pos.getX(), pos.getY(), pos.getZ());
             boolean nearTarget    = mgr.hasAnyAt(target.getX(), target.getY(), target.getZ());
-            if (!nearDispenser && !nearTarget) return;
+            if (!nearDispenser && !nearTarget) {
+                if (mgr.globalRegion().getFlag(Flags.DISPENSER_OUTPUT) == StateFlag.State.DENY) {
+                    ci.cancel();
+                }
+                return;
+            }
 
-            // Check 1: dispenser-output flag at the dispenser's own position.
-            if (nearDispenser
-                    && !mgr.testState(Flags.DISPENSER_OUTPUT, null, pos.getX(), pos.getY(), pos.getZ())) {
+            // Check 1: dispenser-output flag at the dispenser's own position. No nearDispenser
+            // guard: when only the TARGET is in a region, testState falls back to the global
+            // value, which must still be able to deny.
+            if (!mgr.testState(Flags.DISPENSER_OUTPUT, null, pos.getX(), pos.getY(), pos.getZ())) {
                 ci.cancel();
                 return;
             }
