@@ -3,6 +3,7 @@ package dev.dizzy.worldguardneo.listeners;
 import dev.dizzy.worldguardneo.WorldGuardNeo;
 import dev.dizzy.worldguardneo.flags.Flags;
 import dev.dizzy.worldguardneo.flags.StateFlag;
+import dev.dizzy.worldguardneo.region.ProtectedRegion;
 import dev.dizzy.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
