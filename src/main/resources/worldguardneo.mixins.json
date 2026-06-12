@@ -1,0 +1,26 @@
+{
+  "required": true,
+  "minVersion": "0.8.5",
+  "package": "dev.dizzy.worldguardneo.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "refmap": "worldguardneo.refmap.json",
+  "mixins": [
+    "BiomeMixin",
+    "IceBlockMixin",
+    "FrostedIceBlockMixin",
+    "SnowLayerBlockMixin",
+    "SpreadingSnowyDirtBlockMixin",
+    "VineBlockMixin",
+    "LeavesBlockMixin",
+    "HangingEntityMixin",
+    "ServerPlayerGameModeMixin",
+    "ArmorStandMixin",
+    "PressurePlateBlockMixin",
+    "DispenserBlockMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 0
+  }
+}
