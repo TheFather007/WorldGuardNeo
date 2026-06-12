@@ -258,8 +258,9 @@ public final class BlockEventHandler {
                 // the global / region-level flag value matters.
                 if (ent instanceof net.minecraft.world.entity.decoration.HangingEntity
                         || ent instanceof net.minecraft.world.entity.decoration.ArmorStand) {
-                    return !mgr.testState(finalFlag, null,
-                            (int) ent.getX(), (int) ent.getY(), (int) ent.getZ());
+                    // Pass raw doubles — testState takes doubles; the old (int) casts truncated
+                    // toward zero, mis-binning decorations at negative coordinates by one block.
+                    return !mgr.testState(finalFlag, null, ent.getX(), ent.getY(), ent.getZ());
                 }
                 return false; // Mobs, items, projectiles etc. — vanilla rules.
             });
