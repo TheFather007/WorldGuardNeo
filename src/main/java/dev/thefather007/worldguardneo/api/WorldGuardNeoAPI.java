@@ -126,11 +126,13 @@ public final class WorldGuardNeoAPI {
         if (mod == null || !mod.isProtectionActive(player.serverLevel())) return true;
         if (mod.perms().has(player, "worldguardneo.region.bypass")) return true;
         RegionManager mgr = mod.regions().get(player.serverLevel());
-        // Get applicable once and test both flags against it — avoids two spatial lookups.
-        List<ProtectedRegion> applicable = mgr.getApplicable(pos.getX(), pos.getY(), pos.getZ());
         UUID uid = player.getUUID();
-        return mgr.testState(Flags.BLOCK_BREAK, applicable, uid)
-            && mgr.testState(Flags.BUILD,       applicable, uid);
+        // testBuildAccess (NOT plain testState) — the break handler grants strangers no access
+        // to a claimed region even when no flag is explicitly set (implicit membership
+        // protection). A testState here answered "true" for foreign claims with unset flags,
+        // so API consumers disagreed with what the actual event handlers enforce.
+        return mgr.testBuildAccess(Flags.BLOCK_BREAK, pos.getX(), pos.getY(), pos.getZ(), uid)
+            && mgr.testBuildAccess(Flags.BUILD,       pos.getX(), pos.getY(), pos.getZ(), uid);
     }
 
     /**
@@ -142,10 +144,10 @@ public final class WorldGuardNeoAPI {
         if (mod == null || !mod.isProtectionActive(player.serverLevel())) return true;
         if (mod.perms().has(player, "worldguardneo.region.bypass")) return true;
         RegionManager mgr = mod.regions().get(player.serverLevel());
-        List<ProtectedRegion> applicable = mgr.getApplicable(pos.getX(), pos.getY(), pos.getZ());
         UUID uid = player.getUUID();
-        return mgr.testState(Flags.BLOCK_PLACE, applicable, uid)
-            && mgr.testState(Flags.BUILD,       applicable, uid);
+        // Mirrors EntityPlaceEvent handling — see canBuild for why testBuildAccess.
+        return mgr.testBuildAccess(Flags.BLOCK_PLACE, pos.getX(), pos.getY(), pos.getZ(), uid)
+            && mgr.testBuildAccess(Flags.BUILD,       pos.getX(), pos.getY(), pos.getZ(), uid);
     }
 
     /**
@@ -157,7 +159,10 @@ public final class WorldGuardNeoAPI {
         if (mod == null || !mod.isProtectionActive(player.serverLevel())) return true;
         if (mod.perms().has(player, "worldguardneo.region.bypass")) return true;
         RegionManager mgr = mod.regions().get(player.serverLevel());
-        return mgr.testState(Flags.INTERACT, player.getUUID(), pos.getX(), pos.getY(), pos.getZ());
+        UUID uid = player.getUUID();
+        // Mirrors RightClickBlock handling (INTERACT + USE, build-access semantics).
+        return mgr.testBuildAccess(Flags.INTERACT, pos.getX(), pos.getY(), pos.getZ(), uid)
+            && mgr.testBuildAccess(Flags.USE,      pos.getX(), pos.getY(), pos.getZ(), uid);
     }
 
     /** Whether the player can open chests/containers at the position. */
@@ -166,7 +171,9 @@ public final class WorldGuardNeoAPI {
         if (mod == null || !mod.isProtectionActive(player.serverLevel())) return true;
         if (mod.perms().has(player, "worldguardneo.region.bypass")) return true;
         RegionManager mgr = mod.regions().get(player.serverLevel());
-        return mgr.testState(Flags.CHEST_ACCESS, player.getUUID(), pos.getX(), pos.getY(), pos.getZ());
+        // Build-access semantics, same as the container branch of RightClickBlock.
+        return mgr.testBuildAccess(Flags.CHEST_ACCESS,
+                pos.getX(), pos.getY(), pos.getZ(), player.getUUID());
     }
 
     /** Whether PvP is allowed at the position for this attacker. */

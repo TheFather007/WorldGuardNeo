@@ -51,8 +51,11 @@ public abstract class PressurePlateBlockMixin {
             if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-            // Fast path: no region here → vanilla behaviour, no allocation.
-            if (!mgr.hasAnyAt(x, y, z)) return;
+            // Fast path: no region here AND the global region has no USE opinion → vanilla,
+            // no allocation. The global check keeps a world-wide "use deny" effective on
+            // wilderness plates (testBuildAccess below falls back to the global value).
+            if (!mgr.hasAnyAt(x, y, z)
+                    && mgr.globalRegion().getFlag(Flags.USE) == null) return;
 
             // Inside a region: allow only if a member of the controlling region stands on it.
             AABB box = TOUCH_AABB.move(pos);

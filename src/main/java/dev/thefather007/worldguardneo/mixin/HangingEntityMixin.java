@@ -53,11 +53,16 @@ public abstract class HangingEntityMixin {
         if (mod == null) return; // pre-init or shutdown
 
         try {
+            if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             // Allocation-free fast probe: if no spatial-index entry under us AND globalRegion
             // has no BUILD opinion, vanilla survives() decides. Only when a region IS nearby
             // do we run the full state-resolution.
-            int x = (int) self.getX(), y = (int) self.getY(), z = (int) self.getZ();
+            // floor, not a plain (int) cast: casting truncates toward zero, so x=-3.7 mapped to
+            // block -3 (one off) and frames near a region border in negative coords were missed.
+            int x = (int) Math.floor(self.getX());
+            int y = (int) Math.floor(self.getY());
+            int z = (int) Math.floor(self.getZ());
             if (!mgr.hasAnyAt(x, y, z)
                     && mgr.globalRegion().getFlag(Flags.BUILD) == null
                     && mgr.globalRegion().getFlag(Flags.BLOCK_BREAK) == null) {

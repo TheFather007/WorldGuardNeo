@@ -45,6 +45,10 @@ public final class MixinFlagBridge {
         if (mod == null) return true; // pre-init or shutdown
 
         try {
+            // Per-world useRegions kill-switch — the listeners and the other mixins all honour
+            // it; without this check the nine random-tick flags kept being enforced in worlds
+            // where the admin disabled regions entirely. Cheap: a cached IdentityHashMap probe.
+            if (!mod.isProtectionActive(sl)) return true;
             RegionManager mgr = mod.regions().get(sl);
             // Allocation-free fast path: if there's no region AABB at this position, only the
             // GLOBAL region can override the flag. Resolve directly against globalRegion
