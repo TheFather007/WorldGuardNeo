@@ -80,6 +80,10 @@ public final class PlayerEventHandler {
     public void onPlayerTick(PlayerTickEvent.Post e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         ServerLevel lvl = p.serverLevel();
+        // World-level kill-switch: when regions are disabled for this world (useRegions=false),
+        // none of the per-tick protections (entry/exit, heal/feed, game-mode, speed, time/weather)
+        // should run — matches the block/entity handlers that already honour this flag.
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         // mgr is never null — get(Level) uses computeIfAbsent.
 
@@ -148,7 +152,7 @@ public final class PlayerEventHandler {
                 }
             }
             if (denyMsg != null) p.displayClientMessage(Component.literal(denyMsg), true);
-            bounce(p, st, lvl);
+            bounceFromEntry(p, st, lvl, mgr, id);
             return;
         }
         // Entry-vehicle: a stricter guard that only triggers when the player is mounted
@@ -156,7 +160,7 @@ public final class PlayerEventHandler {
         // allow walking in but not riding. Again, bypass is only consulted on a deny.
         if (p.isPassenger() && !mgr.testState(Flags.ENTRY_VEHICLE, here, id)
                 && !resolveBypassCached(p, bypassState)) {
-            bounce(p, st, lvl);
+            bounceFromEntry(p, st, lvl, mgr, id);
             return;
         }
 
@@ -298,10 +302,28 @@ public final class PlayerEventHandler {
                 Integer max = mgr.resolveValue(Flags.MAX_HEAL, applicable, id);
                 float cap = max != null ? max.floatValue() : p.getMaxHealth();
                 Integer min = mgr.resolveValue(Flags.MIN_HEAL, applicable, id);
+                float floor = min != null ? min.floatValue() : 0f;
                 float hp = p.getHealth();
-                if ((min == null || hp >= min) && hp < cap) {
-                    float delta = Math.min((float) healAmount.intValue(), cap - hp);
-                    if (delta > 0) p.heal(delta);
+                int amount = healAmount.intValue();
+                if (amount > 0) {
+                    // Heal UP toward the max. min-hp is the lower bound of the band, NOT a
+                    // precondition: a player below it (badly hurt) is exactly who should be
+                    // healed, so we must not gate on hp >= min (the previous behaviour, which
+                    // refused to heal anyone who had dropped below the floor).
+                    if (hp < cap) {
+                        float delta = Math.min((float) amount, cap - hp);
+                        if (delta > 0) p.heal(delta);
+                    }
+                } else if (amount < 0) {
+                    // Negative heal-amount drains health (a "damage zone"), but never below
+                    // the min-hp floor.
+                    if (hp > floor) {
+                        float delta = Math.min((float) -amount, hp - floor);
+                        if (delta > 0) {
+                            try { p.hurt(p.damageSources().generic(), delta); }
+                            catch (Throwable t) { WorldGuardNeo.LOGGER.debug("heal-drain failed", t); }
+                        }
+                    }
                 }
             }
         }
@@ -434,6 +456,27 @@ public final class PlayerEventHandler {
     }
 
     /**
+     * Bounce a player who is being denied ENTRY. Unlike {@link #bounce} (used for EXIT, where
+     * sending the player back INSIDE the region is the intended behaviour), an entry-denied player
+     * must end up OUTSIDE. If their last "safe" position is itself entry-denied — which happens when
+     * ENTRY is toggled to deny while the player is already inside, or a region is created/redefined
+     * around them — teleporting there would trap them in a per-tick teleport loop (the next tick
+     * re-denies and re-bounces to the same spot). Detect that case and fall back to world spawn,
+     * invalidating the poisoned safe position so it isn't reused until a fresh safe tick records one.
+     */
+    private void bounceFromEntry(ServerPlayer p, PlayerState st, ServerLevel lvl,
+                                 RegionManager mgr, UUID id) {
+        if (st.lastSafeValid
+                && mgr.testState(Flags.ENTRY, id, st.lastSafeX, st.lastSafeY, st.lastSafeZ)) {
+            p.teleportTo(st.lastSafeX, st.lastSafeY, st.lastSafeZ);
+        } else {
+            BlockPos spawn = lvl.getSharedSpawnPos();
+            p.teleportTo(spawn.getX() + 0.5, spawn.getY(), spawn.getZ() + 0.5);
+            st.lastSafeValid = false;
+        }
+    }
+
+    /**
      * Best-effort per-player time/weather override via client packets.
      * Stays per-player (uses the connection's PacketSender) so the world clock isn't touched.
      */
@@ -512,6 +555,7 @@ public final class PlayerEventHandler {
     public void onCommand(CommandEvent e) {
         var src = e.getParseResults().getContext().getSource();
         if (!(src.getEntity() instanceof ServerPlayer p)) return;
+        if (!mod.isProtectionActive(p.serverLevel())) return;
         if (canBypass(p)) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = p.getX(), y = p.getY(), z = p.getZ();
@@ -616,6 +660,7 @@ public final class PlayerEventHandler {
     public void onChat(ServerChatEvent e) {
         ServerPlayer p = e.getPlayer();
         if (p == null) return;
+        if (!mod.isProtectionActive(p.serverLevel())) return;
         // Admins with bypass can chat anywhere — silencing them by accident in a no-chat
         // PvP arena is annoying and they'd just dimension-hop to talk.
         if (canBypass(p)) return;
@@ -632,6 +677,7 @@ public final class PlayerEventHandler {
     @SubscribeEvent
     public void onItemPickup(ItemEntityPickupEvent.Pre e) {
         if (!(e.getPlayer() instanceof ServerPlayer p)) return;
+        if (!mod.isProtectionActive(p.serverLevel())) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
         // Spatial test first: if the flag wouldn't deny anyway, skip the permission check.
         // testState returns true (allow) for positions outside all regions, so this short-
@@ -644,6 +690,7 @@ public final class PlayerEventHandler {
     @SubscribeEvent
     public void onItemToss(ItemTossEvent e) {
         if (!(e.getPlayer() instanceof ServerPlayer p)) return;
+        if (!mod.isProtectionActive(p.serverLevel())) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
         if (mgr.testState(Flags.ITEM_DROP, p.getUUID(), p.getX(), p.getY(), p.getZ())) return;
         if (canBypass(p)) return;
@@ -655,6 +702,7 @@ public final class PlayerEventHandler {
     @SubscribeEvent
     public void onSleep(net.neoforged.neoforge.event.entity.player.CanPlayerSleepEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
+        if (!mod.isProtectionActive(p.serverLevel())) return;
         if (canBypass(p)) return;
         var bedPos = e.getPos();
         if (bedPos == null) return;
@@ -687,12 +735,14 @@ public final class PlayerEventHandler {
     public void onEnderPearlTeleport(net.neoforged.neoforge.event.entity.EntityTeleportEvent.EnderPearl e) {
         var entity = e.getEntity();
         if (entity instanceof ServerPlayer p) {
+            if (!mod.isProtectionActive(p.serverLevel())) return;
             if (canBypass(p)) return;
             RegionManager mgr = mod.regions().get(p.serverLevel());
             if (!mgr.testState(Flags.ENDER_BUILD, p.getUUID(), e.getTargetX(), e.getTargetY(), e.getTargetZ())) {
                 e.setCanceled(true);
             }
         } else if (entity != null && entity.level() instanceof ServerLevel sl) {
+            if (!mod.isProtectionActive(sl)) return;
             // Non-player teleporter (rare for EnderPearl, but mod-driven sources exist).
             RegionManager mgr = mod.regions().get(sl);
             if (!mgr.testState(Flags.MOB_TELEPORT, null, e.getTargetX(), e.getTargetY(), e.getTargetZ())) {
@@ -709,12 +759,14 @@ public final class PlayerEventHandler {
     public void onChorusFruitTeleport(net.neoforged.neoforge.event.entity.EntityTeleportEvent.ChorusFruit e) {
         var entity = e.getEntity();
         if (entity instanceof ServerPlayer p) {
+            if (!mod.isProtectionActive(p.serverLevel())) return;
             if (canBypass(p)) return;
             RegionManager mgr = mod.regions().get(p.serverLevel());
             if (!mgr.testState(Flags.CHORUS_FRUIT, p.getUUID(), e.getTargetX(), e.getTargetY(), e.getTargetZ())) {
                 e.setCanceled(true);
             }
         } else if (entity != null && entity.level() instanceof ServerLevel sl) {
+            if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             if (!mgr.testState(Flags.MOB_TELEPORT, null, e.getTargetX(), e.getTargetY(), e.getTargetZ())) {
                 e.setCanceled(true);
@@ -740,6 +792,7 @@ public final class PlayerEventHandler {
         // Defensive: EnderEntity is for mobs, but never gate a player here regardless.
         if (entity instanceof ServerPlayer) return;
         if (!(entity.level() instanceof ServerLevel sl)) return;
+        if (!mod.isProtectionActive(sl)) return;
         RegionManager mgr = mod.regions().get(sl);
         if (!mgr.testState(Flags.MOB_TELEPORT, null, e.getTargetX(), e.getTargetY(), e.getTargetZ())) {
             e.setCanceled(true);

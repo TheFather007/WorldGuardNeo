@@ -226,7 +226,11 @@ public final class BlockEventHandler {
                 }
                 if (touchesRegion) {
                     e.getAffectedBlocks().clear();
-                    e.getAffectedEntities().removeIf(ent -> ent instanceof ServerPlayer);
+                    // Only shield players who are themselves standing in a region — a player out
+                    // in the wilderness next to the blast shouldn't be made immune just because
+                    // some of the affected blocks happened to overlap a nearby claim.
+                    e.getAffectedEntities().removeIf(ent -> ent instanceof ServerPlayer
+                            && mgr.hasAnyAt(ent.getX(), ent.getY(), ent.getZ()));
                     return;
                 }
             }
