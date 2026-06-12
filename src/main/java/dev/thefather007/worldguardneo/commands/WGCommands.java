@@ -579,10 +579,6 @@ public final class WGCommands {
             return 0;
         }
         printRegion(src, mod, r);
-        // Don't broadcast WECUI geometry for the global region — it has none, and it would
-        // confuse clients with Integer.MIN/MAX corners.
-        if (!(r instanceof GlobalRegion)) {
-        }
         return 1;
     }
 
@@ -996,10 +992,30 @@ public final class WGCommands {
         ServerPlayer p = src.getPlayerOrException();
         var ropt = mod.regions().get(p.serverLevel()).get(id);
         if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        // Global region has no geometry — priority is meaningless on it (it's the resolution
+        // fallback, never part of the applicable list).
+        if (ropt.get() instanceof GlobalRegion) {
+            err(src, mod, "msg.region.global-select", "id", id);
+            return 0;
+        }
+        // Same region-access rule as /rg flag: owner OR flag.others OR bypass. Without this,
+        // anyone holding the priority node could re-prioritise FOREIGN regions — e.g. raise
+        // their own claim above a neighbour's overlapping one to flip flag resolution.
+        if (!region2AccessOk(p, ropt.get(), mod)) {
+            err(src, mod, "msg.region.notyours", "id", id);
+            return 0;
+        }
         ropt.get().setPriority(value);
         mod.regions().save(p.serverLevel());
         ok(src, mod, "msg.priority.set", "id", id, "value", value);
         return 1;
+    }
+
+    /** Shared region-access rule for region-shape/meta edits: owner OR flag.others OR bypass. */
+    private static boolean region2AccessOk(ServerPlayer p, ProtectedRegion r, WorldGuardNeo mod) {
+        return r.isOwner(p.getUUID())
+            || mod.perms().has(p, "worldguardneo.region.bypass")
+            || mod.perms().has(p, "worldguardneo.region.flag.others");
     }
 
     private static int setParent(CommandSourceStack src, String id, String parent, WorldGuardNeo mod) throws CommandSyntaxException {
@@ -1007,10 +1023,27 @@ public final class WGCommands {
         RegionManager mgr = mod.regions().get(p.serverLevel());
         var ropt = mgr.get(id);
         if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        if (ropt.get() instanceof GlobalRegion) {
+            err(src, mod, "msg.region.global-select", "id", id);
+            return 0;
+        }
+        // Owner/bypass/others gate — mirrors setPriority. Re-parenting is flag-inheritance
+        // surgery: without this check a player could attach their region under a foreign admin
+        // region and inherit its flags.
+        if (!region2AccessOk(p, ropt.get(), mod)) {
+            err(src, mod, "msg.region.notyours", "id", id);
+            return 0;
+        }
         if (parent == null) { ropt.get().setParent(null); ok(src, mod, "msg.parent.cleared", "child", id); }
         else {
             var popt = mgr.get(parent);
             if (popt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", parent); return 0; }
+            // Parenting under the global region is redundant (it's already the universal
+            // fallback in flag resolution) and would create a bogus link in save data.
+            if (popt.get() instanceof GlobalRegion) {
+                err(src, mod, "msg.region.global-select", "id", parent);
+                return 0;
+            }
             try { ropt.get().setParent(popt.get()); }
             catch (Exception e) { err(src, mod, "msg.parent.cycle"); return 0; }
             ok(src, mod, "msg.parent.set", "child", id, "parent", parent);

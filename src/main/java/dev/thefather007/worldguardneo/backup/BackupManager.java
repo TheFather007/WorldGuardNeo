@@ -41,6 +41,7 @@ public final class BackupManager implements AutoCloseable {
     private static final DateTimeFormatter STAMP =
             DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss");
 
+    private final Path dataDir;
     private final Path regionsDir;
     private final Path backupsDir;
 
@@ -54,6 +55,7 @@ public final class BackupManager implements AutoCloseable {
      *                {@code dataDir/regions} and backups written to {@code dataDir/backups}.
      */
     public BackupManager(Path dataDir) {
+        this.dataDir    = dataDir;
         this.regionsDir = dataDir.resolve("regions");
         this.backupsDir = dataDir.resolve("backups");
         // Single-thread daemon executor. Serial execution avoids concurrent
@@ -136,8 +138,12 @@ public final class BackupManager implements AutoCloseable {
     /* ---------------------- internals ---------------------- */
 
     private void doBackup(String label) throws IOException {
-        if (!Files.isDirectory(regionsDir)) {
-            // Nothing to back up yet — server hasn't created any region files.
+        // Region data may exist as JSON files in regions/ OR as an embedded database file
+        // (regions.sqlite / regions_h2.mv.db) at the data root, depending on storage-format.
+        boolean haveJsonDir = Files.isDirectory(regionsDir);
+        boolean haveDbFiles = !collectDbFiles().isEmpty();
+        if (!haveJsonDir && !haveDbFiles) {
+            // Nothing to back up yet — server hasn't created any region data.
             return;
         }
         String stamp = LocalDateTime.now().format(STAMP);
@@ -163,27 +169,54 @@ public final class BackupManager implements AutoCloseable {
         } catch (Throwable ignored) {}
 
         int copied = 0;
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(regionsDir, "*.{json,sqlite}")) {
-            for (Path src : stream) {
-                if (!Files.isRegularFile(src)) continue;
-                Path target = dest.resolve(src.getFileName().toString() + (compress ? ".gz" : ""));
-                if (compress) {
-                    // Gzip — typical compression ratio for JSON regions is 6-12x.
-                    try (OutputStream raw = Files.newOutputStream(target);
-                         GZIPOutputStream gz = new GZIPOutputStream(raw)) {
-                        Files.copy(src, gz);
-                    }
-                } else {
-                    Files.copy(src, target, StandardCopyOption.REPLACE_EXISTING);
+        if (haveJsonDir) {
+            try (DirectoryStream<Path> stream = Files.newDirectoryStream(regionsDir, "*.{json,sqlite}")) {
+                for (Path src : stream) {
+                    if (!Files.isRegularFile(src)) continue;
+                    copyOne(src, dest, compress);
+                    copied++;
                 }
-                copied++;
             }
+        }
+        // Embedded DB backends keep their data file at the DATA ROOT, not in regions/ —
+        // SqliteRegionStorage writes <root>/regions.sqlite, H2RegionStorage <root>/regions_h2.mv.db.
+        // Without this pass a sqlite/h2 server's backups silently contained no region data at all.
+        // Best-effort: the file is copied while the DB connection is open, which is fine for a
+        // disaster-recovery snapshot (both engines keep the main file consistent between commits,
+        // and all writes happen on the server thread).
+        for (Path src : collectDbFiles()) {
+            copyOne(src, dest, compress);
+            copied++;
         }
 
         WorldGuardNeo.LOGGER.info("[WorldGuardNeo] Backup '{}' written ({} files, compress={})",
                 dirName, copied, compress);
 
         rotate(retain);
+    }
+
+    /** Embedded-database files living at the data root (sqlite / h2), present ones only. */
+    private List<Path> collectDbFiles() {
+        List<Path> out = new ArrayList<>(2);
+        for (String name : new String[]{"regions.sqlite", "regions_h2.mv.db"}) {
+            Path p = dataDir.resolve(name);
+            if (Files.isRegularFile(p)) out.add(p);
+        }
+        return out;
+    }
+
+    /** Copy (optionally gzipping) one source file into the backup directory. */
+    private static void copyOne(Path src, Path destDir, boolean compress) throws IOException {
+        Path target = destDir.resolve(src.getFileName().toString() + (compress ? ".gz" : ""));
+        if (compress) {
+            // Gzip — typical compression ratio for JSON regions is 6-12x.
+            try (OutputStream raw = Files.newOutputStream(target);
+                 GZIPOutputStream gz = new GZIPOutputStream(raw)) {
+                Files.copy(src, gz);
+            }
+        } else {
+            Files.copy(src, target, StandardCopyOption.REPLACE_EXISTING);
+        }
     }
 
     /**
