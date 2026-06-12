@@ -73,6 +73,7 @@ public final class WorldEventHandler {
     public void onFluidPlace(BlockEvent.FluidPlaceBlockEvent e) {
         ServerLevel lvl = asServerLevel(e.getLevel());
         if (lvl == null) return;
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         // FluidPlaceBlockEvent fires when a flowing fluid converts to a solid block:
         //   water + lava → cobblestone / stone / obsidian / basalt
@@ -125,6 +126,7 @@ public final class WorldEventHandler {
     public void onPistonPre(net.neoforged.neoforge.event.level.PistonEvent.Pre e) {
         ServerLevel lvl = asServerLevel(e.getLevel());
         if (lvl == null) return;
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         net.minecraft.core.Direction dir = e.getDirection();
         BlockPos piston = e.getPos();
@@ -211,15 +213,16 @@ public final class WorldEventHandler {
     public void onRedstoneNotify(BlockEvent.NeighborNotifyEvent e) {
         ServerLevel lvl = asServerLevel(e.getLevel());
         if (lvl == null) return;
+        if (!mod.isProtectionActive(lvl)) return;
         BlockState state = e.getState();
         // Fast filter 1: not a signal source → exit immediately.
         if (!state.isSignalSource()) return;
         BlockPos src = e.getPos();
         RegionManager mgr = mod.regions().get(lvl);
-        // Fast filter 2: no region at source → global default (allow) wins. Skip resolution.
-        if (!mgr.hasAnyAt(src.getX(), src.getY(), src.getZ())) return;
-        // Slow path: there IS a region — do the full priority+parent resolution.
-        if (!mgr.testState(Flags.REDSTONE, null, src.getX(), src.getY(), src.getZ())) {
+        // test() fast-paths the wilderness case (single hasAnyAt probe) while still honouring
+        // a REDSTONE flag set on the GLOBAL region — a plain hasAnyAt bail here used to make
+        // a global "redstone deny" silently ineffective outside claimed regions.
+        if (!test(mgr, Flags.REDSTONE, src)) {
             e.setCanceled(true);
         }
     }
@@ -228,6 +231,7 @@ public final class WorldEventHandler {
     public void onFireSpread(BlockEvent.NeighborNotifyEvent e) {
         ServerLevel lvl = asServerLevel(e.getLevel());
         if (lvl == null) return;
+        if (!mod.isProtectionActive(lvl)) return;
         BlockState state = e.getState();
         boolean isFire = state.is(Blocks.FIRE) || state.is(Blocks.SOUL_FIRE);
         boolean isLava = state.is(Blocks.LAVA);
@@ -238,6 +242,24 @@ public final class WorldEventHandler {
 
         RegionManager mgr = mod.regions().get(lvl);
         BlockPos src = e.getPos();
+
+        // World-wide kill-switches FIRST — they are documented as world-wide, so they must apply
+        // in wilderness too. (They used to sit below the nearRegion bail, which made
+        // prevent-fire-spread silently ineffective away from claims.) worldOrGlobal is a cached
+        // per-Level lookup, so this costs one IdentityHashMap probe per event.
+        var ws = mod.config().worldOrGlobal(lvl);
+        boolean killFire = ws != null && isFire && ws.preventFireSpread;
+        boolean killLava = ws != null && isLava && ws.preventLavaFire;
+        if (killFire || killLava) { e.setCanceled(true); return; }
+
+        StateFlag flag = isFire ? Flags.FIRE_SPREAD : (isLava ? Flags.LAVA_FIRE : null);
+
+        // Global-region flag (fire/lava only): applies everywhere, including wilderness, so it
+        // must be honoured before the nearRegion bail below.
+        if (flag != null) {
+            StateFlag.State g = mgr.globalRegion().getFlag(flag);
+            if (g == StateFlag.State.DENY) { e.setCanceled(true); return; }
+        }
 
         // Performance: water/lava neighbour-notifies fire constantly (every ocean, river, flow).
         // Before doing ANY set allocation, cheaply check whether a region is even near the source.
@@ -253,14 +275,6 @@ public final class WorldEventHandler {
         if (!nearRegion) return; // wilderness fluid/fire far from any claim → vanilla, zero cost
 
         var srcRegions = mgr.getApplicable(src.getX(), src.getY(), src.getZ());
-
-        // World-wide kill-switches resolved once (not per-side).
-        var ws = mod.config().worldOrGlobal(lvl);
-        boolean killFire = ws != null && isFire && ws.preventFireSpread;
-        boolean killLava = ws != null && isLava && ws.preventLavaFire;
-        if (killFire || killLava) { e.setCanceled(true); return; }
-
-        StateFlag flag = isFire ? Flags.FIRE_SPREAD : (isLava ? Flags.LAVA_FIRE : null);
 
         // Single pass over notified sides doing BOTH checks:
         //  (1) cross-border containment — a fluid/fire block in zone X must not propagate into a
@@ -295,6 +309,7 @@ public final class WorldEventHandler {
         LivingEntity victim = e.getEntity();
         Level lvl = victim.level();
         if (lvl.isClientSide()) return;
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         double x = victim.getX(), y = victim.getY(), z = victim.getZ();
         if (!mgr.testState(Flags.EXP_DROPS, null, x, y, z)) {
@@ -315,6 +330,7 @@ public final class WorldEventHandler {
         if (!(e.getEntity() instanceof net.minecraft.world.entity.LightningBolt bolt)) return;
         Level lvl = e.getLevel();
         if (lvl.isClientSide()) return;
+        if (!mod.isProtectionActive(lvl)) return;
         // World-wide lightning kill-switch — cancels every bolt in this world without
         // even consulting the region index.
         if (lvl instanceof ServerLevel sl) {
@@ -342,6 +358,7 @@ public final class WorldEventHandler {
         Level lvl = victim.level();
         if (lvl.isClientSide()) return;
         if (!(victim instanceof ServerPlayer)) return;
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         var blocked = mgr.resolveValue(Flags.BLOCKED_EFFECTS,
                 victim.getX(), victim.getY(), victim.getZ(), victim.getUUID());
@@ -378,6 +395,7 @@ public final class WorldEventHandler {
     @SubscribeEvent
     public void onTreeGrow(net.neoforged.neoforge.event.level.BlockGrowFeatureEvent e) {
         if (!(e.getLevel() instanceof ServerLevel lvl)) return;
+        if (!mod.isProtectionActive(lvl)) return;
         BlockPos pos = e.getPos();
         if (pos == null) return;
         RegionManager mgr = mod.regions().get(lvl);
@@ -407,6 +425,7 @@ public final class WorldEventHandler {
     public void onCropGrow(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre e) {
         ServerLevel lvl = asServerLevel(e.getLevel());
         if (lvl == null) return;
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         if (!test(mgr, Flags.CROP_GROWTH, e.getPos())) {
             // CropGrowEvent.Pre uses its OWN nested Result enum (NOT TriState):

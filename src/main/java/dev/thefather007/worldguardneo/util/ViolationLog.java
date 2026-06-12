@@ -174,10 +174,19 @@ public final class ViolationLog {
     /** Flush and stop the writer thread on server shutdown. */
     public void close() {
         running = false;
-        worker.interrupt();
+        // Do NOT interrupt immediately: an interrupt lands inside queue.poll() and aborts the
+        // drain loop via its InterruptedException handler, dropping every line still queued.
+        // The loop exits on its own once running=false and the queue is empty (poll has a 1s
+        // timeout), so a plain join lets the backlog flush. Interrupt only as a last resort
+        // if the writer is genuinely stuck (e.g. disk hang).
         try {
-            worker.join(2000);
+            worker.join(3000);
+            if (worker.isAlive()) {
+                worker.interrupt();
+                worker.join(1000);
+            }
         } catch (InterruptedException ie) {
+            worker.interrupt();
             Thread.currentThread().interrupt();
         }
     }
