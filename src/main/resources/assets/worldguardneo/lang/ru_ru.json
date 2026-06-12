@@ -7,6 +7,8 @@
   "msg.protection.deny-use-item": "§cЗдесь нельзя использовать этот предмет.",
   "msg.protection.cmd-blocked": "§cЭта команда отключена в данном регионе.",
   "msg.protection.chat-blocked": "§cЧат отключён в данном регионе.",
+  "msg.protection.deny-drop": "§cЗдесь нельзя выбрасывать предметы.",
+  "msg.protection.deny-pickup": "§cЗдесь нельзя поднимать предметы.",
   "msg.selection.none": "§eСначала сделайте выделение через §f//pos1 //pos2§e или WorldEdit.",
   "msg.selection.from-region": "§a✓ Выделение скопировано из §6'%id%'§a §7(§f%type%§7, §b%volume%§7 блоков).",
   "msg.region.global-select": "§eРегион §6'%id%'§e — глобальный, нет геометрии для выделения.",

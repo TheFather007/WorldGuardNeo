@@ -7,6 +7,8 @@
   "msg.protection.deny-use-item": "§cYou can't use that item here.",
   "msg.protection.cmd-blocked": "§cThis command is disabled in this region.",
   "msg.protection.chat-blocked": "§cChat is disabled in this region.",
+  "msg.protection.deny-drop": "§cYou can't drop items here.",
+  "msg.protection.deny-pickup": "§cYou can't pick up items here.",
   "msg.selection.none": "§eMake a selection first with §f//pos1 //pos2§e or WorldEdit.",
   "msg.selection.from-region": "§a✓ Selection copied from §6'%id%'§a §7(§f%type%§7, §b%volume%§7 blocks).",
   "msg.region.global-select": "§eRegion §6'%id%'§e is the global region — no geometry to select.",
