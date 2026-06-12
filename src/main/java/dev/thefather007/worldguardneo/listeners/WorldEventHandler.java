@@ -209,30 +209,35 @@ public final class WorldEventHandler {
         return s != StateFlag.State.DENY; // unset or ALLOW → allowed; only explicit DENY blocks
     }
 
+    /**
+     * Single subscriber for {@link BlockEvent.NeighborNotifyEvent} covering BOTH concerns that
+     * piggyback on it (redstone gating + fire/lava/water propagation).
+     *
+     * <p>Performance: NeighborNotify is the hottest block event on a server — every block
+     * update fires it. These used to be two separate {@code @SubscribeEvent} methods, which
+     * doubled event-bus dispatch and re-ran the level/kill-switch/state filters twice per
+     * event. One subscriber shares those filters and exits in a couple of comparisons for
+     * the vast majority of traffic (state is neither a signal source nor fire/lava/water).
+     */
     @SubscribeEvent
-    public void onRedstoneNotify(BlockEvent.NeighborNotifyEvent e) {
+    public void onNeighborNotify(BlockEvent.NeighborNotifyEvent e) {
         ServerLevel lvl = asServerLevel(e.getLevel());
         if (lvl == null) return;
         if (!mod.isProtectionActive(lvl)) return;
         BlockState state = e.getState();
-        // Fast filter 1: not a signal source → exit immediately.
-        if (!state.isSignalSource()) return;
-        BlockPos src = e.getPos();
-        RegionManager mgr = mod.regions().get(lvl);
-        // test() fast-paths the wilderness case (single hasAnyAt probe) while still honouring
-        // a REDSTONE flag set on the GLOBAL region — a plain hasAnyAt bail here used to make
-        // a global "redstone deny" silently ineffective outside claimed regions.
-        if (!test(mgr, Flags.REDSTONE, src)) {
-            e.setCanceled(true);
-        }
-    }
 
-    @SubscribeEvent
-    public void onFireSpread(BlockEvent.NeighborNotifyEvent e) {
-        ServerLevel lvl = asServerLevel(e.getLevel());
-        if (lvl == null) return;
-        if (!mod.isProtectionActive(lvl)) return;
-        BlockState state = e.getState();
+        // ---- redstone branch ----
+        if (state.isSignalSource()) {
+            RegionManager mgr = mod.regions().get(lvl);
+            // test() fast-paths the wilderness case (single hasAnyAt probe) while still
+            // honouring a REDSTONE flag set on the GLOBAL region.
+            if (!test(mgr, Flags.REDSTONE, e.getPos())) {
+                e.setCanceled(true);
+            }
+            return; // signal sources are never fire/lava/water — branches are disjoint
+        }
+
+        // ---- fire / lava / water propagation branch ----
         boolean isFire = state.is(Blocks.FIRE) || state.is(Blocks.SOUL_FIRE);
         boolean isLava = state.is(Blocks.LAVA);
         boolean isWater = state.is(Blocks.WATER);

@@ -198,7 +198,7 @@ public void onModify(RegionModifyEvent e) {
 
 ```java
 public static final StateFlag MY_MAGIC_PROTECTION =
-        WorldGuardNeoAPI.registerFlag(new StateFlag("mymod.no-magic", true));
+        WorldGuardNeoAPI.registerFlag(new StateFlag("mymod-no-magic", true));
 
 @SubscribeEvent
 public void onCommonSetup(FMLCommonSetupEvent e) {
@@ -223,7 +223,7 @@ boolean allowed = WorldGuardNeoAPI.queryFlag(level, MY_MAGIC_PROTECTION, uuid, p
 
 Все находятся в `dev.thefather007.worldguardneo.flags`.
 
-**Naming convention:** используй namespace своего мода. `mymod.no-magic` — хорошо. `cool-flag` — конфликт с базовыми флагами и другими модами.
+**Naming convention:** имя флага должно соответствовать `[a-z][a-z0-9-]*` (строчные буквы, цифры, дефисы — точки запрещены валидатором). Префиксуй именем своего мода через дефис: `mymod-no-magic` — хорошо. `cool-flag` — риск конфликта с базовыми флагами и другими модами.
 
 ---
 
@@ -238,7 +238,7 @@ public class MyMagicMod {
     static {
         if (ModList.get().isLoaded("worldguardneo")) {
             NO_MAGIC = WorldGuardNeoAPI.registerFlag(
-                new StateFlag("mymagicmod.no-magic", true));  // default allow
+                new StateFlag("mymagicmod-no-magic", true));  // default allow
         } else {
             NO_MAGIC = null;
         }

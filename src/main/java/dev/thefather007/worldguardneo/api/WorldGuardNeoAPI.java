@@ -243,8 +243,9 @@ public final class WorldGuardNeoAPI {
 
     /**
      * Register a custom flag from your mod. Should be called during mod initialization,
-     * BEFORE the server starts. Flag identifiers are global — pick something namespaced
-     * (e.g. {@code "mymod.feature"}) to avoid collisions.
+     * BEFORE the server starts. Flag identifiers are global and must match
+     * {@code [a-z][a-z0-9-]*} (no dots) — prefix with your mod name dash-style
+     * (e.g. {@code "mymod-feature"}) to avoid collisions.
      *
      * <p>Returns the registered flag instance — keep a reference to it for later
      * {@code queryFlag()} / {@code queryValue()} calls.
