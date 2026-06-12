@@ -13,8 +13,6 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
 description='''${mod_description}'''
-logoFile="logo.png"
-logoBlur=false
 displayURL="https://example.com/worldguardneo"
 
 # NeoForge + Minecraft — server-side mod, so SERVER side.

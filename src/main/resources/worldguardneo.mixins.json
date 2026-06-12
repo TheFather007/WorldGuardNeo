@@ -1,7 +1,7 @@
 {
   "required": true,
   "minVersion": "0.8.5",
-  "package": "dev.dizzy.worldguardneo.mixin",
+  "package": "dev.thefather007.worldguardneo.mixin",
   "compatibilityLevel": "JAVA_21",
   "refmap": "worldguardneo.refmap.json",
   "mixins": [
