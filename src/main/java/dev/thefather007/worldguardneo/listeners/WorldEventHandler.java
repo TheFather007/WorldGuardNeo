@@ -132,22 +132,30 @@ public final class WorldEventHandler {
         RegionManager mgr = mod.regions().get(lvl);
         net.minecraft.core.Direction dir = e.getDirection();
         BlockPos piston = e.getPos();
+        // getDirection() is the piston's FACING. Blocks travel along it when extending but in
+        // the OPPOSITE direction when a sticky piston retracts (pulls) — using the facing for
+        // retraction destinations pointed one cell the wrong way.
+        boolean extending = e.getPistonMoveType()
+                == net.neoforged.neoforge.event.level.PistonEvent.PistonMoveType.EXTEND;
+        net.minecraft.core.Direction moveDir = extending ? dir : dir.getOpposite();
 
         // Regions the piston's own cell belongs to.
         var pistonRegions = mgr.getApplicable(piston.getX(), piston.getY(), piston.getZ());
 
-        // Collect every cell this move physically affects.
+        // Collect every cell this move physically affects: each moved block's origin AND its
+        // destination (origin catches sticky-piston theft FROM a region, destination catches
+        // pushes INTO one), plus blocks the move destroys.
         java.util.List<BlockPos> touched = new java.util.ArrayList<>();
         touched.add(e.getFaceOffsetPos());
         var helper = e.getStructureHelper();
         if (helper != null && helper.resolve()) {
             for (BlockPos p : helper.getToPush()) {
                 touched.add(p);
-                touched.add(p.relative(dir));
+                touched.add(p.relative(moveDir));
             }
             touched.addAll(helper.getToDestroy());
         } else {
-            touched.add(e.getFaceOffsetPos().relative(dir));
+            touched.add(e.getFaceOffsetPos().relative(moveDir));
         }
 
         // Find the first touched cell that lies in a region the piston isn't allowed to affect.
@@ -198,7 +206,16 @@ public final class WorldEventHandler {
         return false;
     }
 
-    /** Resolve a region's PISTONS flag (walking parents); default ALLOW when unset. */
+    /**
+     * Resolve a region's PISTONS flag (walking parents) for a CROSS-BORDER move coming from
+     * outside that region. Only an EXPLICIT ALLOW opts the region in; unset means protected.
+     *
+     * <p>This used to return {@code s != DENY} ("unset → allowed"), which gutted the boundary
+     * rule completely: since {@code pistons} is unset on every fresh claim, a foreign piston
+     * could push blocks INTO any region and a sticky piston / slime block could pull blocks
+     * OUT of it unless the owner had manually set {@code pistons=deny}. The boundary itself
+     * is supposed to be the protection — opting in must be the explicit act.
+     */
     private static boolean resolvePistonsAllow(ProtectedRegion r) {
         StateFlag.State s = null;
         ProtectedRegion cur = r;
@@ -208,7 +225,7 @@ public final class WorldEventHandler {
             if (s != null) break;
             cur = cur.parent();
         }
-        return s != StateFlag.State.DENY; // unset or ALLOW → allowed; only explicit DENY blocks
+        return s == StateFlag.State.ALLOW; // only an explicit ALLOW permits cross-border moves
     }
 
     /**
