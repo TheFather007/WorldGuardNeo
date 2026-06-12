@@ -6,7 +6,7 @@
 
 [English](PERMISSIONS.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · **🔑 Права** · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · **🔑 Права** · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -60,11 +60,13 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.flag.parent` | OP 2 | `/rg setparent` — задать родителя региона. То же требование владения, что и у `flag.priority`. |
 | `worldguardneo.region.flags.list` | OP 2 | `/rg flags` — список всех доступных флагов с подсказками и описаниями. |
 
+Кроме того, **у каждого флага** есть свой узел `worldguardneo.flag.<имя>` (по умолчанию OP 2), проверяемый при установке именно этого флага. `region.flag.bypass` (или `region.bypass`) пропускает проверку. Полный список узлов флагов — в **[FLAGS_RU.md](FLAGS_RU.md)**.
+
 ## Узлы выделения и администрирования
 
 | Узел | По умолчанию | За что отвечает |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | `/rg select` и получение кастомного `//wand`. |
+| `worldguardneo.selection.use` | OP 0 | Получение кастомного WorldGuardNeo `//wand`. |
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |

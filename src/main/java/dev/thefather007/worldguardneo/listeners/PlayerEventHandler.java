@@ -723,6 +723,13 @@ public final class PlayerEventHandler {
 
     /* ---------------- Item pickup / drop ---------------- */
 
+    /**
+     * Last game-time we showed the pickup-denied action bar, per player. The pickup event
+     * re-fires every tick while the player stands over a denied item, so an unthrottled
+     * message would flicker continuously.
+     */
+    private final Map<UUID, Long> lastPickupDenyMsg = new HashMap<>();
+
     @SubscribeEvent
     public void onItemPickup(ItemEntityPickupEvent.Pre e) {
         if (!(e.getPlayer() instanceof ServerPlayer p)) return;
@@ -734,6 +741,13 @@ public final class PlayerEventHandler {
         if (mgr.testState(Flags.ITEM_PICKUP, p.getUUID(), p.getX(), p.getY(), p.getZ())) return;
         if (canBypass(p)) return;
         e.setCanPickup(TriState.FALSE);
+        long now = p.serverLevel().getGameTime();
+        Long last = lastPickupDenyMsg.get(p.getUUID());
+        if (last == null || now - last >= 60) {
+            lastPickupDenyMsg.put(p.getUUID(), now);
+            p.displayClientMessage(
+                    Component.literal(mod.i18n().raw("msg.protection.deny-pickup")), true);
+        }
     }
 
     @SubscribeEvent
@@ -744,6 +758,22 @@ public final class PlayerEventHandler {
         if (mgr.testState(Flags.ITEM_DROP, p.getUUID(), p.getX(), p.getY(), p.getZ())) return;
         if (canBypass(p)) return;
         e.setCanceled(true);
+        // CRITICAL: ItemTossEvent fires AFTER the stack has already been removed from the
+        // inventory and wrapped into the spawned ItemEntity. Cancelling alone discards that
+        // entity, so the denied drop silently DELETED the items. Put the stack back (the slot
+        // it came from has just been freed) and tell the player why nothing happened.
+        var stack = e.getEntity().getItem();
+        if (!stack.isEmpty()) {
+            if (!p.getInventory().add(stack)) {
+                // Inventory unexpectedly full (another mod raced the freed slot): never
+                // destroy items — letting the drop proceed is the lesser evil.
+                e.setCanceled(false);
+                return;
+            }
+            p.containerMenu.broadcastChanges();
+        }
+        p.displayClientMessage(
+                Component.literal(mod.i18n().raw("msg.protection.deny-drop")), true);
     }
 
     /* ---------------- Sleep, ender pearl, chorus fruit, hunger drain, max speed, spawn ---------------- */
@@ -1009,6 +1039,7 @@ public final class PlayerEventHandler {
     @SubscribeEvent
     public void onLogout(PlayerEvent.PlayerLoggedOutEvent e) {
         states.remove(e.getEntity().getUUID());
+        lastPickupDenyMsg.remove(e.getEntity().getUUID());
     }
 
     @SubscribeEvent

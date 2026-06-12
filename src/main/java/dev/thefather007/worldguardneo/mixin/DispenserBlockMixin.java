@@ -106,7 +106,13 @@ public abstract class DispenserBlockMixin {
         return false;
     }
 
-    /** Resolve a region's dispenser-output (walking parents); default ALLOW when unset. */
+    /**
+     * Resolve a region's dispenser-output (walking parents) for a CROSS-BORDER dispense coming
+     * from outside that region. Only an EXPLICIT ALLOW opts the region in; unset means protected.
+     * (Previously "unset → allowed", which let a dispenser outside a claim fire lava/fire/items
+     * across the border into any region whose owner hadn't manually set dispenser-output=deny —
+     * the same gutted-boundary bug the piston handler had.)
+     */
     private static boolean resolveDispenserAllow(ProtectedRegion r) {
         StateFlag.State s = null;
         ProtectedRegion cur = r;
@@ -116,6 +122,6 @@ public abstract class DispenserBlockMixin {
             if (s != null) break;
             cur = cur.parent();
         }
-        return s != StateFlag.State.DENY; // unset/ALLOW → allowed; only explicit DENY blocks
+        return s == StateFlag.State.ALLOW; // only an explicit ALLOW permits cross-border dispensing
     }
 }

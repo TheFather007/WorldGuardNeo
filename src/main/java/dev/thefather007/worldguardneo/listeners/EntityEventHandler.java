@@ -2,6 +2,7 @@ package dev.thefather007.worldguardneo.listeners;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flags;
+import dev.thefather007.worldguardneo.flags.StateFlag;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -275,9 +276,14 @@ public final class EntityEventHandler {
         var hit = e.getRayTraceResult();
         if (!(hit instanceof net.minecraft.world.phys.EntityHitResult ehr)) return;
         Entity target = ehr.getEntity();
-        if (!(target instanceof net.minecraft.world.entity.decoration.HangingEntity)
-                && !(target instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
-            return; // Not a decoration — vanilla rules apply.
+        boolean isDecoration = target instanceof net.minecraft.world.entity.decoration.HangingEntity
+                            || target instanceof net.minecraft.world.entity.decoration.ArmorStand;
+        // Vehicles (boats, minecarts) are NOT LivingEntities, so projectile hits on them never
+        // reach LivingIncomingDamageEvent — without gating here, a single arrow pops a boat in
+        // a vehicle-destroy=DENY region (or with protectVehicles on) even though melee is blocked.
+        boolean isVehicle = target instanceof AbstractMinecart || target instanceof Boat;
+        if (!isDecoration && !isVehicle) {
+            return; // Mobs/players take the LivingIncomingDamageEvent path; rest is vanilla.
         }
         Level lvl = target.level();
         if (lvl.isClientSide()) return;
@@ -295,6 +301,21 @@ public final class EntityEventHandler {
 
         RegionManager mgr = mod.regions().get(lvl);
         double x = target.getX(), y = target.getY(), z = target.getZ();
+
+        if (isVehicle) {
+            // Mirror the melee vehicle branch in onPlayerAttack: world-wide protectVehicles
+            // first, then the per-region vehicle-destroy flag.
+            var ws = mod.config().worldOrGlobal(lvl);
+            if (ws != null && ws.protectVehicles) {
+                e.setCanceled(true);
+                return;
+            }
+            if (!mgr.testState(Flags.VEHICLE_DESTROY, shooterId, x, y, z)) {
+                e.setCanceled(true);
+            }
+            return;
+        }
+
         if (!mgr.testBuildAccess(Flags.BUILD, x, y, z, shooterId)
                 || !mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, shooterId)) {
             // Pass-through: arrow continues flying, doesn't damage the decoration.
@@ -307,13 +328,37 @@ public final class EntityEventHandler {
     @SubscribeEvent
     public void onLivingDamage(LivingIncomingDamageEvent e) {
         LivingEntity victim = e.getEntity();
-        if (!(victim instanceof ServerPlayer sp)) return;
         Level levelObj = victim.level();
         if (levelObj.isClientSide()) return;
         if (!mod.isProtectionActive(levelObj)) return;
 
         // Cache the manager once for use across world-config and per-region paths below.
         RegionManager mgr = mod.regions().get(levelObj);
+
+        // ---- player-sourced damage: melee AND ranged (arrows, tridents, potions, …) ----
+        // DamageSource#getEntity resolves to the CAUSING entity — the shooter for projectiles —
+        // so this closes the classic bypass where AttackEntityEvent gates melee but a bow shot
+        // sails through pvp=deny / mob-damage=deny untouched. Melee passes through both this
+        // and AttackEntityEvent with the same verdict, which is harmless.
+        if (e.getSource().getEntity() instanceof ServerPlayer attacker && attacker != victim
+                && !(victim instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
+            // Armor stands are decoration: their BUILD/BLOCK_BREAK gating lives in the
+            // melee/projectile handlers, not under mob-damage.
+            if (!mod.perms().has(attacker, "worldguardneo.region.bypass")) {
+                var applicableAtVictim = mgr.getApplicable(victim.getX(), victim.getY(), victim.getZ());
+                StateFlag gate = victim instanceof Player ? Flags.PVP : Flags.MOB_DAMAGE;
+                if (!mgr.testState(gate, applicableAtVictim, attacker.getUUID())) {
+                    e.setCanceled(true);
+                    attacker.displayClientMessage(
+                            net.minecraft.network.chat.Component.literal(mod.i18n().raw(
+                                    victim instanceof Player ? "msg.attack.pvp-denied"
+                                                             : "msg.attack.mob-denied")), true);
+                    return;
+                }
+            }
+        }
+
+        if (!(victim instanceof ServerPlayer sp)) return;
 
         // World-wide config: invincibleRegions forces all-region invincibility, preventMobDamage
         // blocks ALL mob-sourced damage across the world (regardless of regions).

@@ -13,7 +13,7 @@
 
 [English](README.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -73,7 +73,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 /rg addmember myregion Steve
 ```
 
-`/rg select myregion` загружает границы региона обратно в ваше выделение WorldEdit, чтобы `/rg redefine myregion` мог изменить его размер после нового выделения.
+`/rg info myregion` также подсвечивает контур региона, загружая его границы в ваше выделение WorldEdit (отрисовывается WECUI), чтобы `/rg redefine myregion` мог изменить его размер после нового выделения.
 
 ## Настройка
 
@@ -165,8 +165,7 @@ vertical-expand-up = 0     # для режима "fixed"
 | `/rg claim <id>` | Зарегистрировать выделение WorldEdit как новый регион |
 | `/rg redefine <id>` | Изменить размер региона под текущее выделение |
 | `/rg remove <id>` | Удалить регион |
-| `/rg select <id>` | Загрузить границы региона в выделение WorldEdit |
-| `/rg info [id]` | Показать владельцев, участников, флаги региона |
+| `/rg info [id]` | Показать тип, размер, границы, владельцев, участников, флаги — и подсветить контур |
 | `/rg list [игрок]` | Список регионов (опц. для игрока) |
 | `/rg lists [радиус]` | Список регионов рядом с вами (радиус по умолчанию 50) |
 | `/rg flag <id> <флаг> [-g группа] [значение]` | Задать/снять флаг (без значения — снять) |
@@ -192,7 +191,7 @@ vertical-expand-up = 0     # для режима "fixed"
 | `worldguardneo.region.delete` | OP 0 | Удаление своих регионов |
 | `worldguardneo.region.info` / `.list` | OP 0 | Просмотр / список своих регионов |
 | `worldguardneo.region.teleport` | OP 0 | Телепорт к регионам |
-| `worldguardneo.selection.use` | OP 0 | `/rg select` + получение `//wand` |
+| `worldguardneo.selection.use` | OP 0 | Получение кастомного `//wand` |
 | `worldguardneo.region.redefine` | OP 2 | Изменение размера |
 | `worldguardneo.region.flag` | OP 2 | Установка флагов |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Управление участниками / владельцами |

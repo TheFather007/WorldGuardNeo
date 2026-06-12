@@ -6,7 +6,7 @@
 
 **English** · [Русский](PERMISSIONS_RU.md)
 
-[🏠 Home](README.md) · [🔨 Building](BUILD.md) · **🔑 Permissions** · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · **🔑 Permissions** · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -60,11 +60,13 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.flag.parent` | OP 2 | `/rg setparent` — set a region's parent. Same ownership requirement as `flag.priority`. |
 | `worldguardneo.region.flags.list` | OP 2 | `/rg flags` — list every available flag with its value hint and description. |
 
+In addition, **each individual flag** has its own node `worldguardneo.flag.<name>` (default OP 2), checked when setting that specific flag. `region.flag.bypass` (or `region.bypass`) skips the per-flag check. The full list of per-flag nodes is in **[FLAGS.md](FLAGS.md)**.
+
 ## Selection & admin nodes
 
 | Node | Default | Controls |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | `/rg select` and receiving the custom `//wand`. |
+| `worldguardneo.selection.use` | OP 0 | Receiving the custom WorldGuardNeo `//wand`. |
 | `worldguardneo.region.admin` | OP 3 | Administrative region operations. |
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |

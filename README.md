@@ -13,7 +13,7 @@
 
 **English** · [Русский](README_RU.md)
 
-[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -73,7 +73,7 @@ The mod is **server-side only**. Vanilla clients connect normally; no client-sid
 /rg addmember myregion Steve
 ```
 
-`/rg select myregion` pushes a region's bounds back into your WorldEdit selection, so `/rg redefine myregion` can resize it after a new selection.
+`/rg info myregion` also highlights the region's outline by loading its bounds into your WorldEdit selection (rendered by WECUI), so `/rg redefine myregion` can resize it after making a new selection.
 
 ## Configuration
 
@@ -165,8 +165,7 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg claim <id>` | Claim your WorldEdit selection as a new region |
 | `/rg redefine <id>` | Resize a region to your current selection |
 | `/rg remove <id>` | Delete a region |
-| `/rg select <id>` | Load a region's bounds into your WorldEdit selection |
-| `/rg info [id]` | Show a region's owners, members, flags |
+| `/rg info [id]` | Show a region's type, size, bounds, owners, members, flags — and highlight its outline |
 | `/rg list [player]` | List regions (optionally for a player) |
 | `/rg lists [radius]` | List regions near you (default radius 50) |
 | `/rg flag <id> <flag> [-g group] [value]` | Set/clear a flag (omit value to clear) |
@@ -204,7 +203,9 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 
 ## Flags
 
-WorldGuardNeo ships 80+ flags. Each is documented in-game — run `/rg flags` to list every flag with its value hint and description, and `/rg info <id>` to see what's set on a region. Build-type flags (build, block-break, block-place, interact, use, chest-access) follow the membership model; the rest are environmental state flags (allow/deny) or value flags (greetings, locks, limits).
+WorldGuardNeo ships 80+ flags. Build-type flags (build, block-break, block-place, interact, use, chest-access) follow the membership model; the rest are environmental state flags (allow/deny) or value flags (greetings, locks, limits). Run `/rg flags` in-game to list every flag with its value hint and description.
+
+**See [FLAGS.md](FLAGS.md) for the complete table** — every flag with its type, default, permission node, and description.
 
 ## Building
 
