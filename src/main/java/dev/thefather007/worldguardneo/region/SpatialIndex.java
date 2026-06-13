@@ -42,9 +42,22 @@ public final class SpatialIndex {
      */
     private final IdentityHashMap<ProtectedRegion, Boolean> oversized = new IdentityHashMap<>();
 
+    /**
+     * Immutable snapshot of {@link #oversized}'s keys, rebuilt only when the oversized set
+     * mutates. Lets {@link #candidates} return it directly (zero allocation) for the very
+     * common "point is in a world-spanning region but no bucketed region" lookup — on a server
+     * with even one oversized region that path previously allocated an ArrayList on EVERY probe.
+     */
+    private List<ProtectedRegion> oversizedSnapshot = List.of();
+
+    private void refreshOversizedSnapshot() {
+        oversizedSnapshot = oversized.isEmpty() ? List.of() : List.copyOf(oversized.keySet());
+    }
+
     public void clear() {
         buckets.clear();
         oversized.clear();
+        oversizedSnapshot = List.of();
     }
 
     public void add(ProtectedRegion r) {
@@ -57,6 +70,7 @@ public final class SpatialIndex {
         long span = (long)(cx1 - cx0 + 1) * (long)(cz1 - cz0 + 1);
         if (span <= 0 || span > MAX_BUCKETS_PER_REGION) {
             oversized.put(r, Boolean.TRUE);
+            refreshOversizedSnapshot();
             return;
         }
         for (int cx = cx0; cx <= cx1; cx++) {
@@ -76,7 +90,7 @@ public final class SpatialIndex {
 
     public void remove(ProtectedRegion r) {
         if (r instanceof GlobalRegion) return;
-        if (oversized.remove(r) != null) return;
+        if (oversized.remove(r) != null) { refreshOversizedSnapshot(); return; }
         Vec3 mn = r.minimumBound(), mx = r.maximumBound();
         if (mn.x() == Integer.MIN_VALUE || mx.x() == Integer.MAX_VALUE) return;
         int cx0 = mn.x() >> 4, cx1 = mx.x() >> 4;
@@ -108,11 +122,13 @@ public final class SpatialIndex {
         long k = key(floor(x) >> 4, floor(z) >> 4);
         List<ProtectedRegion> bucket = buckets.get(k);
         if (oversized.isEmpty()) return bucket == null ? List.of() : bucket;
-        // Combine bucket + oversized. Oversized is usually empty or has 1-2 entries.
-        int bucketSize = bucket == null ? 0 : bucket.size();
-        ArrayList<ProtectedRegion> out = new ArrayList<>(bucketSize + oversized.size());
-        if (bucket != null) out.addAll(bucket);
-        out.addAll(oversized.keySet());
+        // No bucketed region here but oversized ones exist (the common case on a server with a
+        // world-spanning region): return the cached snapshot directly — zero allocation.
+        if (bucket == null) return oversizedSnapshot;
+        // Both present (rarer): combine. Oversized is usually 1-2 entries.
+        ArrayList<ProtectedRegion> out = new ArrayList<>(bucket.size() + oversizedSnapshot.size());
+        out.addAll(bucket);
+        out.addAll(oversizedSnapshot);
         return out;
     }
 

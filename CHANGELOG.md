@@ -1,7 +1,12 @@
-# WorldGuardNeo — журнал сборок
+<div align="center">
 
-Каждая сборка помечена номером. Имя архива: `worldguardneo-b<НОМЕР>-src.zip`.
-Самая свежая сборка — сверху.
+# 📋 WorldGuardNeo — Changelog
+
+**Build-numbered history of the mod. Newest build at the top.**
+
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · **📋 Changelog**
+
+</div>
 
 ---
 
@@ -387,3 +392,9 @@ b5 H2/MySQL).
 - Конфиг в TOML с комментариями (`config/worldguardneo/config.toml`), регионы в JSON.
 - Защита смежных регионов A↔B: поршни (дроп при нарушении), жидкость/огонь
   (boundary), рост деревьев, диспенсер (`dispenser-output` + boundary).
+
+---
+
+## License
+
+Released under the **GNU General Public License v3.0 or later**. See [`LICENSE`](LICENSE) for the full text.
