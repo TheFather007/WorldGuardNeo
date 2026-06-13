@@ -86,6 +86,7 @@ bash tests/run.sh
 - `FlagResolutionEdgeTest` — затенение по тирам с группами, наследуемый build-access, value-флаги с группой, индексация oversized-регионов, запросы владения.
 - `FlagContractTest` — контракт каждого флага: тип, дефолт (только `invincible`/`keep-inventory`/`keep-xp` по умолчанию deny), узел права, подсказка значения, round-trip реестра.
 - `StorageRoundTripTest` — все типы флагов, группы, родители и геометрия переживают save → JSON → load.
+- `PerFlagReport` — для **каждого** флага гоняет персональную батарею (контракт, резолюция, build-access, группы, приоритет, наследование родителя, JSON round-trip) и пишет подробный отчёт по флагам в `tests/FLAG_REPORT.txt` (снимок закоммичен).
 - `tests/coverage.sh` — статический страж: каждый флаг должен упоминаться в обработчике/команде (ловит флаг, потерявший enforcement; намеренно «declared-only» только `allowed-enchants` и `receive-chat`).
 
 ### Внутриигровые GameTest

@@ -15,6 +15,9 @@ for T in FlagLogicTest StorageRoundTripTest FlagScenarioTest FlagResolutionEdgeT
   printf '%-24s ' "$T:"
   java -cp "$OUT:$CP" "$T" | tail -1 || rc=1
 done
+# Per-flag battery → writes the detailed report file.
+printf '%-24s ' "PerFlagReport:"
+java -cp "$OUT:$CP" PerFlagReport "$ROOT/tests/FLAG_REPORT.txt" | tail -1 || rc=1
 # Static per-flag enforcement-coverage guard.
 printf '%-24s ' "coverage:"
 bash "$ROOT/tests/coverage.sh" | tail -1 || rc=1

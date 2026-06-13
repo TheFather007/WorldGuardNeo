@@ -86,6 +86,7 @@ This compiles and runs all suites (**1200+ checks**):
 - `FlagResolutionEdgeTest` — cross-priority group shadowing, inherited build-access, group-scoped value flags, oversized (world-spanning) region indexing, ownership queries.
 - `FlagContractTest` — per-flag contract: type, default (only `invincible`/`keep-inventory`/`keep-xp` default to deny), permission node, value hint, registry round-trip.
 - `StorageRoundTripTest` — every flag type, groups, parents and geometry survive save → JSON → load.
+- `PerFlagReport` — runs a tailored battery for **every** flag (contract, resolution, build-access, groups, priority, parent inheritance, JSON round-trip) and writes a detailed, per-flag report to `tests/FLAG_REPORT.txt` (committed snapshot included).
 - `tests/coverage.sh` — static guard that every registered flag is referenced in a handler/command (catches a flag that silently loses its enforcement; only `allowed-enchants` and `receive-chat` are intentionally declared-only).
 
 ### In-game GameTests
