@@ -91,6 +91,30 @@ public final class BlockEventHandler {
     }
 
     /**
+     * Farmland trampling: jumping on crops to destroy the farmland underneath (turning it back
+     * to dirt and killing the plant) is a classic claim-grief that block-break protection misses,
+     * because vanilla routes it through {@link BlockEvent.FarmlandTrampleEvent}, not a break. We
+     * gate PLAYER trampling by the same build-access membership rule as breaking: a non-member
+     * (no explicit allow) can't trample a claimed farm. Mob/entity trampling is left to vanilla
+     * (the {@code mobGriefing} game rule already governs that).
+     */
+    @SubscribeEvent
+    public void onFarmlandTrample(BlockEvent.FarmlandTrampleEvent e) {
+        ServerLevel lvl = asServerLevel(e.getLevel());
+        if (lvl == null) return;
+        if (!mod.isProtectionActive(lvl)) return;
+        if (!(e.getEntity() instanceof ServerPlayer p)) return;
+        RegionManager mgr = mod.regions().get(lvl);
+        BlockPos bp = e.getPos();
+        int x = bp.getX(), y = bp.getY(), z = bp.getZ();
+        UUID id = p.getUUID();
+        if (mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, id)
+         && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
+        if (canBypass(p)) return;
+        e.setCanceled(true);
+    }
+
+    /**
      * Force the player's currently-open menu (always at least the inventory menu) to re-broadcast
      * its contents to the client. Used after cancelling a place/use so the client's optimistic
      * prediction (item already consumed) is corrected back to the real server state.

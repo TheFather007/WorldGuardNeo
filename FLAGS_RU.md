@@ -85,6 +85,7 @@
 | `lightning` | состояние (allow/deny) | allow | `worldguardneo.flag.lightning` | Разрешить или запретить удары молний в регионе. |
 | `max-speed` | число | — | `worldguardneo.flag.max-speed` | Максимальная скорость передвижения в регионе. |
 | `mob-damage` | состояние (allow/deny) | allow | `worldguardneo.flag.mob-damage` | Разрешить или запретить атаку игроками мобов. |
+| `mob-grief` | состояние (allow/deny) | allow | `worldguardneo.flag.mob-grief` | Разрешить или запретить изменение блоков мобами (эндермен берёт/ставит, овца ест траву и т.п.). |
 | `mob-spawning` | состояние (allow/deny) | allow | `worldguardneo.flag.mob-spawning` | Разрешить или запретить естественный спавн мобов. |
 | `mob-teleport` | состояние (allow/deny) | allow | `worldguardneo.flag.mob-teleport` | Разрешить или запретить телепорт мобов (Эндермены, выстрелы Шалкера). |
 | `mycelium-spread` | состояние (allow/deny) | allow | `worldguardneo.flag.mycelium-spread` | Разрешить или запретить распространение мицелия. |

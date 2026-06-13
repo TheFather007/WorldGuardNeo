@@ -12,11 +12,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Properties;
 
 /**
  * H2-backed region storage (embedded file database).
@@ -44,34 +44,39 @@ public final class H2RegionStorage implements RegionStorage, AutoCloseable {
 
     private final Path          dbFile;   // base path; H2 appends .mv.db
     private final RegionStorage fallback;
+    private final Class<?>      driverClass;
     private boolean             driverPresent;
     private Connection          conn;
 
     public H2RegionStorage(Path baseDir) {
         this.dbFile   = baseDir.resolve("regions_h2");
         this.fallback = new JsonRegionStorage(baseDir);
-        boolean present = false;
-        try {
-            Class.forName("org.h2.Driver");
-            present = true;
-        } catch (ClassNotFoundException ignored) {
-            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] H2 driver (org.h2.Driver) not on classpath; H2 storage will defer to JSON. "
-                    + "Install an H2 jar or LuckPerms (which ships H2) to use it.");
+        // org.h2.Driver is the canonical name across H2 1.x/2.x. Resolved via the classloader-
+        // robust helper — a plain Class.forName missed drivers loaded by a sibling mod's loader,
+        // which is exactly why "H2 init failed → JSON" happened on servers that had H2 present.
+        this.driverClass = JdbcSupport.findDriverClass("org.h2.Driver");
+        if (driverClass == null) {
+            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] H2 driver (org.h2.Driver) not found on any classloader; "
+                    + "H2 storage will defer to JSON. Add an H2 jar to the server to use it.");
         }
-        this.driverPresent = present;
+        boolean present = driverClass != null;
         try {
             Files.createDirectories(baseDir);
             if (present) initSchema();
         } catch (Exception ex) {
             WorldGuardNeo.LOGGER.error("[WorldGuardNeo] H2 init failed — falling back to JSON storage", ex);
-            this.driverPresent = false;
+            present = false;
         }
+        this.driverPresent = present;
+        if (present) JdbcSupport.logDriver("H2", driverClass);
     }
 
     private Connection conn() throws SQLException {
         if (conn == null || conn.isClosed()) {
-            // Embedded file mode. No username/password for a local embedded DB.
-            conn = DriverManager.getConnection("jdbc:h2:file:" + dbFile.toAbsolutePath());
+            // Embedded file mode, bypassing DriverManager (see JdbcSupport). DB_CLOSE_ON_EXIT=FALSE
+            // keeps the store open until we close() it ourselves at server stop.
+            String url = "jdbc:h2:file:" + dbFile.toAbsolutePath() + ";DB_CLOSE_ON_EXIT=FALSE";
+            conn = JdbcSupport.connect(driverClass, url, new Properties());
         }
         return conn;
     }

@@ -29,6 +29,8 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 - **Membership model** — owners and members; build-type flags respect them (WorldGuard "private by default").
 - **Parents & priority** — regions inherit flags from a parent; overlapping regions resolve by priority (DENY beats ALLOW).
 - **Adjacency-grief protection** — lava/water/fire spread, pistons, dispensers and tree growth are blocked from crossing a region boundary into a foreign claim.
+- **Crop & farm protection** — non-members can't trample farmland (jump-destroying crops); stripping logs, tilling dirt and path-making by strangers go through the same interact/build checks.
+- **Mob-griefing & trap control** — the `mob-grief` flag stops mobs altering blocks in a claim (endermen, sheep, etc.); pressure plates and tripwires can't be triggered by strangers, mobs or thrown items.
 - **Pluggable storage** — `json` (default), `sqlite`, `h2`, or `mysql`. Any DB backend falls back to JSON if its driver is missing.
 - **LuckPerms integration** — permissions resolved through LuckPerms when installed (OP-level fallback otherwise), plus per-group region limits.
 - **Web-map integration** — regions render on **BlueMap** and **squaremap** if present.
@@ -101,7 +103,12 @@ database = "worldguardneo"
 user = "root"
 password = ""
 use-ssl = false
+table = "world_regions"            # change to share one DB between servers
+connection-timeout-seconds = 10
+properties = ["serverTimezone=UTC"] # extra "key=value" JDBC params appended to the URL
 ```
+
+The MySQL backend accepts the **Connector/J** *or* the **MariaDB** driver, and opens connections through the driver directly (not `DriverManager`), so it works even when the driver jar is loaded by a different classloader than the mod — the cause of the old "DB init failed → fell back to JSON" reports. The same direct-driver path is used for SQLite and H2.
 
 ### Per-group region limits (LuckPerms)
 
@@ -191,7 +198,7 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 | `worldguardneo.region.delete` | OP 0 | Delete your own regions |
 | `worldguardneo.region.info` / `.list` | OP 0 | View / list your regions |
 | `worldguardneo.region.teleport` | OP 0 | Teleport to regions |
-| `worldguardneo.selection.use` | OP 0 | `/rg select` + receive the `//wand` |
+| `worldguardneo.selection.use` | OP 0 | Receive the custom `//wand` |
 | `worldguardneo.region.redefine` | OP 2 | Resize regions |
 | `worldguardneo.region.flag` | OP 2 | Set flags |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Manage members / owners |

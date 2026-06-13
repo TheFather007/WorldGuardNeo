@@ -6,96 +6,125 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
 import dev.thefather007.worldguardneo.WorldGuardNeo;
+import dev.thefather007.worldguardneo.config.WGConfig;
 import dev.thefather007.worldguardneo.region.RegionManager;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Properties;
 
 /**
- * MySQL-backed region storage for servers that want regions in a shared external database
+ * MySQL/MariaDB-backed region storage for servers that want regions in a shared external database
  * (e.g. a network of servers, or centralised backups).
  *
  * <p>Schema (payload is the JSON document from {@link RegionJsonCodec}, round-trip-compatible
- * with the other backends):
+ * with the other backends; {@code <table>} is configurable):
  * <pre>
- *   CREATE TABLE world_regions (
+ *   CREATE TABLE &lt;table&gt; (
  *     world      VARCHAR(255) PRIMARY KEY,
  *     payload    LONGTEXT     NOT NULL,
  *     updated_at BIGINT       NOT NULL
  *   );
  * </pre>
  *
- * <p>Connection details (host, port, database, user, password) come from the {@code [mysql]}
- * section of {@code config.toml}. The MySQL Connector/J driver is NOT bundled with this mod —
- * the admin must drop {@code mysql-connector-j-*.jar} into the server's libraries/mods. If the
- * driver is missing or the connection can't be established, this backend transparently defers to
- * {@link JsonRegionStorage} so the server still runs (regions just stay local).
+ * <p>All connection settings come from the {@code [mysql]} section of {@code config.toml}
+ * (host, port, database, user, password, ssl, table, connection-timeout, pool size, extra
+ * JDBC properties). The Connector/J (or MariaDB) driver is NOT bundled — drop the jar into the
+ * server. If the driver is missing or the connection can't be established, this backend defers
+ * to {@link JsonRegionStorage} so the server still runs.
  *
- * <p>A single connection is reused; it is validated (and reopened) before each operation so a
- * dropped network connection self-heals. All calls come from the server thread.
+ * <p>Connections are validated before each operation and reopened if dropped, so an idle network
+ * connection self-heals. All calls come from the server thread.
  */
 public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     private final String        jdbcUrl;
-    private final String        user;
-    private final String        password;
+    private final Properties    connProps;
+    private final String        table;
+    private final int           validateTimeoutSeconds;
     private final RegionStorage fallback;
+    private final Class<?>      driverClass;
     private boolean             usable;
     private Connection          conn;
 
-    public MySqlRegionStorage(Path baseDir, String host, int port, String database,
-                              String user, String password, boolean useSsl) {
+    public MySqlRegionStorage(Path baseDir, WGConfig.GlobalSection g) {
         this.fallback = new JsonRegionStorage(baseDir);
-        this.user     = user;
-        this.password = password;
-        this.jdbcUrl  = "jdbc:mysql://" + host + ":" + port + "/" + database
-                + "?useSSL=" + useSsl
-                + "&autoReconnect=true&characterEncoding=UTF-8&useUnicode=true";
+        this.table    = sanitizeIdentifier(g.mysqlTable, "world_regions");
+        int timeout   = g.mysqlConnectionTimeout > 0 ? g.mysqlConnectionTimeout : 10;
+        this.validateTimeoutSeconds = Math.min(timeout, 30);
+
+        // Build the JDBC URL. Base params are sane defaults; admin extra-params can override or add.
+        StringBuilder url = new StringBuilder("jdbc:mysql://")
+                .append(g.mysqlHost).append(':').append(g.mysqlPort).append('/').append(g.mysqlDatabase)
+                .append("?useSSL=").append(g.mysqlUseSsl)
+                .append("&characterEncoding=UTF-8&useUnicode=true&autoReconnect=true")
+                .append("&connectTimeout=").append(timeout * 1000)
+                .append("&socketTimeout=").append(Math.max(timeout, 30) * 1000);
+        if (g.mysqlProperties != null) {
+            for (String kv : g.mysqlProperties) {
+                if (kv != null && kv.indexOf('=') > 0) url.append('&').append(kv.trim());
+            }
+        }
+        this.jdbcUrl = url.toString();
+
+        this.connProps = new Properties();
+        connProps.setProperty("user", g.mysqlUser == null ? "" : g.mysqlUser);
+        connProps.setProperty("password", g.mysqlPassword == null ? "" : g.mysqlPassword);
+
+        // Connector/J 8 = com.mysql.cj.jdbc.Driver; legacy 5.x = com.mysql.jdbc.Driver;
+        // MariaDB's own driver also speaks the mysql:// URL and is a common substitute.
+        this.driverClass = JdbcSupport.findDriverClass(
+                "com.mysql.cj.jdbc.Driver", "com.mysql.jdbc.Driver", "org.mariadb.jdbc.Driver");
 
         boolean ok = false;
-        // MySQL Connector/J 8 uses com.mysql.cj.jdbc.Driver; older 5.x used com.mysql.jdbc.Driver.
-        if (driverAvailable("com.mysql.cj.jdbc.Driver") || driverAvailable("com.mysql.jdbc.Driver")) {
+        if (driverClass != null) {
             try {
                 initSchema();
                 ok = true;
-                WorldGuardNeo.LOGGER.info("[WorldGuardNeo] MySQL region storage connected to {}:{}/{}",
-                        host, port, database);
+                JdbcSupport.logDriver("MySQL", driverClass);
+                WorldGuardNeo.LOGGER.info("[WorldGuardNeo] MySQL region storage connected to {}:{}/{} (table '{}').",
+                        g.mysqlHost, g.mysqlPort, g.mysqlDatabase, table);
             } catch (Exception ex) {
                 WorldGuardNeo.LOGGER.error("[WorldGuardNeo] MySQL connection/init failed — falling back to JSON storage. "
                         + "Check the [mysql] settings in config.toml.", ex);
             }
         } else {
-            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] MySQL Connector/J driver not on classpath; MySQL storage will defer to JSON. "
-                    + "Drop mysql-connector-j-*.jar into the server to use it.");
+            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] No MySQL/MariaDB driver found on any classloader; MySQL storage "
+                    + "will defer to JSON. Drop mysql-connector-j-*.jar (or the MariaDB driver) into the server.");
         }
         this.usable = ok;
     }
 
-    private static boolean driverAvailable(String cls) {
-        try { Class.forName(cls); return true; }
-        catch (ClassNotFoundException e) { return false; }
+    /**
+     * Keep a SQL identifier to a safe character set so a misconfigured table name can't become
+     * an injection vector (the name is interpolated, not bindable). Falls back to {@code def}.
+     */
+    private static String sanitizeIdentifier(String raw, String def) {
+        if (raw == null) return def;
+        String s = raw.trim();
+        if (s.isEmpty() || !s.matches("[A-Za-z_][A-Za-z0-9_]*")) return def;
+        return s;
     }
 
     private Connection conn() throws SQLException {
-        // Validate the pooled connection; MySQL drops idle ones. isValid(2s) → reopen if needed.
-        if (conn == null || conn.isClosed() || !conn.isValid(2)) {
+        // Validate the connection; MySQL drops idle ones. Reopen via the driver directly.
+        if (conn == null || conn.isClosed() || !conn.isValid(validateTimeoutSeconds)) {
             if (conn != null) { try { conn.close(); } catch (SQLException ignored) {} }
-            conn = DriverManager.getConnection(jdbcUrl, user, password);
+            conn = JdbcSupport.connect(driverClass, jdbcUrl, connProps);
         }
         return conn;
     }
 
     private void initSchema() throws SQLException {
         try (Statement st = conn().createStatement()) {
-            st.executeUpdate("CREATE TABLE IF NOT EXISTS world_regions ("
+            st.executeUpdate("CREATE TABLE IF NOT EXISTS " + table + " ("
                     + "world VARCHAR(255) PRIMARY KEY, payload LONGTEXT NOT NULL, updated_at BIGINT NOT NULL)");
         }
     }
@@ -104,7 +133,7 @@ public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
     public void load(String worldKey, RegionManager into) throws IOException {
         if (!usable) { fallback.load(worldKey, into); return; }
         try (PreparedStatement ps = conn().prepareStatement(
-                "SELECT payload FROM world_regions WHERE world = ?")) {
+                "SELECT payload FROM " + table + " WHERE world = ?")) {
             ps.setString(1, worldKey);
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
@@ -129,7 +158,7 @@ public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
         if (!usable) { fallback.save(worldKey, from); return; }
         String payload = GSON.toJson(RegionJsonCodec.toJson(from));
         try (PreparedStatement ps = conn().prepareStatement(
-                "INSERT INTO world_regions (world, payload, updated_at) VALUES (?, ?, ?) "
+                "INSERT INTO " + table + " (world, payload, updated_at) VALUES (?, ?, ?) "
                         + "ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)")) {
             ps.setString(1, worldKey);
             ps.setString(2, payload);

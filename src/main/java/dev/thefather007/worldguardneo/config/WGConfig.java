@@ -108,12 +108,15 @@ public final class WGConfig {
             g.backupRetainCount       = intOf(toml, "backup.retain-count", g.backupRetainCount);
             g.backupCompress          = bool(toml, "backup.compress", g.backupCompress);
 
-            g.mysqlHost     = str(toml, "mysql.host", g.mysqlHost);
-            g.mysqlPort     = intOf(toml, "mysql.port", g.mysqlPort);
-            g.mysqlDatabase = str(toml, "mysql.database", g.mysqlDatabase);
-            g.mysqlUser     = str(toml, "mysql.user", g.mysqlUser);
-            g.mysqlPassword = str(toml, "mysql.password", g.mysqlPassword);
-            g.mysqlUseSsl   = bool(toml, "mysql.use-ssl", g.mysqlUseSsl);
+            g.mysqlHost              = str(toml, "mysql.host", g.mysqlHost);
+            g.mysqlPort              = intOf(toml, "mysql.port", g.mysqlPort);
+            g.mysqlDatabase          = str(toml, "mysql.database", g.mysqlDatabase);
+            g.mysqlUser              = str(toml, "mysql.user", g.mysqlUser);
+            g.mysqlPassword          = str(toml, "mysql.password", g.mysqlPassword);
+            g.mysqlUseSsl            = bool(toml, "mysql.use-ssl", g.mysqlUseSsl);
+            g.mysqlTable             = str(toml, "mysql.table", g.mysqlTable);
+            g.mysqlConnectionTimeout = intOf(toml, "mysql.connection-timeout-seconds", g.mysqlConnectionTimeout);
+            g.mysqlProperties        = readStrList(toml, "mysql.properties", g.mysqlProperties);
 
             g.groupRegionLimits = readIntMap(toml, "group-region-limits", g.groupRegionLimits);
 
@@ -224,21 +227,61 @@ public final class WGConfig {
         CommentedConfig c = CommentedConfig.inMemory();
         GlobalSection g = global;
 
+        // night-config writes keys in insertion order, so the order below IS the file layout.
+        // Keys are grouped into labelled sections; each section's first key carries a banner
+        // comment so the generated config.toml reads top-to-bottom in a logical order.
+
+        /* ───────────────────────── GENERAL ───────────────────────── */
         c.setComment("locale",
+                " ======================= GENERAL =======================\n" +
                 " Language for the mod's messages. Built-in: en_us, ru_ru.\n" +
                 " For a custom language, drop <tag>.json into config/worldguardneo/lang/.");
         c.set("locale", g.locale);
 
+        /* ───────────────────────── STORAGE ───────────────────────── */
         c.setComment("storage-format",
+                " ======================= STORAGE =======================\n" +
                 " Region storage backend: \"json\", \"sqlite\", \"h2\" or \"mysql\". REQUIRES A SERVER RESTART.\n" +
                 " json   — one file per world (default, no dependencies).\n" +
                 " sqlite — embedded regions.sqlite; needs an sqlite-jdbc jar.\n" +
                 " h2     — embedded regions_h2; needs an H2 jar (LuckPerms ships one).\n" +
-                " mysql  — external server; configure [mysql] below and add mysql-connector-j.\n" +
+                " mysql  — external server; configure [mysql] below and add a Connector/J or MariaDB jar.\n" +
                 " Any DB backend that can't load its driver falls back to json automatically.");
         c.set("storage-format", g.storageFormat);
 
+        c.setComment("mysql",
+                " MySQL/MariaDB connection — used ONLY when storage-format = \"mysql\". Drop a\n" +
+                " mysql-connector-j-*.jar (or the MariaDB driver) into the server; otherwise\n" +
+                " storage transparently falls back to JSON.");
+        CommentedConfig my = CommentedConfig.inMemory();
+        my.setComment("host", " Server host.");
+        my.set("host", g.mysqlHost);
+        my.setComment("port", " Server port (default 3306).");
+        my.set("port", g.mysqlPort);
+        my.setComment("database", " Database name. It must already exist; the table is created automatically.");
+        my.set("database", g.mysqlDatabase);
+        my.setComment("user", " Username.");
+        my.set("user", g.mysqlUser);
+        my.setComment("password", " Password.");
+        my.set("password", g.mysqlPassword);
+        my.setComment("use-ssl", " Connect with SSL/TLS.");
+        my.set("use-ssl", g.mysqlUseSsl);
+        my.setComment("table",
+                " Table name. Change it to host several servers' regions in one database\n" +
+                " (e.g. \"survival_regions\"). Allowed chars: letters, digits, underscore.");
+        my.set("table", g.mysqlTable);
+        my.setComment("connection-timeout-seconds",
+                " How long to wait when opening or validating the connection (seconds).");
+        my.set("connection-timeout-seconds", g.mysqlConnectionTimeout);
+        my.setComment("properties",
+                " Extra JDBC parameters appended to the connection URL, each as \"key=value\".\n" +
+                " Examples: \"serverTimezone=UTC\", \"tcpKeepAlive=true\", \"allowPublicKeyRetrieval=true\".");
+        my.set("properties", g.mysqlProperties);
+        c.set("mysql", my);
+
+        /* ───────────────────────── PERMISSIONS ───────────────────────── */
         c.setComment("use-luckperms",
+                " ======================= PERMISSIONS =======================\n" +
                 " Use LuckPerms for permissions when installed. false forces the built-in op\n" +
                 " resolver. REQUIRES A SERVER RESTART (permission backend is chosen at boot).");
         c.set("use-luckperms", g.useLuckPerms);
@@ -254,9 +297,11 @@ public final class WGConfig {
                 " flag.others, redefine, addowner, ...). Picked up by /rg reload.");
         c.set("default-op-level-mod", g.defaultOpLevelMod);
 
+        /* ───────────────────────── REGION LIMITS ───────────────────────── */
         c.setComment("max-regions-per-player",
-                " Max regions a player without region.bypass may own. Can be raised per LuckPerms\n" +
-                " group via [group-region-limits].");
+                " ======================= REGION LIMITS =======================\n" +
+                " Max regions a player without region.bypass may own (counted across ALL worlds).\n" +
+                " Can be raised per LuckPerms group via [group-region-limits].");
         c.set("max-regions-per-player", g.maxRegionsPerPlayer);
 
         c.setComment("max-region-volume",
@@ -273,11 +318,34 @@ public final class WGConfig {
                 " Players with region.bypass skip this check.");
         c.set("min-region-volume", g.minRegionVolume);
 
+        c.setComment("group-region-limits",
+                " Per-LuckPerms-group overrides for max-regions-per-player. A player gets the MAX\n" +
+                " limit across all their groups. Keys are matched case-insensitively. Only works\n" +
+                " with LuckPerms installed; otherwise max-regions-per-player applies to everyone.\n" +
+                " Edit or remove these example entries to match your groups.");
+        CommentedConfig limits = CommentedConfig.inMemory();
+        for (Map.Entry<String, Integer> e : g.groupRegionLimits.entrySet()) {
+            limits.set(e.getKey(), e.getValue());
+        }
+        c.set("group-region-limits", limits);
+
+        /* ───────────────────────── SELECTION ───────────────────────── */
         c.setComment("wand-item-selection-ticks",
+                " ======================= SELECTION =======================\n" +
                 " How long a wand selection stays visible, in ticks (20 = 1 second). 200 = 10s.");
         c.set("wand-item-selection-ticks", g.wandItemSelectionTicks);
 
-        c.setComment("announce-greetings", " Show greeting / greeting-title when a player enters a region.");
+        /* ───────────────────────── FLAG DEFAULTS ───────────────────────── */
+        c.setComment("default-region-group",
+                " ======================= FLAG DEFAULTS =======================\n" +
+                " Default group for new flags when -g isn't given.\n" +
+                " One of: ALL, OWNERS, MEMBERS, NON_OWNERS, NON_MEMBERS.");
+        c.set("default-region-group", g.defaultRegionGroup);
+
+        /* ───────────────────────── ANNOUNCEMENTS ───────────────────────── */
+        c.setComment("announce-greetings",
+                " ======================= ANNOUNCEMENTS =======================\n" +
+                " Show greeting / greeting-title when a player enters a region.");
         c.set("announce-greetings", g.announceGreetings);
         c.setComment("announce-farewells", " Show farewell / farewell-title when a player leaves a region.");
         c.set("announce-farewells", g.announceFarewells);
@@ -285,18 +353,17 @@ public final class WGConfig {
                 " Show an action-bar with the region name + PvP status on boundary crossings.");
         c.set("announce-region-action-bar", g.announceRegionActionBar);
 
+        /* ───────────────────────── ENTITIES ───────────────────────── */
         c.setComment("blocked-entity-hostile",
+                " ======================= ENTITIES =======================\n" +
                 " Global peaceful mode: cancel the spawn of every hostile (Monster) entity,\n" +
                 " vanilla and modded alike.");
         c.set("blocked-entity-hostile", g.blockedEntityHostile);
 
-
-        c.setComment("default-region-group",
-                " Default group for new flags when -g isn't given.\n" +
-                " One of: ALL, OWNERS, MEMBERS, NON_OWNERS, NON_MEMBERS.");
-        c.set("default-region-group", g.defaultRegionGroup);
-
-        c.setComment("backup", " Automatic region backups.");
+        /* ───────────────────────── BACKUPS ───────────────────────── */
+        c.setComment("backup",
+                " ======================= BACKUPS =======================\n" +
+                " Automatic region backups.");
         c.setComment("backup.enabled",
                 " Master switch for automatic backups. false disables the scheduler, but\n" +
                 " /rg backup still works manually.");
@@ -311,39 +378,10 @@ public final class WGConfig {
                 " Gzip each region file inside a backup (typically 6-12x smaller). false = no compression.");
         c.set("backup.compress", g.backupCompress);
 
-        // [mysql] — only used when storage-format = "mysql".
-        c.setComment("mysql",
-                " MySQL connection — used ONLY when storage-format = \"mysql\". Drop a\n" +
-                " mysql-connector-j-*.jar into the server for the driver; otherwise storage\n" +
-                " transparently falls back to JSON.");
-        CommentedConfig my = CommentedConfig.inMemory();
-        my.setComment("host", " MySQL server host.");
-        my.set("host", g.mysqlHost);
-        my.setComment("port", " MySQL server port (default 3306).");
-        my.set("port", g.mysqlPort);
-        my.setComment("database", " Database name. It must already exist; the table is created automatically.");
-        my.set("database", g.mysqlDatabase);
-        my.setComment("user", " MySQL user.");
-        my.set("user", g.mysqlUser);
-        my.setComment("password", " MySQL password.");
-        my.set("password", g.mysqlPassword);
-        my.setComment("use-ssl", " Connect with SSL/TLS.");
-        my.set("use-ssl", g.mysqlUseSsl);
-        c.set("mysql", my);
-
-        c.setComment("group-region-limits",
-                " Per-LuckPerms-group overrides for max-regions-per-player. A player gets the MAX\n" +
-                " limit across all their groups. Keys are matched case-insensitively. Only works\n" +
-                " with LuckPerms installed; otherwise max-regions-per-player applies to everyone.\n" +
-                " Edit or remove these example entries to match your groups.");
-        CommentedConfig limits = CommentedConfig.inMemory();
-        for (Map.Entry<String, Integer> e : g.groupRegionLimits.entrySet()) {
-            limits.set(e.getKey(), e.getValue());
-        }
-        c.set("group-region-limits", limits);
-
+        /* ───────────────────────── PER-WORLD DEFAULTS ───────────────────────── */
         c.setComment("defaults",
-                " Per-world defaults. Applied to every world that has no override file in worlds/.\n" +
+                " ======================= PER-WORLD DEFAULTS =======================\n" +
+                " Applied to every world that has no override file in worlds/.\n" +
                 " Create worlds/<dimension>.toml (':' replaced by '_') to override per dimension.");
         CommentedConfig d = CommentedConfig.inMemory();
         writeWorldDefaultsBody(d, g.defaults.useRegions, g.defaults.protectVehicles,
@@ -513,6 +551,9 @@ public final class WGConfig {
         public String  mysqlUser     = "root";
         public String  mysqlPassword = "";
         public boolean mysqlUseSsl   = false;
+        public String  mysqlTable    = "world_regions";   // table name (lets several servers share one DB)
+        public int     mysqlConnectionTimeout = 10;        // seconds for connect/validate
+        public java.util.List<String> mysqlProperties = new java.util.ArrayList<>(); // extra "key=value" JDBC params
 
         public WorldDefaults defaults         = new WorldDefaults();
 

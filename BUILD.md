@@ -57,7 +57,7 @@ worldguardneo/
 * **BlueMap** / **squaremap** — optional. Region rendering on the web map.
 * **WorldEditCUI** (client only) — selection highlighting. Provided by WorldEdit itself; nothing to install server-side.
 
-For alternative region storage (`storage-format`), the matching JDBC driver must be on the server classpath: **sqlite-jdbc** for `sqlite`, **H2** for `h2` (LuckPerms already ships H2), **mysql-connector-j** for `mysql`. Without the driver the mod falls back to `json` automatically.
+For alternative region storage (`storage-format`), the matching JDBC driver must be on the server classpath: **sqlite-jdbc** for `sqlite`, **H2** for `h2` (LuckPerms already ships H2), **mysql-connector-j** *or* the **MariaDB** driver for `mysql`. Drivers are located across classloaders and used directly (not via `DriverManager`), so a driver loaded by another mod still works. Without any driver the mod falls back to `json` automatically.
 
 ## Building without compile dependencies
 
@@ -68,6 +68,25 @@ The mod is deliberately designed to compile without any third-party mods on the 
 - **JDBC drivers** (sqlite/H2/MySQL) — loaded reflectively at runtime, not part of the build.
 
 So `./gradlew build` works out of the box with nothing to install manually.
+
+## Tests
+
+The region engine (region geometry, flag resolution, JSON storage codec) has **no Minecraft
+dependencies**, so it is covered by standalone JVM test suites in `tests/` that run against the
+compiled classes — no game, no NeoForge runtime:
+
+```
+./gradlew build -x test
+bash tests/run.sh
+```
+
+This compiles and runs all suites (**1200+ checks**):
+- `FlagLogicTest` — per-flag resolution: default/allow/deny × owner/member/stranger/null, groups, priority, parents, geometry, global fallback.
+- `FlagScenarioTest` — deeper matrices: build-access per flag, every region group, multi-tier priority, parent chains, concave polygons, overlapping, value parsing.
+- `FlagResolutionEdgeTest` — cross-priority group shadowing, inherited build-access, group-scoped value flags, oversized (world-spanning) region indexing, ownership queries.
+- `FlagContractTest` — per-flag contract: type, default (only `invincible`/`keep-inventory`/`keep-xp` default to deny), permission node, value hint, registry round-trip.
+- `StorageRoundTripTest` — every flag type, groups, parents and geometry survive save → JSON → load.
+- `tests/coverage.sh` — static guard that every registered flag is referenced in a handler/command (catches a flag that silently loses its enforcement; only `allowed-enchants` and `receive-chat` are intentionally declared-only).
 
 ## Installing the built mod
 
