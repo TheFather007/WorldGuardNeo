@@ -30,11 +30,14 @@ versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="SERVER"
 
-# WorldEdit — REQUIRED. Regions are created exclusively from WorldEdit selections
-# (//wand, //pos1/2, //sel poly). The mod will not load without it.
+# WorldEdit — OPTIONAL for loading, REQUIRED for creating regions: /rg claim and /rg redefine
+# read the player's WorldEdit selection (//wand, //pos1/2, //sel poly). Without WorldEdit the mod
+# still loads and ALL other commands + protection work; only claim/redefine are unavailable.
+# Made optional so a missing WorldEdit can never silently disable the whole mod (which is exactly
+# what "required" did — NeoForge refuses to load the mod, so NO commands register at all).
 [[dependencies.${mod_id}]]
 modId="worldedit"
-type="required"
+type="optional"
 versionRange="[7.3,)"
 ordering="AFTER"
 side="SERVER"

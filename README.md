@@ -6,7 +6,7 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
-![Requires](https://img.shields.io/badge/Requires-WorldEdit%207.3%2B-3b82f6)
+![WorldEdit](https://img.shields.io/badge/WorldEdit-optional%20(for%20claims)-3b82f6)
 ![Optional](https://img.shields.io/badge/Optional-LuckPerms%205.4%2B-9b59b6)
 ![Side](https://img.shields.io/badge/Side-Server%20only-6b7280)
 ![License](https://img.shields.io/badge/License-GPL--3.0-3b82f6)
@@ -43,7 +43,8 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 
 - Minecraft **1.21.1**
 - NeoForge **21.1.x**
-- **WorldEdit** for NeoForge **7.3+** — regions are created from its selections
+
+*(WorldEdit is no longer required to load — see Optional below; it is only needed to create regions.)*
 
 **Optional**
 
@@ -55,13 +56,14 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 | **sqlite-jdbc** jar | `storage-format = "sqlite"` |
 | **H2** jar | `storage-format = "h2"` (LuckPerms already ships H2) |
 | **mysql-connector-j** jar | `storage-format = "mysql"` |
+| **WorldEdit** 7.3+ | Region claiming (`/rg claim`/`redefine`) reads its selection. The mod loads and everything else works without it. |
 | **JDK 21** | Building from source only |
 
 The mod is **server-side only**. Vanilla clients connect normally; no client-side installation is required. WorldEdit renders the selection box (via WECUI) for clients that have it. Any database backend whose driver is absent falls back to JSON automatically, so a missing optional jar never stops the server.
 
 ## Installation
 
-1. Drop WorldGuardNeo's `.jar` **and WorldEdit** into the server's `mods/` folder.
+1. Drop WorldGuardNeo's `.jar` into the server's `mods/` folder. Add **WorldEdit** too if you want region claiming (`/rg claim`/`redefine`) — everything else works without it.
 2. *(Optional)* add LuckPerms, BlueMap, or squaremap.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust settings if needed and run `/rg reload`.

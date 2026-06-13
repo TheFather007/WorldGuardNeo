@@ -6,7 +6,7 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
-![Requires](https://img.shields.io/badge/Требуется-WorldEdit%207.3%2B-3b82f6)
+![WorldEdit](https://img.shields.io/badge/WorldEdit-опционально-3b82f6)
 ![Optional](https://img.shields.io/badge/Опционально-LuckPerms%205.4%2B-9b59b6)
 ![Side](https://img.shields.io/badge/Сторона-Только%20сервер-6b7280)
 ![License](https://img.shields.io/badge/Лицензия-GPL--3.0-3b82f6)
@@ -43,7 +43,8 @@ WorldGuardNeo приносит защиту территорий в стиле W
 
 - Minecraft **1.21.1**
 - NeoForge **21.1.x**
-- **WorldEdit** для NeoForge **7.3+** — регионы создаются по его выделению
+
+*(WorldEdit больше не обязателен для загрузки — см. «Опционально» ниже; нужен только для создания регионов.)*
 
 **Опционально**
 
@@ -61,7 +62,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 
 ## Установка
 
-1. Положите `.jar` WorldGuardNeo **и WorldEdit** в папку `mods/` сервера.
+1. Положите `.jar` WorldGuardNeo в папку `mods/` сервера. Добавьте **WorldEdit**, если нужно создание регионов (`/rg claim`/`redefine`) — остальное работает и без него.
 2. *(Опционально)* добавьте LuckPerms, BlueMap или squaremap.
 3. Запустите сервер один раз, чтобы создался `config/worldguardneo/config.toml`.
 4. При необходимости измените настройки и выполните `/rg reload`.
