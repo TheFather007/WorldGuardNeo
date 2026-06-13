@@ -44,6 +44,13 @@ neoForge {
             server()
             programArgument("--nogui")
         }
+        // Dedicated GameTest server: runs the in-game @GameTest battery
+        // (dev.thefather007.worldguardneo.gametest). Launch with `./gradlew runGameTestServer`.
+        // The mod requires WorldEdit at runtime, so a WorldEdit jar must be on this run's classpath.
+        create("gameTestServer") {
+            type = "gameTestServer"
+            systemProperty("neoforge.enabledGameTestNamespaces", modId)
+        }
     }
 
     mods {

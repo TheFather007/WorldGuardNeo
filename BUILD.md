@@ -88,6 +88,25 @@ This compiles and runs all suites (**1200+ checks**):
 - `StorageRoundTripTest` — every flag type, groups, parents and geometry survive save → JSON → load.
 - `tests/coverage.sh` — static guard that every registered flag is referenced in a handler/command (catches a flag that silently loses its enforcement; only `allowed-enchants` and `receive-chat` are intentionally declared-only).
 
+### In-game GameTests
+
+The JVM suites can't reach the event/mixin enforcement layer (that needs a live server). For
+that there's an in-game **GameTest** battery in `dev.thefather007.worldguardneo.gametest`
+(`WGNGameTests`) that creates a region on a test platform and performs real world actions — a mock
+player breaking/using blocks, forced random ticks, spawning entities — asserting the protection
+outcome. It covers block-break/build (deny stranger, allow owner, explicit allow/deny, wilderness),
+interact/use (trapdoor), random-tick mixins (leaf-decay, ice/snow melt), entity events (lightning,
+pvp) and live region-engine resolution.
+
+Run them on a dedicated GameTest server:
+
+```
+./gradlew runGameTestServer
+```
+
+or on a normal server with `/test runall`. The run must have **WorldEdit** present (it's a required
+dependency of the mod). Region creation in the tests is programmatic and does not use WorldEdit.
+
 ## Installing the built mod
 
 1. Drop `worldguardneo-1.0.jar` **and WorldEdit** into the server's `mods/` folder.
