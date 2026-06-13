@@ -80,11 +80,13 @@ compiled classes — no game, no NeoForge runtime:
 bash tests/run.sh
 ```
 
-This compiles and runs all suites (≈650 checks): `FlagLogicTest` (per-flag resolution:
-default/allow/deny × owner/member/stranger/null, groups, priority, parents, geometry, global
-fallback), `FlagScenarioTest` (deeper matrices — build-access per flag, every region group,
-multi-tier priority, parent chains, concave polygons, overlapping, value parsing), and
-`StorageRoundTripTest` (every flag type, groups, parents and geometry survive save → JSON → load).
+This compiles and runs all suites (**1200+ checks**):
+- `FlagLogicTest` — per-flag resolution: default/allow/deny × owner/member/stranger/null, groups, priority, parents, geometry, global fallback.
+- `FlagScenarioTest` — deeper matrices: build-access per flag, every region group, multi-tier priority, parent chains, concave polygons, overlapping, value parsing.
+- `FlagResolutionEdgeTest` — cross-priority group shadowing, inherited build-access, group-scoped value flags, oversized (world-spanning) region indexing, ownership queries.
+- `FlagContractTest` — per-flag contract: type, default (only `invincible`/`keep-inventory`/`keep-xp` default to deny), permission node, value hint, registry round-trip.
+- `StorageRoundTripTest` — every flag type, groups, parents and geometry survive save → JSON → load.
+- `tests/coverage.sh` — static guard that every registered flag is referenced in a handler/command (catches a flag that silently loses its enforcement; only `allowed-enchants` and `receive-chat` are intentionally declared-only).
 
 ## Installing the built mod
 
