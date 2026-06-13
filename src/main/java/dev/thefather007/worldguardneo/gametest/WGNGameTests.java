@@ -7,15 +7,25 @@ import dev.thefather007.worldguardneo.region.CuboidRegion;
 import dev.thefather007.worldguardneo.region.ProtectedRegion;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.animal.Cow;
+import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -257,6 +267,113 @@ public final class WGNGameTests {
         float before = victim.getHealth();
         attacker.attack(victim); // routes through hurt() → LivingIncomingDamageEvent → pvp gate
         h.assertTrue(victim.getHealth() == before, "pvp deny → victim took no damage");
+        h.succeed();
+    }
+
+    /* ---------------- BLOCK-PLACE ---------------- */
+
+    @GameTest(template = TPL)
+    public static void placeDeniedForStranger(GameTestHelper h) {
+        region(h, "gt_place_deny");
+        BlockPos floorRel = new BlockPos(4, 0, 4); // place ON TOP of this → (4,1,4)
+        ServerPlayer p = stranger(h);
+        placeBlockOnTop(h, p, floorRel, Items.STONE);
+        h.assertBlockNotPresent(Blocks.STONE, floorRel.above()); // stranger can't place
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void placeAllowedForOwner(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_place_owner");
+        ServerPlayer p = stranger(h);
+        r.owners().add(p.getUUID());
+        BlockPos floorRel = new BlockPos(4, 0, 4);
+        placeBlockOnTop(h, p, floorRel, Items.STONE);
+        h.assertBlockPresent(Blocks.STONE, floorRel.above());
+        h.succeed();
+    }
+
+    private static void placeBlockOnTop(GameTestHelper h, ServerPlayer p, BlockPos floorRel,
+                                        net.minecraft.world.item.Item item) {
+        ItemStack stack = new ItemStack(item, 64);
+        p.setItemInHand(InteractionHand.MAIN_HAND, stack);
+        BlockPos floorAbs = h.absolutePos(floorRel);
+        Vec3 hitVec = new Vec3(floorAbs.getX() + 0.5, floorAbs.getY() + 1.0, floorAbs.getZ() + 0.5);
+        BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, floorAbs, false);
+        p.gameMode.useItemOn(p, h.getLevel(), stack, InteractionHand.MAIN_HAND, hit);
+    }
+
+    /* ---------------- CHEST-ACCESS ---------------- */
+
+    @GameTest(template = TPL)
+    public static void chestAccessDeniedForStranger(GameTestHelper h) {
+        region(h, "gt_chest_deny");
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.CHEST);
+        ServerPlayer p = stranger(h);
+        h.useBlock(h.absolutePos(rel), p);
+        h.assertTrue(p.containerMenu == p.inventoryMenu, "stranger: chest menu did not open");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void chestAccessAllowedForMember(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_chest_member");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.CHEST);
+        h.useBlock(h.absolutePos(rel), p);
+        h.assertTrue(p.containerMenu != p.inventoryMenu, "member: chest menu opened");
+        h.succeed();
+    }
+
+    /* ---------------- PvP / MOB-DAMAGE / VEHICLE / DECORATION ---------------- */
+
+    @GameTest(template = TPL)
+    public static void mobDamageDenyProtectsMob(GameTestHelper h) {
+        region(h, "gt_mobdmg_deny").setFlag(Flags.MOB_DAMAGE, StateFlag.State.DENY);
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        float before = cow.getHealth();
+        stranger(h).attack(cow);
+        h.assertTrue(cow.getHealth() == before, "mob-damage deny → cow unharmed");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void vehicleProtectedFromDestruction(GameTestHelper h) {
+        region(h, "gt_vehicle"); // protect-vehicles defaults true; vehicle-destroy also gates
+        Boat boat = h.spawn(EntityType.BOAT, new BlockPos(4, 1, 4));
+        stranger(h).attack(boat);
+        h.assertTrue(boat.isAlive(), "vehicle survives a stranger's attack in a region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void decorationProtectedFromStranger(GameTestHelper h) {
+        region(h, "gt_frame");
+        ItemFrame frame = h.spawn(EntityType.ITEM_FRAME, new BlockPos(4, 1, 4));
+        stranger(h).attack(frame);
+        h.assertTrue(frame.isAlive(), "item frame survives a stranger's attack");
+        h.succeed();
+    }
+
+    /* ---------------- EXPLOSIONS ---------------- */
+
+    @GameTest(template = TPL)
+    public static void explosionProtectsRegionBlocks(GameTestHelper h) {
+        region(h, "gt_explode");
+        // Ring of stone around the blast point, all inside the region.
+        for (int dx = -1; dx <= 1; dx++) for (int dz = -1; dz <= 1; dz++) {
+            h.setBlock(new BlockPos(4 + dx, 1, 4 + dz), Blocks.STONE);
+        }
+        BlockPos centerAbs = h.absolutePos(new BlockPos(4, 1, 4));
+        h.getLevel().explode(null, centerAbs.getX() + 0.5, centerAbs.getY() + 0.5, centerAbs.getZ() + 0.5,
+                4.0f, Level.ExplosionInteraction.TNT);
+        // Region blocks must survive (disable-explosions-around-regions defaults true; the
+        // per-explosion flags also gate it).
+        h.assertBlockPresent(Blocks.STONE, new BlockPos(4, 1, 4));
+        h.assertBlockPresent(Blocks.STONE, new BlockPos(5, 1, 4));
         h.succeed();
     }
 
