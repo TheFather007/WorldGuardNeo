@@ -137,6 +137,7 @@ public final class WorldGuardNeo {
 
     private void onRegisterCommands(RegisterCommandsEvent event) {
         WGCommands.register(event.getDispatcher(), this);
+        LOGGER.info("[WorldGuardNeo] Registered /region and /rg commands.");
     }
 
     private void onServerStarting(ServerStartingEvent event) {

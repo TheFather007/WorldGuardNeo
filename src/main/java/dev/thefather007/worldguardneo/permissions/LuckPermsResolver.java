@@ -62,17 +62,20 @@ public final class LuckPermsResolver implements PermissionResolver {
         QueryOptions opts = api.getContextManager().getQueryOptions(user).orElseGet(api.getContextManager()::getStaticQueryOptions);
         CachedPermissionData data = user.getCachedData().getPermissionData(opts);
         Tristate t = data.checkPermission(node);
-        // LuckPerms is installed and the user is fully loaded, so LP is the SOLE authority:
-        // op-level is intentionally ignored (per design — admins manage everything through LP).
-        //   TRUE      → granted
-        //   FALSE     → explicitly denied
-        //   UNDEFINED → not granted in LP ⇒ DENY. We do NOT fall back to the op-level mapping
-        //               here; otherwise a server operator would silently get every node despite
-        //               LP not granting it, which is exactly what we want to avoid. The OP
-        //               fallback remains only for the transient pre-load states above (LP API
-        //               not ready, or user not cached yet), where denying could break the first
-        //               ticks of a session.
-        return t == Tristate.TRUE;
+        // LuckPerms overrides, OP level is the default — the standard model players expect:
+        //   TRUE      → explicitly granted in LP ⇒ allow.
+        //   FALSE     → explicitly denied in LP ⇒ deny (LP can revoke an OP's access).
+        //   UNDEFINED → not mentioned in LP ⇒ fall back to the per-node OP-level default
+        //               (OpResolver). This is what makes the mod work out of the box: an
+        //               operator (or any player, for OP-0 nodes like claim/info/list) gets the
+        //               documented defaults without an admin having to grant every worldguardneo
+        //               node in LP first. Previously UNDEFINED hard-denied, which hid the whole
+        //               /rg command tree from admins who manage perms via groups — "commands
+        //               don't exist". region.bypass stays OP-5 in OpResolver, so it is still
+        //               never granted by OP alone; it must be an explicit LP grant.
+        if (t == Tristate.TRUE)  return true;
+        if (t == Tristate.FALSE) return false;
+        return opFallback.has(player, node);
     }
 
     @Override
