@@ -101,7 +101,12 @@ database = "worldguardneo"
 user = "root"
 password = ""
 use-ssl = false
+table = "world_regions"             # измените, чтобы делить одну БД между серверами
+connection-timeout-seconds = 10
+properties = ["serverTimezone=UTC"] # доп. параметры JDBC "ключ=значение" к URL
 ```
+
+Бэкенд MySQL принимает драйвер **Connector/J** *или* **MariaDB** и открывает соединение через драйвер напрямую (минуя `DriverManager`), поэтому работает даже когда jar драйвера загружен другим class-loader'ом — это и была причина прежних «DB init failed → откат на JSON». Тот же путь используется для SQLite и H2.
 
 ### Лимиты регионов на группу (LuckPerms)
 

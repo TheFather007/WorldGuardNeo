@@ -198,8 +198,7 @@ public final class WorldGuardNeo {
             case "h2":
                 return new H2RegionStorage(dataDir);
             case "mysql":
-                return new MySqlRegionStorage(dataDir, g.mysqlHost, g.mysqlPort, g.mysqlDatabase,
-                        g.mysqlUser, g.mysqlPassword, g.mysqlUseSsl);
+                return new MySqlRegionStorage(dataDir, g);
             case "json":
                 return new JsonRegionStorage(dataDir);
             default:

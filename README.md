@@ -101,7 +101,12 @@ database = "worldguardneo"
 user = "root"
 password = ""
 use-ssl = false
+table = "world_regions"            # change to share one DB between servers
+connection-timeout-seconds = 10
+properties = ["serverTimezone=UTC"] # extra "key=value" JDBC params appended to the URL
 ```
+
+The MySQL backend accepts the **Connector/J** *or* the **MariaDB** driver, and opens connections through the driver directly (not `DriverManager`), so it works even when the driver jar is loaded by a different classloader than the mod — the cause of the old "DB init failed → fell back to JSON" reports. The same direct-driver path is used for SQLite and H2.
 
 ### Per-group region limits (LuckPerms)
 
@@ -191,7 +196,7 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 | `worldguardneo.region.delete` | OP 0 | Delete your own regions |
 | `worldguardneo.region.info` / `.list` | OP 0 | View / list your regions |
 | `worldguardneo.region.teleport` | OP 0 | Teleport to regions |
-| `worldguardneo.selection.use` | OP 0 | `/rg select` + receive the `//wand` |
+| `worldguardneo.selection.use` | OP 0 | Receive the custom `//wand` |
 | `worldguardneo.region.redefine` | OP 2 | Resize regions |
 | `worldguardneo.region.flag` | OP 2 | Set flags |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Manage members / owners |

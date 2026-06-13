@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -44,6 +43,7 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
 
     private final Path          dbFile;
     private final RegionStorage fallback;
+    private final Class<?>      driverClass;
     private boolean             driverPresent;
     /** Shared connection. Lazily opened on first use; closed at server stop via close(). */
     private Connection          conn;
@@ -51,26 +51,27 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
     public SqliteRegionStorage(Path baseDir) {
         this.dbFile   = baseDir.resolve("regions.sqlite");
         this.fallback = new JsonRegionStorage(baseDir);
-        boolean present = false;
-        try {
-            Class.forName("org.sqlite.JDBC");
-            present = true;
-        } catch (ClassNotFoundException ignored) {
-            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] sqlite-jdbc not on classpath; SQLite storage will defer to JSON.");
+        this.driverClass = JdbcSupport.findDriverClass("org.sqlite.JDBC");
+        if (driverClass == null) {
+            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] sqlite-jdbc not found on any classloader; SQLite storage will defer to JSON.");
         }
-        this.driverPresent = present;
+        boolean present = driverClass != null;
         try {
             Files.createDirectories(baseDir);
             if (present) initSchema();
         } catch (Exception ex) {
             WorldGuardNeo.LOGGER.error("[WorldGuardNeo] SQLite init failed — falling back to JSON storage", ex);
-            this.driverPresent = false; // demote to JSON; further calls go to the fallback
+            present = false; // demote to JSON; further calls go to the fallback
         }
+        this.driverPresent = present;
+        if (present) JdbcSupport.logDriver("SQLite", driverClass);
     }
 
     private Connection conn() throws SQLException {
         if (conn == null || conn.isClosed()) {
-            conn = DriverManager.getConnection("jdbc:sqlite:" + dbFile.toAbsolutePath());
+            // Bypass DriverManager (see JdbcSupport) for classloader robustness.
+            conn = JdbcSupport.connect(driverClass, "jdbc:sqlite:" + dbFile.toAbsolutePath(),
+                    new java.util.Properties());
             // Sensible defaults for a desktop-class server using SQLite.
             try (Statement s = conn.createStatement()) {
                 s.execute("PRAGMA journal_mode = WAL");
