@@ -104,6 +104,8 @@ public final class Flags {
     public static final StateFlag  KEEP_XP           = new StateFlag("keep-xp",         false);
     /** Allows mob interactions (Endermen teleport, villager trade) gated per-region. */
     public static final StateFlag  MOB_TELEPORT      = new StateFlag("mob-teleport",    true);
+    /** DENY = mobs can't change blocks here (enderman pick/place, sheep eat grass, etc.). */
+    public static final StateFlag  MOB_GRIEF         = new StateFlag("mob-grief",       true);
 
     private static final Map<String, Flag<?>> REGISTRY = new LinkedHashMap<>();
 
@@ -144,7 +146,7 @@ public final class Flags {
 
         register(GAME_MODE); register(TIME_LOCK); register(WEATHER_LOCK);
         register(TELE_LOC); register(SPAWN_LOC);
-        register(KEEP_INVENTORY); register(KEEP_XP); register(MOB_TELEPORT);
+        register(KEEP_INVENTORY); register(KEEP_XP); register(MOB_TELEPORT); register(MOB_GRIEF);
     }
 
     public static <F extends Flag<?>> F register(F flag) {

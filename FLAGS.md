@@ -85,6 +85,7 @@ Two flags are **declared but not yet enforced** (kept for save-format stability)
 | `lightning` | state (allow/deny) | allow | `worldguardneo.flag.lightning` | Allow or deny lightning strikes affecting the region. |
 | `max-speed` | number | — | `worldguardneo.flag.max-speed` | Maximum movement speed inside the region. |
 | `mob-damage` | state (allow/deny) | allow | `worldguardneo.flag.mob-damage` | Allow or deny players attacking mobs. |
+| `mob-grief` | state (allow/deny) | allow | `worldguardneo.flag.mob-grief` | Allow or deny mobs changing blocks (enderman pick/place, sheep eating grass, etc.). |
 | `mob-spawning` | state (allow/deny) | allow | `worldguardneo.flag.mob-spawning` | Allow or deny natural mob spawning. |
 | `mob-teleport` | state (allow/deny) | allow | `worldguardneo.flag.mob-teleport` | Allow or deny mob teleports (Endermen, Shulker bullets). |
 | `mycelium-spread` | state (allow/deny) | allow | `worldguardneo.flag.mycelium-spread` | Allow or deny mycelium spreading. |

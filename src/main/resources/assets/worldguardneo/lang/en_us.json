@@ -124,6 +124,7 @@
   "flag.keep-inventory.desc": "Keep player items on death inside this region.",
   "flag.keep-xp.desc": "Keep player XP on death inside this region.",
   "flag.mob-teleport.desc": "Allow or deny mob teleports (Endermen, Shulker bullets).",
+  "flag.mob-grief.desc": "Allow or deny mobs changing blocks (enderman pick/place, sheep eating grass, etc.).",
   "flag.item-pickup.desc": "Allow or deny picking up ground items.",
   "flag.item-drop.desc": "Allow or deny dropping items on the ground.",
   "flag.enderpearl.desc": "Allow or deny ender-pearl teleports.",

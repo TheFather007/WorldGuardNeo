@@ -32,6 +32,27 @@ public final class EntityEventHandler {
     private final WorldGuardNeo mod;
     public EntityEventHandler(WorldGuardNeo mod) { this.mod = mod; }
 
+    /* ---------------- Mob block griefing ---------------- */
+
+    /**
+     * Gate vanilla "mob griefing" (Endermen picking up/placing blocks, sheep eating grass,
+     * zombies breaking doors, villagers farming, silverfish, …) by the per-region {@code mob-grief}
+     * flag. Vanilla funnels all of these through {@code EntityMobGriefingEvent}; denying it here
+     * stops a mob from altering blocks inside a claim without touching the world-wide
+     * {@code mobGriefing} game rule. Default ALLOW — admins opt in with {@code mob-grief deny}.
+     */
+    @SubscribeEvent
+    public void onMobGriefing(net.neoforged.neoforge.event.entity.EntityMobGriefingEvent e) {
+        Entity entity = e.getEntity();
+        if (entity == null) return;
+        if (!(entity.level() instanceof ServerLevel sl)) return;
+        if (!mod.isProtectionActive(sl)) return;
+        RegionManager mgr = mod.regions().get(sl);
+        if (!mgr.testState(Flags.MOB_GRIEF, null, entity.getX(), entity.getY(), entity.getZ())) {
+            e.setCanGrief(false);
+        }
+    }
+
     /* ---------------- Mob spawning ---------------- */
 
     @SubscribeEvent

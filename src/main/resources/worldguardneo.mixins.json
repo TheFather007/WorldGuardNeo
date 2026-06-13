@@ -16,6 +16,7 @@
     "ServerPlayerGameModeMixin",
     "ArmorStandMixin",
     "PressurePlateBlockMixin",
+    "TripWireBlockMixin",
     "DispenserBlockMixin"
   ],
   "client": [],

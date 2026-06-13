@@ -30,6 +30,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 - **Parents & priority** — regions inherit flags from a parent; overlapping regions resolve by priority (DENY beats ALLOW).
 - **Adjacency-grief protection** — lava/water/fire spread, pistons, dispensers and tree growth are blocked from crossing a region boundary into a foreign claim.
 - **Crop & farm protection** — non-members can't trample farmland (jump-destroying crops); stripping logs, tilling dirt and path-making by strangers go through the same interact/build checks.
+- **Mob-griefing & trap control** — the `mob-grief` flag stops mobs altering blocks in a claim (endermen, sheep, etc.); pressure plates and tripwires can't be triggered by strangers, mobs or thrown items.
 - **Pluggable storage** — `json` (default), `sqlite`, `h2`, or `mysql`. Any DB backend falls back to JSON if its driver is missing.
 - **LuckPerms integration** — permissions resolved through LuckPerms when installed (OP-level fallback otherwise), plus per-group region limits.
 - **Web-map integration** — regions render on **BlueMap** and **squaremap** if present.
