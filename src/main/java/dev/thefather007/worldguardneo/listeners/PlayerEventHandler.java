@@ -54,6 +54,12 @@ public final class PlayerEventHandler {
         /** Original MOVEMENT_SPEED base value before we modified it. NaN = never modified. */
         double  origSpeedBase   = Double.NaN;
         /**
+         * The player's game mode BEFORE a region's {@code game-mode} flag overrode it. Null =
+         * we never changed it. Restored when the player leaves the region(s) imposing it, so a
+         * {@code game-mode adventure} zone doesn't permanently trap the player in that mode.
+         */
+        GameType origGameMode   = null;
+        /**
          * Snapshot of the player's position at the moment of death. Used by the respawn
          * handler to look up region-scoped {@code spawn} flags from the death point, not
          * from the post-respawn position (which is already at vanilla bed/world-spawn).
@@ -139,11 +145,12 @@ public final class PlayerEventHandler {
             st.tickFlagsRelevant = anyFlagsInChain(here, mgr);
         }
         if (unchanged && !st.tickFlagsRelevant
-                // Live client-side overrides must be unwound before we may go dormant:
-                // a previously applied time/weather lock or speed override still needs its
-                // restore path below to run until it has reset.
+                // Live overrides must be unwound before we may go dormant: a previously applied
+                // time/weather lock, speed override, or game-mode override still needs its restore
+                // path below to run until it has reset.
                 && !st.timeLockActive && !st.weatherLockActive
-                && Double.isNaN(st.origSpeedBase)) {
+                && Double.isNaN(st.origSpeedBase)
+                && st.origGameMode == null) {
             st.lastSafeX = x; st.lastSafeY = y; st.lastSafeZ = z; st.lastSafeValid = true;
             return;
         }
@@ -315,13 +322,26 @@ public final class PlayerEventHandler {
         // since global flag values for these are typically unset.
         List<ProtectedRegion> applicable = here;
 
-        // game-mode lock
+        // game-mode lock. Snapshot the player's pre-region mode on first override and restore it
+        // on exit — mirrors the MAX_SPEED snapshot/restore below — so a `game-mode` region doesn't
+        // permanently trap the player in the imposed mode after they walk out (WorldGuard restores).
         String gm = mgr.resolveValue(Flags.GAME_MODE, applicable, id);
         if (gm != null) {
             GameType wanted = GameType.byName(gm.toLowerCase(Locale.ROOT), null);
-            if (wanted != null && p.gameMode.getGameModeForPlayer() != wanted) {
-                p.setGameMode(wanted);
+            if (wanted != null) {
+                GameType cur = p.gameMode.getGameModeForPlayer();
+                if (cur != wanted) {
+                    if (st.origGameMode == null) st.origGameMode = cur; // capture once, before changing
+                    p.setGameMode(wanted);
+                }
             }
+        } else if (st.origGameMode != null) {
+            // No game-mode flag applies here anymore — restore the snapshot, unless the player
+            // already happens to be in that mode (or changed it themselves to match).
+            if (p.gameMode.getGameModeForPlayer() != st.origGameMode) {
+                p.setGameMode(st.origGameMode);
+            }
+            st.origGameMode = null;
         }
 
         // heal flag
