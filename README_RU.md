@@ -6,7 +6,7 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
-![Requires](https://img.shields.io/badge/Требуется-WorldEdit%207.3%2B-3b82f6)
+![Optional](https://img.shields.io/badge/Опционально-WorldEdit%207.3%2B-3b82f6)
 ![Optional](https://img.shields.io/badge/Опционально-LuckPerms%205.4%2B-9b59b6)
 ![Side](https://img.shields.io/badge/Сторона-Только%20сервер-6b7280)
 ![License](https://img.shields.io/badge/Лицензия-GPL--3.0-3b82f6)
@@ -43,7 +43,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 
 - Minecraft **1.21.1**
 - NeoForge **21.1.x**
-- **WorldEdit** для NeoForge **7.3+** — регионы создаются по его выделению
+- **WorldEdit** для NeoForge **7.3+** — *опционально*, нужен только для создания регионов (`/rg claim`, `/rg redefine`) по его выделению; мод загружается и все остальные функции работают без него
 
 **Опционально**
 
@@ -61,7 +61,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 
 ## Установка
 
-1. Положите `.jar` WorldGuardNeo **и WorldEdit** в папку `mods/` сервера.
+1. Положите `.jar` WorldGuardNeo в папку `mods/` сервера. Добавьте также **WorldEdit**, если хотите создавать регионы (`/rg claim`).
 2. *(Опционально)* добавьте LuckPerms, BlueMap или squaremap.
 3. Запустите сервер один раз, чтобы создался `config/worldguardneo/config.toml`.
 4. При необходимости измените настройки и выполните `/rg reload`.
@@ -220,7 +220,7 @@ WorldGuardNeo поставляет 80+ флагов. Каждый докумен
 ./gradlew clean build
 ```
 
-Готовый `.jar` появится в `build/libs/`. WorldEdit **не** является зависимостью времени компиляции — мод обращается к нему только через рефлексию, поэтому собирается без WorldEdit в classpath. WorldEdit обязателен в **рантайме** (объявлен в `neoforge.mods.toml`).
+Готовый `.jar` появится в `build/libs/`. WorldEdit **не** является зависимостью времени компиляции — мод обращается к нему только через рефлексию, поэтому собирается без WorldEdit в classpath. WorldEdit — **опциональная** зависимость в **рантайме** (объявлена в `neoforge.mods.toml`); нужна только для создания регионов.
 
 ## Лицензия
 

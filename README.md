@@ -6,7 +6,7 @@
 
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
-![Requires](https://img.shields.io/badge/Requires-WorldEdit%207.3%2B-3b82f6)
+![Optional](https://img.shields.io/badge/Optional-WorldEdit%207.3%2B-3b82f6)
 ![Optional](https://img.shields.io/badge/Optional-LuckPerms%205.4%2B-9b59b6)
 ![Side](https://img.shields.io/badge/Side-Server%20only-6b7280)
 ![License](https://img.shields.io/badge/License-GPL--3.0-3b82f6)
@@ -43,7 +43,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 
 - Minecraft **1.21.1**
 - NeoForge **21.1.x**
-- **WorldEdit** for NeoForge **7.3+** — regions are created from its selections
+- **WorldEdit** for NeoForge **7.3+** — *optional*, needed only to create regions (`/rg claim`, `/rg redefine`) from its selections; the mod loads and all other features work without it
 
 **Optional**
 
@@ -61,7 +61,7 @@ The mod is **server-side only**. Vanilla clients connect normally; no client-sid
 
 ## Installation
 
-1. Drop WorldGuardNeo's `.jar` **and WorldEdit** into the server's `mods/` folder.
+1. Drop WorldGuardNeo's `.jar` into the server's `mods/` folder. Add **WorldEdit** too if you want to create regions (`/rg claim`).
 2. *(Optional)* add LuckPerms, BlueMap, or squaremap.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust settings if needed and run `/rg reload`.
@@ -222,7 +222,7 @@ JDK 21 is required. From the project folder:
 ./gradlew clean build
 ```
 
-The finished `.jar` is written to `build/libs/`. WorldEdit is **not** a compile-time dependency — the mod talks to it purely through reflection, so it builds without WorldEdit on the classpath. WorldEdit is required at **runtime** (declared in `neoforge.mods.toml`).
+The finished `.jar` is written to `build/libs/`. WorldEdit is **not** a compile-time dependency — the mod talks to it purely through reflection, so it builds without WorldEdit on the classpath. WorldEdit is an **optional** runtime dependency (declared in `neoforge.mods.toml`); it is only needed to create regions.
 
 ## License
 

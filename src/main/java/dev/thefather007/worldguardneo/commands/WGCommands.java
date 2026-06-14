@@ -225,6 +225,9 @@ public final class WGCommands {
      */
     private static int claimRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
+        // Claiming reads the player's WorldEdit selection, so WorldEdit must be present. The mod
+        // loads fine without it (worldedit is an optional dependency) — only claim/redefine need it.
+        if (!mod.worldEdit().isAvailable()) { err(src, mod, "msg.selection.no-worldedit"); return 0; }
         RegionManager mgr = mod.regions().get(p.serverLevel());
         boolean bypass = mod.perms().has(p, "worldguardneo.region.bypass");
 
@@ -424,6 +427,8 @@ public final class WGCommands {
 
     private static int redefineRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
+        // Redefine reads the player's WorldEdit selection — requires WorldEdit (optional dependency).
+        if (!mod.worldEdit().isAvailable()) { err(src, mod, "msg.selection.no-worldedit"); return 0; }
         RegionManager mgr = mod.regions().get(p.serverLevel());
         boolean bypass = mod.perms().has(p, "worldguardneo.region.bypass");
         return mgr.get(id).map(existing -> mod.worldEdit().toProtectedRegion(p, id).map(newRegion -> {
