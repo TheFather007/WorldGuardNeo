@@ -53,11 +53,6 @@ public final class OpResolver implements PermissionResolver {
         } catch (Throwable ignored) {}
 
         // Region-management nodes.
-        // bypass is the ULTIMATE override — defaults to OP 4 (highest), one tier above other
-        // admin nodes. Rationale: an admin running /rg reload (OP 3) doesn't necessarily need
-        // to also bypass region protection. We keep the strongest privilege escalation gated
-        // separately so admins can build infra accounts (OP 3 service account that reloads
-        // configs without being able to walk through PvP regions).
         // region.bypass is deliberately set to level 5 — ABOVE the maximum vanilla op level (4).
         // This means being an operator does NOT auto-grant bypass via the OP fallback. Bypass
         // is a protection-critical permission: on servers where builders/staff hold op for

@@ -162,7 +162,14 @@ public final class BlockEventHandler {
                     isContainer = true;
                     allowed = mgr.testBuildAccess(Flags.CHEST_ACCESS, x, y, z, id);
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                // Fail SAFE: if we can't determine whether this is a container (e.g. a chunk-unload
+                // race throwing in getBlockEntity), treat it as a protected container and deny the
+                // interaction rather than silently letting a potential chest access through.
+                WorldGuardNeo.LOGGER.debug("container detection failed at {} — denying to be safe", bp, t);
+                isContainer = true;
+                allowed = false;
+            }
         }
         if (allowed) return;
         if (canBypass(p)) return;
@@ -232,6 +239,10 @@ public final class BlockEventHandler {
     public void onExplosion(ExplosionEvent.Detonate e) {
         Level lvl = e.getLevel();
         if (lvl.isClientSide()) return;
+        // Honour the per-world protection kill-switch (useRegions=false) like every other handler.
+        // Without this, explosions were still being filtered by region flags in a world where an
+        // admin had disabled WorldGuardNeo.
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
 
         // World-wide: if any affected block sits in a region and admins set

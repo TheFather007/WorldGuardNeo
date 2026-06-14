@@ -64,7 +64,15 @@ public final class SpatialIndex {
         // GlobalRegion uses Integer.MIN/MAX bounds → never index it (the manager treats it specially).
         if (r instanceof GlobalRegion) return;
         Vec3 mn = r.minimumBound(), mx = r.maximumBound();
-        if (mn.x() == Integer.MIN_VALUE || mx.x() == Integer.MAX_VALUE) return;
+        // A real (non-global) region whose bounds reach an extreme int coordinate must NOT be
+        // silently dropped (that would make it invisible to lookups — its flags would never
+        // apply). Treat it as oversized so it is still consulted via the fallback scan.
+        if (mn.x() == Integer.MIN_VALUE || mx.x() == Integer.MAX_VALUE
+         || mn.z() == Integer.MIN_VALUE || mx.z() == Integer.MAX_VALUE) {
+            oversized.put(r, Boolean.TRUE);
+            refreshOversizedSnapshot();
+            return;
+        }
         int cx0 = mn.x() >> 4, cx1 = mx.x() >> 4;
         int cz0 = mn.z() >> 4, cz1 = mx.z() >> 4;
         long span = (long)(cx1 - cx0 + 1) * (long)(cz1 - cz0 + 1);
@@ -92,7 +100,10 @@ public final class SpatialIndex {
         if (r instanceof GlobalRegion) return;
         if (oversized.remove(r) != null) { refreshOversizedSnapshot(); return; }
         Vec3 mn = r.minimumBound(), mx = r.maximumBound();
-        if (mn.x() == Integer.MIN_VALUE || mx.x() == Integer.MAX_VALUE) return;
+        // Extreme-coordinate regions live in oversized (handled above); guard the bucket loop
+        // against extreme bounds so we never iterate an astronomically large chunk range.
+        if (mn.x() == Integer.MIN_VALUE || mx.x() == Integer.MAX_VALUE
+         || mn.z() == Integer.MIN_VALUE || mx.z() == Integer.MAX_VALUE) return;
         int cx0 = mn.x() >> 4, cx1 = mx.x() >> 4;
         int cz0 = mn.z() >> 4, cz1 = mx.z() >> 4;
         for (int cx = cx0; cx <= cx1; cx++) {

@@ -124,8 +124,11 @@ public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
 
     private void initSchema() throws SQLException {
         try (Statement st = conn().createStatement()) {
+            // utf8mb4 so non-ASCII region ids / flag values (greetings, modded dimension keys)
+            // round-trip correctly even when the server's default database charset is latin1.
             st.executeUpdate("CREATE TABLE IF NOT EXISTS " + table + " ("
-                    + "world VARCHAR(255) PRIMARY KEY, payload LONGTEXT NOT NULL, updated_at BIGINT NOT NULL)");
+                    + "world VARCHAR(255) PRIMARY KEY, payload LONGTEXT NOT NULL, updated_at BIGINT NOT NULL)"
+                    + " DEFAULT CHARSET=utf8mb4");
         }
     }
 

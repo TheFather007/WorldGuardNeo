@@ -294,6 +294,7 @@ public final class EntityEventHandler {
      */
     @SubscribeEvent
     public void onProjectileImpactEntity(ProjectileImpactEvent e) {
+        if (e.isCanceled()) return; // already handled/cancelled upstream — skip redundant work
         var hit = e.getRayTraceResult();
         if (!(hit instanceof net.minecraft.world.phys.EntityHitResult ehr)) return;
         Entity target = ehr.getEntity();
