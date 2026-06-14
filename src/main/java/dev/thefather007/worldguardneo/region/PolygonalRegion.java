@@ -68,14 +68,22 @@ public final class PolygonalRegion extends ProtectedRegion {
         // Quick AABB reject before the more expensive ray-cast. Same exclusive-upper rule.
         if (x < minBound.x() || x >= maxBound.x() + 1.0
          || z < minBound.z() || z >= maxBound.z() + 1.0) return false;
-        // Ray casting in XZ plane.
+        // Ray casting in XZ plane. Test the BLOCK the position sits in (floor to block coords)
+        // rather than the raw continuous coordinate. The polygon's vertices are block coordinates
+        // (as produced by WorldEdit), so a raw entity position on the max +X/+Z block row — e.g.
+        // x=10.5 against a max vertex at x=10 — was classified OUTSIDE, leaving that block row of a
+        // polygonal claim unprotected against players (block-edits already pass integer coords, so
+        // only continuous entity positions were affected). Flooring makes the test block-inclusive,
+        // consistent with CuboidRegion's [min, max+1) bounds and WorldEdit's own block-based
+        // Polygonal2DRegion.contains. Math.floor (not an int cast) is required for negative coords.
+        double bx = Math.floor(x), bz = Math.floor(z);
         boolean inside = false;
         int n = points.size();
         for (int i = 0, j = n - 1; i < n; j = i++) {
             int xi = points.get(i).x(), zi = points.get(i).z();
             int xj = points.get(j).x(), zj = points.get(j).z();
-            boolean intersect = ((zi > z) != (zj > z))
-                    && (x < (double)(xj - xi) * (z - zi) / (double)(zj - zi) + xi);
+            boolean intersect = ((zi > bz) != (zj > bz))
+                    && (bx < (double)(xj - xi) * (bz - zi) / (double)(zj - zi) + xi);
             if (intersect) inside = !inside;
         }
         return inside;
