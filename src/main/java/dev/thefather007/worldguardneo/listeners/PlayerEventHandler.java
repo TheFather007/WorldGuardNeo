@@ -888,6 +888,18 @@ public final class PlayerEventHandler {
     public void onPlayerDeath(net.neoforged.neoforge.event.entity.living.LivingDeathEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         PlayerState st = states.computeIfAbsent(p.getUUID(), k -> new PlayerState());
+        // Honour the per-world kill-switch like every other protection handler: in a world with
+        // WGN disabled (useRegions=false), region keep-inventory / keep-xp / spawn-loc must NOT
+        // take effect. Clear any snapshot and let vanilla handle the death. Gating here is enough
+        // for the whole death chain — onLivingDrops/onLivingExpDropPlayer/onPlayerClone/onRespawn
+        // all read this snapshot, so a cleared snapshot makes them no-op to vanilla.
+        if (!mod.isProtectionActive(p.serverLevel())) {
+            st.deathX = st.deathY = st.deathZ = Double.NaN;
+            st.deathDim = null;
+            st.deathKeepInv = false;
+            st.deathKeepXp = false;
+            return;
+        }
         st.deathX = p.getX();
         st.deathY = p.getY();
         st.deathZ = p.getZ();
