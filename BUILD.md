@@ -69,29 +69,10 @@ The mod is deliberately designed to compile without any third-party mods on the 
 
 So `./gradlew build` works out of the box with nothing to install manually.
 
-## Tests
-
-The region engine (region geometry, flag resolution, JSON storage codec) has **no Minecraft
-dependencies**, so it is covered by standalone JVM test suites in `tests/` that run against the
-compiled classes — no game, no NeoForge runtime:
-
-```
-./gradlew build -x test
-bash tests/run.sh
-```
-
-This compiles and runs all suites (**1200+ checks**):
-- `FlagLogicTest` — per-flag resolution: default/allow/deny × owner/member/stranger/null, groups, priority, parents, geometry, global fallback.
-- `FlagScenarioTest` — deeper matrices: build-access per flag, every region group, multi-tier priority, parent chains, concave polygons, overlapping, value parsing.
-- `FlagResolutionEdgeTest` — cross-priority group shadowing, inherited build-access, group-scoped value flags, oversized (world-spanning) region indexing, ownership queries.
-- `FlagContractTest` — per-flag contract: type, default (only `invincible`/`keep-inventory`/`keep-xp` default to deny), permission node, value hint, registry round-trip.
-- `StorageRoundTripTest` — every flag type, groups, parents and geometry survive save → JSON → load.
-- `tests/coverage.sh` — static guard that every registered flag is referenced in a handler/command (catches a flag that silently loses its enforcement; only `allowed-enchants` and `receive-chat` are intentionally declared-only).
-
 ## Installing the built mod
 
-1. Drop `worldguardneo-1.0.jar` **and WorldEdit** into the server's `mods/` folder.
-2. *(Optional)* add LuckPerms, BlueMap, squaremap, or a JDBC driver.
+1. Drop `worldguardneo-1.0.jar` into the server's `mods/` folder.
+2. *(Optional)* add **WorldEdit** (needed only to create regions via `/rg claim` and `/rg redefine`), LuckPerms, BlueMap, squaremap, or a JDBC driver.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust the config if needed and run `/rg reload`.
 

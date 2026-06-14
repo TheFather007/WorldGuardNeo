@@ -11,6 +11,7 @@
   "msg.protection.deny-pickup": "§c✘ §7You can't §cpick up items §7here.",
 
   "msg.selection.none": "§8[§3WGN§8] §e⚠ §7Make a selection first with §f//wand §7or §f//pos1 //pos2§7.",
+  "msg.selection.no-worldedit": "§8[§3WGN§8] §c✘ §7WorldEdit is not installed — region claiming needs it. All other WorldGuardNeo features work without it.",
   "msg.region.global-select": "§8[§3WGN§8] §e⚠ §7Region §6%id% §7is the §fglobal §7region — it has no geometry.",
   "msg.region.global-remove": "§8[§3WGN§8] §c✘ §7The global region cannot be deleted §8(§7holds world-wide defaults§8)§7.",
   "msg.region.exists": "§8[§3WGN§8] §c✘ §7Region §6%id% §7already exists.",

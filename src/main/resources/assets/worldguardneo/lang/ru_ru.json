@@ -11,6 +11,7 @@
   "msg.protection.deny-pickup": "§c✘ §7Здесь нельзя §cподнимать §7предметы.",
 
   "msg.selection.none": "§8[§3WGN§8] §e⚠ §7Сначала сделайте выделение: §f//wand §7или §f//pos1 //pos2§7.",
+  "msg.selection.no-worldedit": "§8[§3WGN§8] §c✘ §7WorldEdit не установлен — он нужен для создания регионов. Остальные функции WorldGuardNeo работают без него.",
   "msg.region.global-select": "§8[§3WGN§8] §e⚠ §7Регион §6%id% §7— §fглобальный§7, у него нет геометрии.",
   "msg.region.global-remove": "§8[§3WGN§8] §c✘ §7Глобальный регион нельзя удалить §8(§7хранит мировые настройки§8)§7.",
   "msg.region.exists": "§8[§3WGN§8] §c✘ §7Регион §6%id% §7уже существует.",

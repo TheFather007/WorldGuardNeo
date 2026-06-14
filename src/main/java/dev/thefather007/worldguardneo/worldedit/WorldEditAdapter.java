@@ -47,6 +47,9 @@ public abstract class WorldEditAdapter {
     /** Build a region of the given id from the player's current WorldEdit selection. */
     public abstract Optional<ProtectedRegion> toProtectedRegion(ServerPlayer player, String id);
 
+    /** True if WorldEdit is present and the reflective bridge bound — i.e. selections can be read. */
+    public boolean isAvailable() { return true; }
+
     /** Replace the player's WorldEdit selection with the given cuboid (used by /rg select). */
     public abstract void selectCuboid(ServerPlayer player, Vec3 min, Vec3 max);
 
@@ -56,6 +59,7 @@ public abstract class WorldEditAdapter {
 
     /* --------------- no-op used only if WE somehow isn't available --------------- */
     public static final class NoOpWorldEditAdapter extends WorldEditAdapter {
+        @Override public boolean isAvailable() { return false; }
         @Override public Optional<ProtectedRegion> toProtectedRegion(ServerPlayer player, String id) {
             return Optional.empty();
         }
