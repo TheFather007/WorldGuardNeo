@@ -145,7 +145,7 @@ NeoForge.EVENT_BUS.register(new YourEventHandler());
 
 ### `RegionFlagDeniedEvent`
 
-Регион отменил действие через флаг (build, interact, pvp и т.д.). **Cancellable** — listener'ы могут вызвать `setCanceled(true)`, чтобы ПЕРЕОПРЕДЕЛИТЬ отказ и позволить действие.
+Регион отменил **строительное действие** через флаг — ломание или установку блока (только эти два пути сейчас порождают событие). **Cancellable** — listener'ы могут вызвать `setCanceled(true)`, чтобы ПЕРЕОПРЕДЕЛИТЬ отказ и позволить действие.
 
 **Поля:**
 - `getRegion()` — регион чьим флагом ограничено

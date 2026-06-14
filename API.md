@@ -95,7 +95,7 @@ The mirror of `RegionEnterEvent`, fired when a player leaves a region.
 
 ### `RegionFlagDeniedEvent`
 
-Fired when a flag denies an action (e.g. a build attempt blocked by the `build` flag). Lets you react to or audit denials. Carries the player, region, the flag involved, and the position.
+Fired when a region flag denies a **build action** (block break or block place) — currently the only paths that fire it. Lets you audit denials or **override** them: the event implements `ICancellableEvent`, so calling `setCanceled(true)` permits the action despite the region denial. Carries the region, the flag involved, the acting entity (`getActor()`, nullable), and a short `reason` string (e.g. `"block-break"`, `"block-place"`). It does **not** carry a position.
 
 ### `RegionModifyEvent`
 
