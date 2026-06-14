@@ -38,6 +38,10 @@ import java.util.UUID;
  */
 public final class PlayerEventHandler {
 
+    /** Stable id for our transient MAX_SPEED attribute modifier (session-only; never persisted). */
+    private static final net.minecraft.resources.ResourceLocation SPEED_MODIFIER_ID =
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("worldguardneo", "max_speed");
+
     private final WorldGuardNeo mod;
     public PlayerEventHandler(WorldGuardNeo mod) { this.mod = mod; }
 
@@ -51,8 +55,8 @@ public final class PlayerEventHandler {
         long    lastTimePacket  = 0;
         boolean timeLockActive  = false;
         boolean weatherLockActive = false;
-        /** Original MOVEMENT_SPEED base value before we modified it. NaN = never modified. */
-        double  origSpeedBase   = Double.NaN;
+        /** True while our transient MAX_SPEED modifier is applied — for the dormancy guard. */
+        boolean speedModified   = false;
         /**
          * The player's game mode BEFORE a region's {@code game-mode} flag overrode it. Null =
          * we never changed it. Restored when the player leaves the region(s) imposing it, so a
@@ -149,7 +153,7 @@ public final class PlayerEventHandler {
                 // time/weather lock, speed override, or game-mode override still needs its restore
                 // path below to run until it has reset.
                 && !st.timeLockActive && !st.weatherLockActive
-                && Double.isNaN(st.origSpeedBase)
+                && !st.speedModified
                 && st.origGameMode == null) {
             st.lastSafeX = x; st.lastSafeY = y; st.lastSafeZ = z; st.lastSafeValid = true;
             return;
@@ -414,26 +418,34 @@ public final class PlayerEventHandler {
             } catch (Throwable ignored) {}
         }
 
-        // max-speed: if the region sets a custom MAX_SPEED, force the player's walking speed
-        // attribute. We snapshot the original base value the first time we modify it and
-        // restore it on exit so the player isn't permanently slowed.
+        // max-speed: apply a SESSION-ONLY (transient) attribute modifier instead of overwriting the
+        // base value. Transient modifiers are never persisted, so logging out inside a max-speed
+        // region can no longer bake the modified speed into the player's saved data — the old
+        // setBaseValue approach did, and because the restore snapshot was discarded on logout the
+        // player came back permanently slowed. This is also stateless and self-correcting: our
+        // modifier is present iff a max-speed flag currently applies, and the true base value is
+        // never touched, so removal always returns the player to their real speed.
         Double speed = mgr.resolveValue(Flags.MAX_SPEED, applicable, id);
         try {
             var attr = p.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
             if (attr != null) {
                 if (speed != null) {
-                    if (Double.isNaN(st.origSpeedBase)) {
-                        st.origSpeedBase = attr.getBaseValue();
+                    // ADD_VALUE amount chosen so (base + amount) == the target speed, matching the
+                    // old base-override semantics (sprint/effect multipliers still stack on top).
+                    double amount = speed - attr.getBaseValue();
+                    var existing = attr.getModifier(SPEED_MODIFIER_ID);
+                    if (existing == null || Math.abs(existing.amount() - amount) > 1e-9) {
+                        attr.removeModifier(SPEED_MODIFIER_ID);
+                        attr.addOrUpdateTransientModifier(
+                                new net.minecraft.world.entity.ai.attributes.AttributeModifier(
+                                        SPEED_MODIFIER_ID, amount,
+                                        net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_VALUE));
                     }
-                    if (Math.abs(attr.getBaseValue() - speed) > 1e-4) {
-                        attr.setBaseValue(speed);
-                    }
-                } else if (!Double.isNaN(st.origSpeedBase)) {
-                    // No region speed-cap here; restore the snapshot.
-                    if (Math.abs(attr.getBaseValue() - st.origSpeedBase) > 1e-4) {
-                        attr.setBaseValue(st.origSpeedBase);
-                    }
-                    st.origSpeedBase = Double.NaN;
+                    st.speedModified = true;
+                } else if (st.speedModified || attr.getModifier(SPEED_MODIFIER_ID) != null) {
+                    // No max-speed applies here anymore — drop our modifier (base was never touched).
+                    attr.removeModifier(SPEED_MODIFIER_ID);
+                    st.speedModified = false;
                 }
             }
         } catch (Throwable ignored) {}
