@@ -145,14 +145,33 @@ public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
                         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
                         RegionJsonCodec.applyJson(root, into);
                     } catch (JsonParseException | IllegalStateException ex) {
+                        // Data-loss guard (see JsonRegionStorage): quarantine the corrupt payload so
+                        // the next (empty) save can't overwrite and destroy recoverable data.
+                        quarantineCorrupt(worldKey, json);
                         WorldGuardNeo.LOGGER.error(
-                                "MySQL payload for world '{}' is malformed — leaving manager empty.",
+                                "MySQL payload for world '{}' is malformed — copied to a quarantine row "
+                              + "and left the manager empty. Restore from the quarantine row or a backup.",
                                 worldKey, ex);
                     }
                 }
             }
         } catch (SQLException ex) {
             throw new IOException("MySQL load failed for " + worldKey, ex);
+        }
+    }
+
+    /** Preserve a corrupt payload under a timestamped quarantine key before the manager is emptied. */
+    private void quarantineCorrupt(String worldKey, String payload) {
+        String qkey = worldKey + ".corrupt-" + System.currentTimeMillis();
+        try (PreparedStatement ps = conn().prepareStatement(
+                "INSERT INTO " + table + " (world, payload, updated_at) VALUES (?, ?, ?) "
+                        + "ON DUPLICATE KEY UPDATE payload = VALUES(payload), updated_at = VALUES(updated_at)")) {
+            ps.setString(1, qkey);
+            ps.setString(2, payload);
+            ps.setLong(3, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException qe) {
+            WorldGuardNeo.LOGGER.error("Failed to quarantine corrupt MySQL payload for '{}'", worldKey, qe);
         }
     }
 
