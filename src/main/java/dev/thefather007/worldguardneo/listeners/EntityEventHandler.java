@@ -362,14 +362,19 @@ public final class EntityEventHandler {
         // so this closes the classic bypass where AttackEntityEvent gates melee but a bow shot
         // sails through pvp=deny / mob-damage=deny untouched. Melee passes through both this
         // and AttackEntityEvent with the same verdict, which is harmless.
+        // Victim's applicable regions, resolved at most once and shared between the player-attack
+        // gate and the environmental-damage cascade below (both at the victim's position). Lazy:
+        // the common mob-environmental-damage path returns before it's needed and never pays for it.
+        java.util.List<dev.thefather007.worldguardneo.region.ProtectedRegion> applicable = null;
+
         if (e.getSource().getEntity() instanceof ServerPlayer attacker && attacker != victim
                 && !(victim instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
             // Armor stands are decoration: their BUILD/BLOCK_BREAK gating lives in the
             // melee/projectile handlers, not under mob-damage.
             if (!mod.perms().has(attacker, "worldguardneo.region.bypass")) {
-                var applicableAtVictim = mgr.getApplicable(victim.getX(), victim.getY(), victim.getZ());
+                applicable = mgr.getApplicable(victim.getX(), victim.getY(), victim.getZ());
                 StateFlag gate = victim instanceof Player ? Flags.PVP : Flags.MOB_DAMAGE;
-                if (!mgr.testState(gate, applicableAtVictim, attacker.getUUID())) {
+                if (!mgr.testState(gate, applicable, attacker.getUUID())) {
                     e.setCanceled(true);
                     attacker.displayClientMessage(
                             net.minecraft.network.chat.Component.literal(mod.i18n().raw(
@@ -402,8 +407,9 @@ public final class EntityEventHandler {
         }
 
         double x = victim.getX(), y = victim.getY(), z = victim.getZ();
-        // Single applicable lookup reused across all damage-type tests below.
-        var applicable = mgr.getApplicable(x, y, z);
+        // Reuse the list already resolved by the player-attack gate above (same position) when
+        // present; otherwise resolve it once here for the environmental-damage cascade below.
+        if (applicable == null) applicable = mgr.getApplicable(x, y, z);
         UUID id = sp.getUUID();
 
         // Wilderness fast path: if there are no applicable regions AND the global region has

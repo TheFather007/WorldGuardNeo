@@ -476,12 +476,17 @@ public final class WorldEventHandler {
         var server = mover.getServer();
         if (server == null) return;
         String key = entered ? "msg.notify.enter" : "msg.notify.leave";
-        Component msg = Component.literal(mod.i18n().format(key,
-                "player", mover.getGameProfile().getName(),
-                "region", regionId,
-                "world",  mover.serverLevel().dimension().location().toString()));
+        // Build the message lazily on the first permission holder — if nobody online holds
+        // worldguardneo.notify, we never format the string or stringify the dimension id.
+        Component msg = null;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (mod.perms().has(p, "worldguardneo.notify")) {
+                if (msg == null) {
+                    msg = Component.literal(mod.i18n().format(key,
+                            "player", mover.getGameProfile().getName(),
+                            "region", regionId,
+                            "world",  mover.serverLevel().dimension().location().toString()));
+                }
                 p.displayClientMessage(msg, false);
             }
         }

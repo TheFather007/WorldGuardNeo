@@ -356,8 +356,11 @@ public final class BlockEventHandler {
      * @param detail optional extra context (block/item id), may be null
      */
     private void denyMessage(ServerPlayer p, RegionManager mgr, BlockPos bp, String action, String detail) {
+        // Resolve the applicable list ONCE and reuse it for both the custom deny-message lookup and
+        // the violation-log region id (previously two separate getApplicable probes for one point).
+        var applicable = mgr.getApplicable(bp.getX(), bp.getY(), bp.getZ());
         String msg;
-        String custom = mgr.resolveValue(Flags.DENY_MESSAGE, bp.getX(), bp.getY(), bp.getZ(), p.getUUID());
+        String custom = mgr.resolveValue(Flags.DENY_MESSAGE, applicable, p.getUUID());
         if (custom != null) {
             msg = custom;
         } else {
@@ -373,9 +376,7 @@ public final class BlockEventHandler {
         }
         p.displayClientMessage(Component.literal(msg), true);
         // Record to the dedicated violation log (async, off the game thread).
-        String regionId = null;
-        var applicable = mgr.getApplicable(bp.getX(), bp.getY(), bp.getZ());
-        if (!applicable.isEmpty()) regionId = applicable.get(0).id();
+        String regionId = applicable.isEmpty() ? null : applicable.get(0).id();
         mod.violations().record(p, action, detail,
                 bp.getX(), bp.getY(), bp.getZ(),
                 p.serverLevel().dimension().location().toString(), regionId);
