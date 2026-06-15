@@ -4,6 +4,7 @@
 
 **Серверная защита регионов для NeoForge — переосмысление модели WorldGuard. Регионы создаются по выделению WorldEdit и защищаются 80+ флагами на регион.**
 
+![Version](https://img.shields.io/badge/Версия-1.2-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
 ![Optional](https://img.shields.io/badge/Опционально-WorldEdit%207.3%2B-3b82f6)

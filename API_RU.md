@@ -30,7 +30,7 @@ WorldGuardNeo — `optional` зависимость. Объяви это в `neo
 [[dependencies.yourmod]]
 modId = "worldguardneo"
 type = "optional"
-versionRange = "[1.0,)"
+versionRange = "[1.2,)"
 ordering = "AFTER"
 side = "BOTH"
 ```
