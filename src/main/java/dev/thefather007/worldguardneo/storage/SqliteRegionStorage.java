@@ -101,8 +101,14 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
                         JsonObject root = JsonParser.parseString(json).getAsJsonObject();
                         RegionJsonCodec.applyJson(root, into);
                     } catch (JsonParseException | IllegalStateException ex) {
+                        // Same data-loss guard as JsonRegionStorage: copy the corrupt payload to a
+                        // quarantine row so the next (empty) save can't overwrite and permanently
+                        // destroy recoverable data. The quarantine key isn't a real dimension, so
+                        // it is never loaded or overwritten — it just waits for manual recovery.
+                        quarantineCorrupt(worldKey, json);
                         WorldGuardNeo.LOGGER.error(
-                                "SQLite payload for world '{}' is malformed — leaving manager empty.",
+                                "SQLite payload for world '{}' is malformed — copied to a quarantine "
+                              + "row and left the manager empty. Restore from the quarantine row or a backup.",
                                 worldKey, ex);
                     }
                 }
@@ -125,6 +131,20 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
             ps.executeUpdate();
         } catch (SQLException ex) {
             throw new IOException("SQLite save failed for " + worldKey, ex);
+        }
+    }
+
+    /** Preserve a corrupt payload under a timestamped quarantine key before the manager is emptied. */
+    private void quarantineCorrupt(String worldKey, String payload) {
+        String qkey = worldKey + ".corrupt-" + System.currentTimeMillis();
+        try (PreparedStatement ps = conn().prepareStatement(
+                "INSERT INTO world_regions (world, payload, updated_at) VALUES (?, ?, ?)")) {
+            ps.setString(1, qkey);
+            ps.setString(2, payload);
+            ps.setLong(3, System.currentTimeMillis());
+            ps.executeUpdate();
+        } catch (SQLException qe) {
+            WorldGuardNeo.LOGGER.error("Failed to quarantine corrupt SQLite payload for '{}'", worldKey, qe);
         }
     }
 

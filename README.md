@@ -4,6 +4,7 @@
 
 **Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created from WorldEdit selections and protected by 80+ per-region flags.**
 
+![Version](https://img.shields.io/badge/Version-1.2-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
 ![Optional](https://img.shields.io/badge/Optional-WorldEdit%207.3%2B-3b82f6)

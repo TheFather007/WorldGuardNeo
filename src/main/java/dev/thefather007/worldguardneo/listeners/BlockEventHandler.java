@@ -83,6 +83,16 @@ public final class BlockEventHandler {
         if (mgr.testBuildAccess(Flags.BLOCK_PLACE, x, y, z, id)
          && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
         if (canBypass(p)) return;
+        // Public API override hook — mirrors onBreak so the documented RegionFlagDeniedEvent
+        // covers BOTH build actions (break and place), not just break. A listener may cancel the
+        // event to permit the placement despite the region denial.
+        var applicable = mgr.getApplicable(x, y, z);
+        if (!applicable.isEmpty()) {
+            var deniedEvent = new dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent(
+                    applicable.get(0), Flags.BUILD, p, "block-place");
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(deniedEvent);
+            if (deniedEvent.isCanceled()) return;
+        }
         e.setCanceled(true);
         // Re-sync inventory: cancelling EntityPlaceEvent keeps the item server-side but the
         // client already removed it from hand; without this the block vanishes until relog.
@@ -162,7 +172,14 @@ public final class BlockEventHandler {
                     isContainer = true;
                     allowed = mgr.testBuildAccess(Flags.CHEST_ACCESS, x, y, z, id);
                 }
-            } catch (Throwable ignored) {}
+            } catch (Throwable t) {
+                // Fail SAFE: if we can't determine whether this is a container (e.g. a chunk-unload
+                // race throwing in getBlockEntity), treat it as a protected container and deny the
+                // interaction rather than silently letting a potential chest access through.
+                WorldGuardNeo.LOGGER.debug("container detection failed at {} — denying to be safe", bp, t);
+                isContainer = true;
+                allowed = false;
+            }
         }
         if (allowed) return;
         if (canBypass(p)) return;
@@ -232,6 +249,10 @@ public final class BlockEventHandler {
     public void onExplosion(ExplosionEvent.Detonate e) {
         Level lvl = e.getLevel();
         if (lvl.isClientSide()) return;
+        // Honour the per-world protection kill-switch (useRegions=false) like every other handler.
+        // Without this, explosions were still being filtered by region flags in a world where an
+        // admin had disabled WorldGuardNeo.
+        if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
 
         // World-wide: if any affected block sits in a region and admins set
@@ -335,8 +356,11 @@ public final class BlockEventHandler {
      * @param detail optional extra context (block/item id), may be null
      */
     private void denyMessage(ServerPlayer p, RegionManager mgr, BlockPos bp, String action, String detail) {
+        // Resolve the applicable list ONCE and reuse it for both the custom deny-message lookup and
+        // the violation-log region id (previously two separate getApplicable probes for one point).
+        var applicable = mgr.getApplicable(bp.getX(), bp.getY(), bp.getZ());
         String msg;
-        String custom = mgr.resolveValue(Flags.DENY_MESSAGE, bp.getX(), bp.getY(), bp.getZ(), p.getUUID());
+        String custom = mgr.resolveValue(Flags.DENY_MESSAGE, applicable, p.getUUID());
         if (custom != null) {
             msg = custom;
         } else {
@@ -352,9 +376,7 @@ public final class BlockEventHandler {
         }
         p.displayClientMessage(Component.literal(msg), true);
         // Record to the dedicated violation log (async, off the game thread).
-        String regionId = null;
-        var applicable = mgr.getApplicable(bp.getX(), bp.getY(), bp.getZ());
-        if (!applicable.isEmpty()) regionId = applicable.get(0).id();
+        String regionId = applicable.isEmpty() ? null : applicable.get(0).id();
         mod.violations().record(p, action, detail,
                 bp.getX(), bp.getY(), bp.getZ(),
                 p.serverLevel().dimension().location().toString(), regionId);

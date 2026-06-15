@@ -331,6 +331,10 @@ public final class WorldEventHandler {
     @SubscribeEvent
     public void onExpDrop(LivingExperienceDropEvent e) {
         LivingEntity victim = e.getEntity();
+        // EXP_DROPS governs MOB experience (e.g. silencing a mob-farm region). Player death XP
+        // is owned exclusively by the KEEP_XP handler (PlayerEventHandler#onLivingExpDropPlayer);
+        // handling players here too would let `exp-drops deny` destroy player XP and fight keep-xp.
+        if (victim instanceof ServerPlayer) return;
         Level lvl = victim.level();
         if (lvl.isClientSide()) return;
         if (!mod.isProtectionActive(lvl)) return;
@@ -423,6 +427,9 @@ public final class WorldEventHandler {
         BlockPos pos = e.getPos();
         if (pos == null) return;
         RegionManager mgr = mod.regions().get(lvl);
+        // Fast path: a world with no regions at all can't have an adjacency-grief case, so skip
+        // the 7×7 neighbour scan entirely (common for the Nether/End and freshly-set-up worlds).
+        if (mgr.size() == 0) return;
         var baseRegions = mgr.getApplicable(pos.getX(), pos.getY(), pos.getZ());
         // Typical large-tree canopy reaches a few blocks out horizontally. 3 is a safe margin that
         // covers oak/birch/spruce/jungle without being huge.
@@ -469,12 +476,17 @@ public final class WorldEventHandler {
         var server = mover.getServer();
         if (server == null) return;
         String key = entered ? "msg.notify.enter" : "msg.notify.leave";
-        Component msg = Component.literal(mod.i18n().format(key,
-                "player", mover.getGameProfile().getName(),
-                "region", regionId,
-                "world",  mover.serverLevel().dimension().location().toString()));
+        // Build the message lazily on the first permission holder — if nobody online holds
+        // worldguardneo.notify, we never format the string or stringify the dimension id.
+        Component msg = null;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (mod.perms().has(p, "worldguardneo.notify")) {
+                if (msg == null) {
+                    msg = Component.literal(mod.i18n().format(key,
+                            "player", mover.getGameProfile().getName(),
+                            "region", regionId,
+                            "world",  mover.serverLevel().dimension().location().toString()));
+                }
                 p.displayClientMessage(msg, false);
             }
         }

@@ -14,14 +14,15 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Bridge to WorldEdit. WorldEdit is a REQUIRED dependency (declared in neoforge.mods.toml),
- * so regions are created exclusively from a WorldEdit selection made with {@code //wand},
- * {@code //pos1}/{@code //pos2}, {@code //sel poly}, etc. There is no built-in wand or
- * selection store any more.
+ * Bridge to WorldEdit. WorldEdit is an OPTIONAL dependency (declared in neoforge.mods.toml):
+ * the mod loads and all protection works without it; it is only needed to CREATE regions, which
+ * are built from a WorldEdit selection made with {@code //wand}, {@code //pos1}/{@code //pos2},
+ * {@code //sel poly}, etc. When WorldEdit is absent, {@link #detect()} returns a no-op adapter
+ * whose {@link #isAvailable()} is false, and {@code /rg claim}/{@code redefine} report a clear
+ * "WorldEdit not installed" message instead of failing silently.
  *
- * <p>Everything here is reflective so the mod still compiles without WE on the classpath and
- * degrades gracefully (logs, returns empty) in the unlikely event WE fails to load at runtime
- * despite the hard dependency.
+ * <p>Everything here is reflective so the mod compiles without WE on the classpath and degrades
+ * gracefully (logs, returns empty) when WE isn't present or fails to bind.
  */
 public abstract class WorldEditAdapter {
 
@@ -37,9 +38,9 @@ public abstract class WorldEditAdapter {
                       + "Region selection will not work until this is resolved.", t);
             }
         } else {
-            WorldGuardNeo.LOGGER.error(
-                    "[WorldGuardNeo] WorldEdit is not loaded, but it is a required dependency. "
-                  + "Region selection is unavailable.");
+            WorldGuardNeo.LOGGER.info(
+                    "[WorldGuardNeo] WorldEdit not detected — all protection works, but creating "
+                  + "regions (/rg claim, /rg redefine) is unavailable until WorldEdit is installed.");
         }
         return new NoOpWorldEditAdapter();
     }
@@ -50,10 +51,10 @@ public abstract class WorldEditAdapter {
     /** True if WorldEdit is present and the reflective bridge bound — i.e. selections can be read. */
     public boolean isAvailable() { return true; }
 
-    /** Replace the player's WorldEdit selection with the given cuboid (used by /rg select). */
+    /** Replace the player's WorldEdit selection with the given cuboid (used by /rg info to outline a region). */
     public abstract void selectCuboid(ServerPlayer player, Vec3 min, Vec3 max);
 
-    /** Replace the player's WorldEdit selection with the given polygon (used by /rg select). */
+    /** Replace the player's WorldEdit selection with the given polygon (used by /rg info to outline a region). */
     public abstract void selectPolygon(ServerPlayer player, List<PolygonalRegion.Point2> points,
                                        int minY, int maxY);
 

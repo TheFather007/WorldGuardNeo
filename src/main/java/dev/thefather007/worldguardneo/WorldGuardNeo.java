@@ -36,7 +36,7 @@ import java.nio.file.Path;
 
 /**
  * WorldGuardNeo — region protection system for NeoForge 1.21.1.
- * Author: TheFather007. Version 1.0.
+ * Author: TheFather007. Version 1.2.
  */
 @Mod(WorldGuardNeo.MOD_ID)
 public final class WorldGuardNeo {
@@ -57,7 +57,7 @@ public final class WorldGuardNeo {
 
     public WorldGuardNeo(IEventBus modBus, ModContainer container) {
         INSTANCE = this;
-        LOGGER.info("[WorldGuardNeo] Bootstrapping v1.0 for NeoForge 1.21.1");
+        LOGGER.info("[WorldGuardNeo] Bootstrapping v1.2 for NeoForge 1.21.1");
 
         // Pre-register all built-in flags FIRST so that storage and config can resolve them
         // by name without races. None of the subsequent constructors take a flag identity,

@@ -38,6 +38,10 @@ import java.util.UUID;
  */
 public final class PlayerEventHandler {
 
+    /** Stable id for our transient MAX_SPEED attribute modifier (session-only; never persisted). */
+    private static final net.minecraft.resources.ResourceLocation SPEED_MODIFIER_ID =
+            net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("worldguardneo", "max_speed");
+
     private final WorldGuardNeo mod;
     public PlayerEventHandler(WorldGuardNeo mod) { this.mod = mod; }
 
@@ -51,8 +55,14 @@ public final class PlayerEventHandler {
         long    lastTimePacket  = 0;
         boolean timeLockActive  = false;
         boolean weatherLockActive = false;
-        /** Original MOVEMENT_SPEED base value before we modified it. NaN = never modified. */
-        double  origSpeedBase   = Double.NaN;
+        /** True while our transient MAX_SPEED modifier is applied — for the dormancy guard. */
+        boolean speedModified   = false;
+        /**
+         * The player's game mode BEFORE a region's {@code game-mode} flag overrode it. Null =
+         * we never changed it. Restored when the player leaves the region(s) imposing it, so a
+         * {@code game-mode adventure} zone doesn't permanently trap the player in that mode.
+         */
+        GameType origGameMode   = null;
         /**
          * Snapshot of the player's position at the moment of death. Used by the respawn
          * handler to look up region-scoped {@code spawn} flags from the death point, not
@@ -139,11 +149,12 @@ public final class PlayerEventHandler {
             st.tickFlagsRelevant = anyFlagsInChain(here, mgr);
         }
         if (unchanged && !st.tickFlagsRelevant
-                // Live client-side overrides must be unwound before we may go dormant:
-                // a previously applied time/weather lock or speed override still needs its
-                // restore path below to run until it has reset.
+                // Live overrides must be unwound before we may go dormant: a previously applied
+                // time/weather lock, speed override, or game-mode override still needs its restore
+                // path below to run until it has reset.
                 && !st.timeLockActive && !st.weatherLockActive
-                && Double.isNaN(st.origSpeedBase)) {
+                && !st.speedModified
+                && st.origGameMode == null) {
             st.lastSafeX = x; st.lastSafeY = y; st.lastSafeZ = z; st.lastSafeValid = true;
             return;
         }
@@ -315,13 +326,26 @@ public final class PlayerEventHandler {
         // since global flag values for these are typically unset.
         List<ProtectedRegion> applicable = here;
 
-        // game-mode lock
+        // game-mode lock. Snapshot the player's pre-region mode on first override and restore it
+        // on exit — mirrors the MAX_SPEED snapshot/restore below — so a `game-mode` region doesn't
+        // permanently trap the player in the imposed mode after they walk out (WorldGuard restores).
         String gm = mgr.resolveValue(Flags.GAME_MODE, applicable, id);
         if (gm != null) {
             GameType wanted = GameType.byName(gm.toLowerCase(Locale.ROOT), null);
-            if (wanted != null && p.gameMode.getGameModeForPlayer() != wanted) {
-                p.setGameMode(wanted);
+            if (wanted != null) {
+                GameType cur = p.gameMode.getGameModeForPlayer();
+                if (cur != wanted) {
+                    if (st.origGameMode == null) st.origGameMode = cur; // capture once, before changing
+                    p.setGameMode(wanted);
+                }
             }
+        } else if (st.origGameMode != null) {
+            // No game-mode flag applies here anymore — restore the snapshot, unless the player
+            // already happens to be in that mode (or changed it themselves to match).
+            if (p.gameMode.getGameModeForPlayer() != st.origGameMode) {
+                p.setGameMode(st.origGameMode);
+            }
+            st.origGameMode = null;
         }
 
         // heal flag
@@ -394,26 +418,34 @@ public final class PlayerEventHandler {
             } catch (Throwable ignored) {}
         }
 
-        // max-speed: if the region sets a custom MAX_SPEED, force the player's walking speed
-        // attribute. We snapshot the original base value the first time we modify it and
-        // restore it on exit so the player isn't permanently slowed.
+        // max-speed: apply a SESSION-ONLY (transient) attribute modifier instead of overwriting the
+        // base value. Transient modifiers are never persisted, so logging out inside a max-speed
+        // region can no longer bake the modified speed into the player's saved data — the old
+        // setBaseValue approach did, and because the restore snapshot was discarded on logout the
+        // player came back permanently slowed. This is also stateless and self-correcting: our
+        // modifier is present iff a max-speed flag currently applies, and the true base value is
+        // never touched, so removal always returns the player to their real speed.
         Double speed = mgr.resolveValue(Flags.MAX_SPEED, applicable, id);
         try {
             var attr = p.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
             if (attr != null) {
                 if (speed != null) {
-                    if (Double.isNaN(st.origSpeedBase)) {
-                        st.origSpeedBase = attr.getBaseValue();
+                    // ADD_VALUE amount chosen so (base + amount) == the target speed, matching the
+                    // old base-override semantics (sprint/effect multipliers still stack on top).
+                    double amount = speed - attr.getBaseValue();
+                    var existing = attr.getModifier(SPEED_MODIFIER_ID);
+                    if (existing == null || Math.abs(existing.amount() - amount) > 1e-9) {
+                        attr.removeModifier(SPEED_MODIFIER_ID);
+                        attr.addOrUpdateTransientModifier(
+                                new net.minecraft.world.entity.ai.attributes.AttributeModifier(
+                                        SPEED_MODIFIER_ID, amount,
+                                        net.minecraft.world.entity.ai.attributes.AttributeModifier.Operation.ADD_VALUE));
                     }
-                    if (Math.abs(attr.getBaseValue() - speed) > 1e-4) {
-                        attr.setBaseValue(speed);
-                    }
-                } else if (!Double.isNaN(st.origSpeedBase)) {
-                    // No region speed-cap here; restore the snapshot.
-                    if (Math.abs(attr.getBaseValue() - st.origSpeedBase) > 1e-4) {
-                        attr.setBaseValue(st.origSpeedBase);
-                    }
-                    st.origSpeedBase = Double.NaN;
+                    st.speedModified = true;
+                } else if (st.speedModified || attr.getModifier(SPEED_MODIFIER_ID) != null) {
+                    // No max-speed applies here anymore — drop our modifier (base was never touched).
+                    attr.removeModifier(SPEED_MODIFIER_ID);
+                    st.speedModified = false;
                 }
             }
         } catch (Throwable ignored) {}
@@ -888,6 +920,18 @@ public final class PlayerEventHandler {
     public void onPlayerDeath(net.neoforged.neoforge.event.entity.living.LivingDeathEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         PlayerState st = states.computeIfAbsent(p.getUUID(), k -> new PlayerState());
+        // Honour the per-world kill-switch like every other protection handler: in a world with
+        // WGN disabled (useRegions=false), region keep-inventory / keep-xp / spawn-loc must NOT
+        // take effect. Clear any snapshot and let vanilla handle the death. Gating here is enough
+        // for the whole death chain — onLivingDrops/onLivingExpDropPlayer/onPlayerClone/onRespawn
+        // all read this snapshot, so a cleared snapshot makes them no-op to vanilla.
+        if (!mod.isProtectionActive(p.serverLevel())) {
+            st.deathX = st.deathY = st.deathZ = Double.NaN;
+            st.deathDim = null;
+            st.deathKeepInv = false;
+            st.deathKeepXp = false;
+            return;
+        }
         st.deathX = p.getX();
         st.deathY = p.getY();
         st.deathZ = p.getZ();
