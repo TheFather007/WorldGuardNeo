@@ -298,28 +298,26 @@ public final class WorldEventHandler {
         }
         if (!nearRegion) return; // wilderness fluid/fire far from any claim → vanilla, zero cost
 
-        var srcRegions = mgr.getApplicable(src.getX(), src.getY(), src.getZ());
-
         // Single pass over notified sides doing BOTH checks:
         //  (1) cross-border containment — a fluid/fire block in zone X must not propagate into a
         //      neighbouring cell belonging to a region X isn't part of (stops lava/water/fire from
         //      region A or wilderness crossing into adjacent region B; symmetric, no owner check);
         //  (2) per-region fire-spread / lava-fire flag at the target (fire & lava only; water has
         //      no such flag and relies solely on the boundary rule).
-        // We avoid allocating a Set per side: walk the target's applicable list directly.
+        // Check (1) uses the allocation-free crossesBoundary probe (no list build/sort) — for water
+        // (flag == null), which is the overwhelmingly common neighbour-notify, this path allocates
+        // nothing per side. The flag test (2) only runs for fire/lava.
+        int sx = src.getX(), sy = src.getY(), sz = src.getZ();
         for (net.minecraft.core.Direction dir : e.getNotifiedSides()) {
             BlockPos target = src.relative(dir);
-            var targetRegions = mgr.getApplicable(target.getX(), target.getY(), target.getZ());
+            int tx = target.getX(), ty = target.getY(), tz = target.getZ();
             // (1) boundary: any region at the target the source isn't part of → block.
-            for (int i = 0, n = targetRegions.size(); i < n; i++) {
-                if (!containsRegion(srcRegions, targetRegions.get(i).id())) {
-                    e.setCanceled(true);
-                    return;
-                }
+            if (mgr.crossesBoundary(sx, sy, sz, tx, ty, tz)) {
+                e.setCanceled(true);
+                return;
             }
             // (2) per-region flag at target (fire/lava only).
-            if (flag != null
-                    && !mgr.testState(flag, null, target.getX(), target.getY(), target.getZ())) {
+            if (flag != null && !mgr.testState(flag, null, tx, ty, tz)) {
                 e.setCanceled(true);
                 return;
             }

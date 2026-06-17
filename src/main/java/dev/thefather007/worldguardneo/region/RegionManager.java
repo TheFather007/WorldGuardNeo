@@ -117,6 +117,25 @@ public final class RegionManager {
     }
 
     /**
+     * Allocation-free "would propagation from the source point to the target point cross a region
+     * boundary?" probe. Returns true if any region that contains the TARGET does NOT also contain
+     * the SOURCE — i.e. fire/fluid/etc. spreading from source into target would enter (or leave) a
+     * region the source isn't part of. Equivalent to comparing {@code getApplicable(target)} ids
+     * against {@code getApplicable(source)} ids, but walks the spatial-index candidates directly
+     * with no list allocation or sort — important on the NeighborNotifyEvent path, the hottest
+     * event in the mod (every ocean/river/lava flow tick).
+     */
+    public boolean crossesBoundary(double sx, double sy, double sz,
+                                   double tx, double ty, double tz) {
+        List<ProtectedRegion> cand = index.candidates(tx, tz);
+        for (int i = 0, n = cand.size(); i < n; i++) {
+            ProtectedRegion r = cand.get(i);
+            if (r.contains(tx, ty, tz) && !r.contains(sx, sy, sz)) return true;
+        }
+        return false;
+    }
+
+    /**
      * Test whether the given player UUID may perform an action governed by {@code flag} at point.
      * Resolution order: highest-priority region's value wins; parent inherited; DENY beats ALLOW
      * on equal priority; falls back to global region; falls back to flag default.
