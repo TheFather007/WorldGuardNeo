@@ -253,6 +253,14 @@ public final class WGCommands {
                         // Admin maintenance: trigger the claim-expiry scan immediately.
                         .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
                         .executes(c -> cleanupClaims(c.getSource(), mod)))
+                .then(Commands.literal("migrate")
+                        // Convert all region data to another storage backend (takes effect after
+                        // a restart). OP 4 + its own node.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.migrate"))
+                        .then(Commands.literal("json").executes(c -> migrateStorage(c.getSource(), mod, "json")))
+                        .then(Commands.literal("sqlite").executes(c -> migrateStorage(c.getSource(), mod, "sqlite")))
+                        .then(Commands.literal("h2").executes(c -> migrateStorage(c.getSource(), mod, "h2")))
+                        .then(Commands.literal("mysql").executes(c -> migrateStorage(c.getSource(), mod, "mysql"))))
                 .then(Commands.literal("flags")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flags.list"))
                         .executes(c -> listFlags(c.getSource(), mod)));
@@ -266,6 +274,51 @@ public final class WGCommands {
         }
         int n = mod.expiry().runCleanup(mod);
         ok(src, mod, "msg.cleanup.done", "count", n);
+        return 1;
+    }
+
+    /**
+     * /rg migrate &lt;json|sqlite|h2|mysql&gt; — convert all region data to another storage backend.
+     * Writes every world's regions into a freshly-constructed target backend, then updates
+     * {@code storage-format} in config.toml. The live backend is not hot-swapped (open handles),
+     * so the switch takes effect on the next server start. DB backends silently fall back to JSON
+     * if their JDBC driver is absent — the message notes this.
+     */
+    private static int migrateStorage(CommandSourceStack src, WorldGuardNeo mod, String fmt) {
+        var g = mod.config().global();
+        String current = g.storageFormat == null ? "json" : g.storageFormat.trim().toLowerCase(java.util.Locale.ROOT);
+        if (fmt.equals(current)) { err(src, mod, "msg.migrate.same", "format", fmt); return 0; }
+        // Flush in-memory edits to the CURRENT backend first so nothing is lost mid-migration.
+        mod.regions().saveAll();
+        java.nio.file.Path dataDir =
+                net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get().resolve(WorldGuardNeo.MOD_ID);
+        int worlds = 0, regions = 0;
+        dev.thefather007.worldguardneo.storage.RegionStorage target;
+        try {
+            target = WorldGuardNeo.createStorage(fmt, g, dataDir);
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.error("[WorldGuardNeo] migrate: could not open '{}' backend", fmt, t);
+            err(src, mod, "msg.migrate.failed", "format", fmt);
+            return 0;
+        }
+        try {
+            for (var entry : mod.regions().allManagers().entrySet()) {
+                target.save(entry.getKey(), entry.getValue());
+                worlds++;
+                regions += entry.getValue().size();
+            }
+        } catch (Exception ex) {
+            WorldGuardNeo.LOGGER.error("[WorldGuardNeo] migrate to '{}' failed", fmt, ex);
+            try { target.close(); } catch (Exception ignored) {}
+            err(src, mod, "msg.migrate.failed", "format", fmt);
+            return 0;
+        }
+        try { target.close(); } catch (Exception ignored) {}
+        // Persist the new backend choice; it activates on next start.
+        g.storageFormat = fmt;
+        mod.config().save();
+        mod.audit().record(src, "migrate", "-", current + "->" + fmt);
+        ok(src, mod, "msg.migrate.done", "format", fmt, "worlds", worlds, "regions", regions);
         return 1;
     }
 

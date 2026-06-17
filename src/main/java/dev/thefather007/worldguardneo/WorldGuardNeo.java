@@ -226,7 +226,16 @@ public final class WorldGuardNeo {
      * JSON internally if its driver/connection is unavailable, so this never fails hard.
      */
     private static RegionStorage createStorage(WGConfig.GlobalSection g, java.nio.file.Path dataDir) {
-        String fmt = g.storageFormat == null ? "json" : g.storageFormat.trim().toLowerCase(java.util.Locale.ROOT);
+        return createStorage(g.storageFormat, g, dataDir);
+    }
+
+    /**
+     * Build a storage backend for an explicit format string (used by {@code /rg migrate} to
+     * construct the target backend without touching the live one). MySQL still reads its
+     * connection settings from {@code g}.
+     */
+    public static RegionStorage createStorage(String format, WGConfig.GlobalSection g, java.nio.file.Path dataDir) {
+        String fmt = format == null ? "json" : format.trim().toLowerCase(java.util.Locale.ROOT);
         switch (fmt) {
             case "sqlite":
                 return new SqliteRegionStorage(dataDir);

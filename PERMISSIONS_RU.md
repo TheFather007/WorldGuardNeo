@@ -79,6 +79,7 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |
+| `worldguardneo.migrate` | OP 4 | `/rg migrate <json\|sqlite\|h2\|mysql>` — перенос данных регионов в другой бэкенд (активируется после перезапуска). |
 | `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. Также даёт `/rg cleanup` (запуск истечения клеймов вручную). |
 | `worldguardneo.notify` | OP 2 | Получение оповещений, когда игроки пересекают регионы с флагами `notify-enter` / `notify-leave`. |
 

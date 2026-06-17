@@ -114,6 +114,7 @@ public final class OpResolver implements PermissionResolver {
         // should be granted the explicit LP node rather than relying on OP level.
         nodeToLevel.put("worldguardneo.reload",               4);
         nodeToLevel.put("worldguardneo.backup",               4);
+        nodeToLevel.put("worldguardneo.migrate",              4);   // /rg migrate — convert storage backend
         nodeToLevel.put("worldguardneo.notify",               mod);
     }
 
