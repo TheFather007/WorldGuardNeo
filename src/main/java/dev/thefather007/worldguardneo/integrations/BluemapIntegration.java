@@ -66,6 +66,8 @@ public final class BluemapIntegration {
     /** Marker setters. */
     private Method markerSetMarkers; // MarkerSet.getMarkers() -> Map<String,Marker>
     private Method markerSetFillColor, markerSetLineColor, markerSetLineWidth;
+    /** Popup: label (title) + detail (HTML shown on click). */
+    private Method markerSetLabel, markerSetDetail;
     /** Color(int r,int g,int b,float a). */
     private java.lang.reflect.Constructor<?> colorCtor;
 
@@ -125,6 +127,9 @@ public final class BluemapIntegration {
         markerSetFillColor = smCls.getMethod("setFillColor", colorCls);
         markerSetLineColor = smCls.getMethod("setLineColor", colorCls);
         markerSetLineWidth = smCls.getMethod("setLineWidth", int.class);
+        // setLabel/setDetail are inherited from Marker/DetailMarker — getMethod finds them.
+        markerSetLabel     = smCls.getMethod("setLabel", String.class);
+        markerSetDetail    = smCls.getMethod("setDetail", String.class);
     }
 
     private void registerCallbacks() throws Exception {
@@ -277,6 +282,9 @@ public final class BluemapIntegration {
         markerSetFillColor.invoke(marker, fillColor);
         markerSetLineColor.invoke(marker, lineColor);
         markerSetLineWidth.invoke(marker, 2);
+        // Click-popup: region id as the title, owners + flags as the detail body.
+        markerSetLabel.invoke(marker, r.id());
+        markerSetDetail.invoke(marker, MarkerPopup.html(r));
         markers.put(r.id(), marker);
     }
 }

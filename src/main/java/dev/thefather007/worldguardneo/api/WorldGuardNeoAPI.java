@@ -87,6 +87,17 @@ public final class WorldGuardNeoAPI {
         return mod.regions().get(level).getApplicable(pos.getX(), pos.getY(), pos.getZ());
     }
 
+    /**
+     * Script-friendly overload of {@link #getRegionAt(ServerLevel, BlockPos)} taking int coords —
+     * convenient from KubeJS where you often have raw block coordinates rather than a BlockPos.
+     */
+    public static Optional<ProtectedRegion> getRegionAt(ServerLevel level, int x, int y, int z) {
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return Optional.empty();
+        List<ProtectedRegion> applicable = mod.regions().get(level).getApplicable(x, y, z);
+        return applicable.isEmpty() ? Optional.empty() : Optional.of(applicable.get(0));
+    }
+
     /** Get a region by id. */
     public static Optional<ProtectedRegion> getRegion(ServerLevel level, String id) {
         WorldGuardNeo mod = WorldGuardNeo.get();
@@ -214,6 +225,34 @@ public final class WorldGuardNeoAPI {
         // resolveValue takes coords first, actor last
         Object v = mgr.resolveValue(flag, pos.getX(), pos.getY(), pos.getZ(), playerUuid);
         return Optional.ofNullable((T) v);
+    }
+
+    /**
+     * Script-friendly state-flag query by flag NAME (e.g. {@code "pvp"}, {@code "build"}). Designed
+     * for KubeJS and other scripting: no need to import the {@link StateFlag} constants. Unknown or
+     * non-state flag names resolve to {@code true} (allow) so a typo never hard-blocks an action.
+     * {@code playerUuid} may be null for non-player contexts.
+     */
+    public static boolean queryFlag(ServerLevel level, String flagName,
+                                    @Nullable UUID playerUuid, int x, int y, int z) {
+        Flag<?> f = Flags.get(flagName);
+        if (!(f instanceof StateFlag sf)) return true;
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return sf.defaultAllow();
+        return mod.regions().get(level).testState(sf, playerUuid, x, y, z);
+    }
+
+    /**
+     * Script-friendly value-flag query by flag NAME — returns the resolved value (Integer, String,
+     * Set, …) or {@code Optional.empty()} if unset at the position. Useful from KubeJS to read
+     * custom/value flags without importing the flag constant.
+     */
+    public static Optional<Object> queryValue(ServerLevel level, String flagName, int x, int y, int z) {
+        Flag<?> f = Flags.get(flagName);
+        if (f == null) return Optional.empty();
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return Optional.empty();
+        return Optional.ofNullable(mod.regions().get(level).resolveValue(f, x, y, z, null));
     }
 
     /* ====================== Ownership checks ====================== */

@@ -71,6 +71,7 @@ public final class SquaremapIntegration {
     private Method markerMarkerOptions;           // Marker.markerOptions(MarkerOptions)
     private Method markerOptionsBuilder;          // MarkerOptions.builder()
     private Method optionsStrokeColor, optionsFillColor, optionsStrokeWeight, optionsStrokeOpacity, optionsFillOpacity;
+    private Method optionsClickTooltip; // MarkerOptions.Builder.clickTooltip(String) — region info popup
     private Method optionsBuilderBuild;
 
     /** Layer key used everywhere — same Key namespace for register/lookup. */
@@ -145,6 +146,7 @@ public final class SquaremapIntegration {
         optionsStrokeWeight          = mOptsBuilderCls.getMethod("strokeWeight", int.class);
         optionsStrokeOpacity         = mOptsBuilderCls.getMethod("strokeOpacity", double.class);
         optionsFillOpacity           = mOptsBuilderCls.getMethod("fillOpacity", double.class);
+        optionsClickTooltip          = mOptsBuilderCls.getMethod("clickTooltip", String.class);
         optionsBuilderBuild          = mOptsBuilderCls.getMethod("build");
 
         // Single shared Key for the layer registry — same identifier per world.
@@ -263,6 +265,8 @@ public final class SquaremapIntegration {
         optionsStrokeWeight.invoke(optsBuilder, 2);
         optionsStrokeOpacity.invoke(optsBuilder, 1.0d);
         optionsFillOpacity.invoke(optsBuilder, 0.25d);
+        // Click-popup with region info/flags (the "click a region → see info" feature).
+        optionsClickTooltip.invoke(optsBuilder, MarkerPopup.html(r));
         Object opts = optionsBuilderBuild.invoke(optsBuilder);
         markerMarkerOptions.invoke(marker, opts);
 
