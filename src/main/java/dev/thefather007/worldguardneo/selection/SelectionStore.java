@@ -91,6 +91,30 @@ public final class SelectionStore {
         return sel.polyPoints.size();
     }
 
+    /**
+     * Load an existing region's geometry into the player's selection so it can be redefined,
+     * expanded, or just outlined ({@code /rg select}). Global regions have no geometry and are
+     * ignored. The selection's world is set to the player's current dimension.
+     */
+    public void selectRegion(ServerPlayer p, ProtectedRegion r) {
+        Selection sel = getOrCreate(p.getUUID());
+        sel.world = p.serverLevel().dimension();
+        resetGeometry(sel);
+        if (r instanceof CuboidRegion c) {
+            sel.mode = Mode.CUBOID;
+            sel.pos1 = c.minimumBound();
+            sel.pos2 = c.maximumBound();
+        } else if (r instanceof PolygonalRegion poly) {
+            sel.mode = Mode.POLYGON;
+            sel.polyPoints.addAll(poly.points());
+            sel.polyMinY = poly.minY();
+            sel.polyMaxY = poly.maxY();
+        } else {
+            return; // global / geometry-less — nothing to load
+        }
+        render(p, sel);
+    }
+
     /** Drop the player's entire selection and clear the client outline. */
     public void reset(ServerPlayer p) {
         selections.remove(p.getUUID());

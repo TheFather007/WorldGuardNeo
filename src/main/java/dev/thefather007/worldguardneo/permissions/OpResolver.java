@@ -75,6 +75,8 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.region.delete",        0);   // own regions
         nodeToLevel.put("worldguardneo.region.delete.others", admin);   // arbitrary regions
         nodeToLevel.put("worldguardneo.region.redefine",      mod);
+        nodeToLevel.put("worldguardneo.region.select",        mod);   // /rg select — load into selection (OP 2)
+        nodeToLevel.put("worldguardneo.region.transfer",      admin); // /rg transfer — sole-ownership handoff (OP 3)
         nodeToLevel.put("worldguardneo.region.addowner",      mod);
         nodeToLevel.put("worldguardneo.region.addmember",     mod);
         nodeToLevel.put("worldguardneo.region.removeowner",   mod);
@@ -98,6 +100,9 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.selection.pos1",       0);   // /rg pos1
         nodeToLevel.put("worldguardneo.selection.pos2",       0);   // /rg pos2
         nodeToLevel.put("worldguardneo.selection.point",      0);   // /rg point
+        // Explicit-coords pos1/pos2 — higher bar than the "here" variants since it can place a
+        // corner anywhere (and run from console via /execute as). OP 4.
+        nodeToLevel.put("worldguardneo.selection.pos.coords", 4);   // /rg pos1|pos2 <x y z>
         // The wand-give command. OP 0 (everyone) by default so any player can grab the selection
         // wand and claim land, mirroring selection.use. Admins can restrict via LuckPerms.
         nodeToLevel.put("worldguardneo.selection.wand",       0);

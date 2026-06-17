@@ -16,6 +16,8 @@ import dev.thefather007.worldguardneo.selection.WandItem;
 import dev.thefather007.worldguardneo.util.Vec3;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -95,10 +97,18 @@ public final class WGCommands {
                 .then(Commands.literal("pos1")
                         // Set cuboid corner 1 to the player's current block position.
                         .requires(s -> mod.perms().has(s, "worldguardneo.selection.pos1"))
-                        .executes(c -> setPosHere(c.getSource(), mod, 1)))
+                        .executes(c -> setPosHere(c.getSource(), mod, 1))
+                        // /rg pos1 <x y z> — explicit coords (also usable from console via
+                        // /execute as <player>). Higher bar: OP 4 + its own node.
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .requires(s -> mod.perms().has(s, "worldguardneo.selection.pos.coords"))
+                                .executes(c -> setPosCoords(c, mod, 1))))
                 .then(Commands.literal("pos2")
                         .requires(s -> mod.perms().has(s, "worldguardneo.selection.pos2"))
-                        .executes(c -> setPosHere(c.getSource(), mod, 2)))
+                        .executes(c -> setPosHere(c.getSource(), mod, 2))
+                        .then(Commands.argument("pos", BlockPosArgument.blockPos())
+                                .requires(s -> mod.perms().has(s, "worldguardneo.selection.pos.coords"))
+                                .executes(c -> setPosCoords(c, mod, 2))))
                 .then(Commands.literal("point")
                         // Append a polygon vertex at the player's current block position.
                         .requires(s -> mod.perms().has(s, "worldguardneo.selection.point"))
@@ -113,6 +123,19 @@ public final class WGCommands {
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .executes(c -> infoRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod)))
                         .executes(c -> infoRegionAtPlayer(c.getSource(), mod)))
+                .then(Commands.literal("select")
+                        // Load an existing region's geometry into your selection (for redefine /
+                        // expand). OP 2 + its own node.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.region.select"))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .executes(c -> selectRegion(c.getSource(),
+                                        StringArgumentType.getString(c, "id"), mod))))
+                .then(Commands.literal("transfer")
+                        // Transfer sole ownership of a region to another player. OP 3 + its own node.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.region.transfer"))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .executes(c -> transferRegion(c, mod)))))
                 .then(Commands.literal("list")
                         // Базовый /rg list (без аргумента) — свои регионы, доступно всем
                         // с базовым пермишионом region.list (default OP 0 = все игроки).
@@ -302,6 +325,77 @@ public final class WGCommands {
         Vec3 v = new Vec3(p.getBlockX(), p.getBlockY(), p.getBlockZ());
         int n = mod.selections().addPolyPoint(p, v);
         ok(src, mod, "msg.selection.point", "n", n, "pos", v.x() + "," + v.y() + "," + v.z());
+        return 1;
+    }
+
+    /**
+     * /rg pos1|pos2 &lt;x y z&gt; — set a cuboid corner to explicit coordinates. Supports relative
+     * (~) coords and runs from console via {@code /execute as <player>}; a pure-console invocation
+     * with no player context is rejected (a selection is always tied to a player).
+     */
+    private static int setPosCoords(CommandContext<CommandSourceStack> c, WorldGuardNeo mod, int which)
+            throws CommandSyntaxException {
+        CommandSourceStack src = c.getSource();
+        ServerPlayer p = src.getPlayer();
+        if (p == null) { err(src, mod, "msg.selection.needs-player"); return 0; }
+        BlockPos bp = BlockPosArgument.getBlockPos(c, "pos");
+        mod.selections().setMode(p, SelectionStore.Mode.CUBOID);
+        Vec3 v = new Vec3(bp.getX(), bp.getY(), bp.getZ());
+        if (which == 1) {
+            mod.selections().setPos1(p, v);
+            ok(src, mod, "msg.selection.pos1", "pos", v.x() + "," + v.y() + "," + v.z());
+        } else {
+            mod.selections().setPos2(p, v);
+            ok(src, mod, "msg.selection.pos2", "pos", v.x() + "," + v.y() + "," + v.z());
+        }
+        return 1;
+    }
+
+    /** /rg select &lt;id&gt; — load an existing region's geometry into the caller's selection. */
+    private static int selectRegion(CommandSourceStack src, String id, WorldGuardNeo mod)
+            throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        var ropt = mod.regions().get(p.serverLevel()).get(id);
+        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        ProtectedRegion r = ropt.get();
+        if (r instanceof GlobalRegion) { err(src, mod, "msg.region.global-select", "id", id); return 0; }
+        mod.selections().selectRegion(p, r);
+        ok(src, mod, "msg.region.selected", "id", id);
+        return 1;
+    }
+
+    /**
+     * /rg transfer &lt;id&gt; &lt;player&gt; — hand sole ownership to another player. The caller must
+     * be an owner of the region (or hold {@code region.bypass}); members are kept untouched.
+     */
+    private static int transferRegion(CommandContext<CommandSourceStack> c, WorldGuardNeo mod)
+            throws CommandSyntaxException {
+        ServerPlayer self = c.getSource().getPlayerOrException();
+        String id  = StringArgumentType.getString(c, "id");
+        String who = StringArgumentType.getString(c, "player");
+        var mgr = mod.regions().get(self.serverLevel());
+        var ropt = mgr.get(id);
+        if (ropt.isEmpty()) { err(c.getSource(), mod, "msg.region.unknown", "id", id); return 0; }
+        ProtectedRegion r = ropt.get();
+        if (r instanceof GlobalRegion) { err(c.getSource(), mod, "msg.region.global-select", "id", id); return 0; }
+        boolean bypass  = mod.perms().has(self, "worldguardneo.region.bypass");
+        if (!bypass && !r.isOwner(self.getUUID())) {
+            err(c.getSource(), mod, "msg.region.notyours", "id", id);
+            return 0;
+        }
+        var uuidOpt = dev.thefather007.worldguardneo.util.UuidResolver.resolve(self.getServer(), who);
+        if (uuidOpt.isEmpty()) { err(c.getSource(), mod, "msg.player.unknown", "player", who); return 0; }
+        UUID target = uuidOpt.get();
+        // Sole-ownership transfer: clear existing owners, then set the target as the only owner.
+        r.owners().clear();
+        r.owners().add(target);
+        mod.regions().saveRegion(self.serverLevel(), r.id());
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
+                new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
+                        self.serverLevel(), r,
+                        dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.UPDATED, self));
+        ok(c.getSource(), mod, "msg.region.transferred", "id", id,
+                "player", dev.thefather007.worldguardneo.util.UuidResolver.nameOf(self.getServer(), target));
         return 1;
     }
 

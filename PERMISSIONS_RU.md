@@ -31,6 +31,8 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.delete` | OP 0 | `/rg remove` — удалить **свой** регион. |
 | `worldguardneo.region.delete.others` | OP 3 | Удалить **любой** регион. |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — изменить размер региона под выделение. |
+| `worldguardneo.region.select` | OP 2 | `/rg select` — загрузить геометрию региона в своё выделение. |
+| `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — передать единоличное владение другому игроку. |
 | `worldguardneo.region.info` | OP 0 | `/rg info` — посмотреть видимый регион. |
 | `worldguardneo.region.info.others` | OP 2 | Просмотр чужих регионов. |
 | `worldguardneo.region.info.global` | OP 4 | Просмотр глобального региона (`__global__`). |
@@ -72,6 +74,7 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.selection.pos1` | OP 0 | `/rg pos1` — задать угол куба 1 по вашей позиции. |
 | `worldguardneo.selection.pos2` | OP 0 | `/rg pos2` — задать угол куба 2 по вашей позиции. |
 | `worldguardneo.selection.point` | OP 0 | `/rg point` — добавить вершину полигона по вашей позиции. |
+| `worldguardneo.selection.pos.coords` | OP 4 | `/rg pos1 <x y z>` / `pos2 <x y z>` — явные координаты (можно из консоли через `/execute as`). |
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |

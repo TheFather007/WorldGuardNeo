@@ -31,6 +31,8 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.delete` | OP 0 | `/rg remove` — delete **your own** region. |
 | `worldguardneo.region.delete.others` | OP 3 | Delete **anyone's** region. |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — resize a region to your selection. |
+| `worldguardneo.region.select` | OP 2 | `/rg select` — load a region's geometry into your selection. |
+| `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — hand sole ownership to another player. |
 | `worldguardneo.region.info` | OP 0 | `/rg info` — view a region you can see. |
 | `worldguardneo.region.info.others` | OP 2 | View regions owned by others. |
 | `worldguardneo.region.info.global` | OP 4 | View the global (`__global__`) region. |
@@ -72,6 +74,7 @@ In addition, **each individual flag** has its own node `worldguardneo.flag.<name
 | `worldguardneo.selection.pos1` | OP 0 | `/rg pos1` — set cuboid corner 1 at your position. |
 | `worldguardneo.selection.pos2` | OP 0 | `/rg pos2` — set cuboid corner 2 at your position. |
 | `worldguardneo.selection.point` | OP 0 | `/rg point` — add a polygon vertex at your position. |
+| `worldguardneo.selection.pos.coords` | OP 4 | `/rg pos1 <x y z>` / `pos2 <x y z>` — explicit coords (console-capable via `/execute as`). |
 | `worldguardneo.region.admin` | OP 3 | Administrative region operations. |
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |

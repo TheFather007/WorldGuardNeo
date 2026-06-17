@@ -77,15 +77,34 @@ public final class SelectionWandHandler {
             int n = store.addPolyPoint(p, v);
             msg(p, "msg.selection.point", "n", String.valueOf(n),
                     "pos", v.x() + "," + v.y() + "," + v.z());
-            return;
-        }
-        if (leftClick) {
+        } else if (leftClick) {
             store.setPos1(p, v);
             msg(p, "msg.selection.pos1", "pos", v.x() + "," + v.y() + "," + v.z());
         } else {
             store.setPos2(p, v);
             msg(p, "msg.selection.pos2", "pos", v.x() + "," + v.y() + "," + v.z());
         }
+        // Live dimensions in the action bar — refreshed on every click. Almost free: a few ints.
+        showDimensions(p, sel);
+    }
+
+    /** Show the current selection's size (W×H×L + volume, or polygon point count + Y span). */
+    private void showDimensions(ServerPlayer p, SelectionStore.Selection sel) {
+        String bar;
+        if (sel.mode == SelectionStore.Mode.CUBOID) {
+            if (sel.pos1 == null || sel.pos2 == null) return; // need both corners
+            int w = Math.abs(sel.pos2.x() - sel.pos1.x()) + 1;
+            int h = Math.abs(sel.pos2.y() - sel.pos1.y()) + 1;
+            int l = Math.abs(sel.pos2.z() - sel.pos1.z()) + 1;
+            bar = mod.i18n().format("msg.selection.dims",
+                    "w", w, "h", h, "l", l, "vol", (long) w * h * l);
+        } else {
+            if (sel.polyPoints.isEmpty()) return;
+            bar = mod.i18n().format("msg.selection.poly-dims",
+                    "n", sel.polyPoints.size(),
+                    "miny", sel.polyMinY, "maxy", sel.polyMaxY);
+        }
+        p.displayClientMessage(Component.literal(bar), true); // true = action bar
     }
 
     private void msg(ServerPlayer p, String key, Object... args) {
