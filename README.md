@@ -13,7 +13,7 @@
 
 **English** · [Русский](README_RU.md)
 
-[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [🧩 KubeJS](KUBEJS.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -174,11 +174,14 @@ Both `/region` and `/rg` work. Region ids are single words.
 | --- | --- |
 | `/rg wand` | Get the built-in selection wand item (one per player) |
 | `/rg sel <cuboid\|poly\|clear>` | Switch selection mode, or clear the current selection |
-| `/rg pos1` / `/rg pos2` | Set cuboid corner 1 / 2 to your current position |
+| `/rg pos1` / `/rg pos2` `[x y z]` | Set cuboid corner 1 / 2 to your position, or explicit coords (OP 4) |
 | `/rg point` | Add a polygon vertex at your current position |
+| `/rg select <id>` | Load a region's geometry into your selection (to redefine/expand) |
 | `/rg claim <id>` | Claim your current selection as a new region |
 | `/rg redefine <id>` | Resize a region to your current selection |
-| `/rg remove <id>` | Delete a region |
+| `/rg remove <id>` | Delete a region (recoverable with `/rg undo`) |
+| `/rg undo` | Restore the most recently removed region in this world |
+| `/rg transfer <id> <player>` | Hand sole ownership to another player |
 | `/rg info [id]` | Show a region's type, size, bounds, owners, members, flags — and highlight its outline |
 | `/rg list [player]` | List regions (optionally for a player) |
 | `/rg lists [radius]` | List regions near you (default radius 50) |
@@ -194,6 +197,7 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg save` | Flush regions to storage |
 | `/rg reload` | Reload config and language |
 | `/rg cleanup` | Run the claim-expiry scan now (admin) |
+| `/rg migrate <json\|sqlite\|h2\|mysql>` | Convert region data to another storage backend (activates on restart) |
 | `/rg debug` | Diagnostics: spatial-index stats, active integrations |
 
 ## Permissions

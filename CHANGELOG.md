@@ -10,6 +10,34 @@
 
 ---
 
+## build 17 (v1.3) — 2026-06-17
+
+Расширение возможностей поверх встроенного выделения: новые команды, флаги защиты, операционные
+инструменты и интеграции.
+
+**Команды выделения/регионов.** `/rg pos1|pos2 <x y z>` — явные координаты (поддержка `~` и консоли
+через `/execute as`, узел `selection.pos.coords`, OP 4). `/rg select <id>` — загрузка геометрии
+региона в выделение (узел `region.select`, OP 2). `/rg transfer <id> <player>` — передача
+единоличного владения (узел `region.transfer`, OP 3). Палочка показывает live-размеры выделения
+(Ш×В×Д + объём / число точек) в actionbar при кликах.
+
+**Новые флаги защиты** (все по умолчанию allow): `vehicle-place`, `vehicle-enter`,
+`item-frame-rotate`, `sign-edit`, `lectern-take`, `armor-stand-use`, `glide` (контроль элитр),
+`bucket-fill`/`bucket-empty`, а также `spawn-limit` — лимиты спавна по типу (`entity-id:max`).
+
+**Операционная надёжность.** Аудит-лог (`logs/worldguardneo-audit.log`) — кто/что/когда по
+create/redefine/remove/undo/transfer/flag/priority/parent/членству. Soft-delete: `/rg remove`
+кладёт регион в посессионную корзину, `/rg undo` восстанавливает (узел `region.undo`, OP 2).
+`/rg migrate <json|sqlite|h2|mysql>` — конвертация данных между бэкендами (узел `migrate`, OP 4;
+активируется после перезапуска).
+
+**Интеграции/скриптинг.** Маркеры регионов на BlueMap и squaremap получили всплывающее окно по
+клику (приоритет, владельцы, участники, флаги). KubeJS: публичный фасад `WorldGuardNeoAPI`
+вызывается из скриптов через `Java.loadClass`; добавлены удобные методы (`getRegionAt` по int,
+`queryFlag`/`queryValue` по имени флага) и руководство [KUBEJS.md](KUBEJS.md).
+
+---
+
 ## build 16 (v1.3) — 2026-06-17
 
 Крупное расширение: полностью свой инструмент выделения вместо WorldEdit, истечение неактивных
