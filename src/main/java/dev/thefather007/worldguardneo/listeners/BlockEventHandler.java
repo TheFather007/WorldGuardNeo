@@ -53,12 +53,8 @@ public final class BlockEventHandler {
          && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
         if (canBypass(p)) return;
         var applicable = mgr.getApplicable(x, y, z);
-        if (!applicable.isEmpty()) {
-            var deniedEvent = new dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent(
-                    applicable.get(0), Flags.BUILD, p, "block-break");
-            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(deniedEvent);
-            if (deniedEvent.isCanceled()) return;
-        }
+        if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
+                .isOverridden(applicable.get(0), Flags.BUILD, p, "block-break")) return;
         e.setCanceled(true);
         denyMessage(p, mgr, bp, "break", null);
     }
@@ -83,16 +79,10 @@ public final class BlockEventHandler {
         if (mgr.testBuildAccess(Flags.BLOCK_PLACE, x, y, z, id)
          && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
         if (canBypass(p)) return;
-        // Public API override hook — mirrors onBreak so the documented RegionFlagDeniedEvent
-        // covers BOTH build actions (break and place), not just break. A listener may cancel the
-        // event to permit the placement despite the region denial.
+        // Public API override hook (see RegionFlagDeniedEvent) — a listener may cancel to permit.
         var applicable = mgr.getApplicable(x, y, z);
-        if (!applicable.isEmpty()) {
-            var deniedEvent = new dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent(
-                    applicable.get(0), Flags.BUILD, p, "block-place");
-            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(deniedEvent);
-            if (deniedEvent.isCanceled()) return;
-        }
+        if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
+                .isOverridden(applicable.get(0), Flags.BUILD, p, "block-place")) return;
         e.setCanceled(true);
         // Re-sync inventory: cancelling EntityPlaceEvent keeps the item server-side but the
         // client already removed it from hand; without this the block vanishes until relog.
@@ -183,6 +173,11 @@ public final class BlockEventHandler {
         }
         if (allowed) return;
         if (canBypass(p)) return;
+        // Public API override hook for interact/container denials (see RegionFlagDeniedEvent).
+        var applicable = mgr.getApplicable(x, y, z);
+        if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
+                .isOverridden(applicable.get(0), isContainer ? Flags.CHEST_ACCESS : Flags.INTERACT,
+                        p, isContainer ? "container" : "interact")) return;
         e.setCanceled(true);
         syncInventory(p);
         // Pick the clearest message — or stay silent when a message would be noise.

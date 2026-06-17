@@ -8,17 +8,11 @@ import net.neoforged.bus.api.ICancellableEvent;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Fired when a region flag denies a block-break action.
+ * Fired when a region flag denies an action, giving other mods a chance to OVERRIDE the denial.
  *
- * <p>NOTE: As of current implementation, this event fires only on {@code BLOCK_BREAK} /
- * {@code BUILD} denials in {@link dev.thefather007.worldguardneo.listeners.BlockEventHandler}.
- * Other denial paths (place, interact, PVP, mob damage, fire spread, etc.) do NOT
- * currently fire this event — they cancel the underlying NeoForge event directly.
- * Listeners that want to grant exceptions on those paths should subscribe to the
- * NeoForge events directly with a HIGH priority and uncancel as needed.
- *
- * <p>Future versions may extend coverage to other denial paths. The event signature
- * is stable; what changes is the set of triggers.
+ * <p>Coverage: block-break, block-place, interact, container (chest-access), and PvP denials all
+ * fire this event. Purely environmental denials with no entity actor (fire/fluid spread, random
+ * ticks, dispensers) do not.
  *
  * <p>Implements {@link ICancellableEvent} — listeners can call {@code setCanceled(true)}
  * to OVERRIDE the denial and let the action proceed. This is the integration point for
@@ -52,6 +46,18 @@ public final class RegionFlagDeniedEvent extends Event implements ICancellableEv
         this.flag = flag;
         this.actor = actor;
         this.reason = reason;
+    }
+
+    /**
+     * Post a denial event for {@code region} and return whether a listener OVERRODE it
+     * ({@code setCanceled(true)} → the caller should permit the action). Central helper used by
+     * every denial path so coverage stays consistent.
+     */
+    public static boolean isOverridden(ProtectedRegion region, Flag<?> flag,
+                                       @Nullable Entity actor, String reason) {
+        RegionFlagDeniedEvent e = new RegionFlagDeniedEvent(region, flag, actor, reason);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(e);
+        return e.isCanceled();
     }
 
     /** The region whose flag caused the denial. */

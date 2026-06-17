@@ -248,11 +248,24 @@ public final class WorldGuardNeoAPI {
      * (e.g. {@code "mymod-feature"}) to avoid collisions.
      *
      * <p>Returns the registered flag instance — keep a reference to it for later
-     * {@code queryFlag()} / {@code queryValue()} calls.
+     * {@code queryFlag()} / {@code queryValue()} calls. Once registered, the flag is fully
+     * first-class: settable via {@code /rg flag}, listed in {@code /rg flags}, and persisted
+     * by every storage backend.
      *
-     * @throws IllegalStateException if a flag with the same name is already registered
+     * <p>Idempotent: if a flag with the same name and type is already registered (e.g. your
+     * mod's class was initialized twice), the EXISTING instance is returned instead of throwing,
+     * so you can safely assign it to a {@code static final} field.
+     *
+     * @throws IllegalStateException if a flag with the same name but a DIFFERENT type exists
      */
+    @SuppressWarnings("unchecked")
     public static <F extends Flag<?>> F registerFlag(F flag) {
+        Flag<?> existing = Flags.get(flag.name());
+        if (existing != null) {
+            if (existing.getClass() == flag.getClass()) return (F) existing;
+            throw new IllegalStateException("Flag '" + flag.name()
+                    + "' is already registered with a different type (" + existing.getClass().getSimpleName() + ")");
+        }
         Flags.register(flag);
         return flag;
     }

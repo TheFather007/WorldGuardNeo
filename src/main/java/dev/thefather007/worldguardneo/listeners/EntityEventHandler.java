@@ -375,12 +375,18 @@ public final class EntityEventHandler {
                 applicable = mgr.getApplicable(victim.getX(), victim.getY(), victim.getZ());
                 StateFlag gate = victim instanceof Player ? Flags.PVP : Flags.MOB_DAMAGE;
                 if (!mgr.testState(gate, applicable, attacker.getUUID())) {
-                    e.setCanceled(true);
-                    attacker.displayClientMessage(
-                            net.minecraft.network.chat.Component.literal(mod.i18n().raw(
-                                    victim instanceof Player ? "msg.attack.pvp-denied"
-                                                             : "msg.attack.mob-denied")), true);
-                    return;
+                    // Public API override hook (see RegionFlagDeniedEvent) — a listener may permit.
+                    boolean overridden = !applicable.isEmpty()
+                            && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent.isOverridden(
+                                    applicable.get(0), gate, attacker, victim instanceof Player ? "pvp" : "mob-damage");
+                    if (!overridden) {
+                        e.setCanceled(true);
+                        attacker.displayClientMessage(
+                                net.minecraft.network.chat.Component.literal(mod.i18n().raw(
+                                        victim instanceof Player ? "msg.attack.pvp-denied"
+                                                                 : "msg.attack.mob-denied")), true);
+                        return;
+                    }
                 }
             }
         }
