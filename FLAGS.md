@@ -21,14 +21,15 @@ Set a flag with `/rg flag <region> <flag> [value]`; omit the value to clear it. 
 - Each flag is gated by its own permission node `worldguardneo.flag.<name>` (default OP 2). `region.flag.bypass` or `region.bypass` skips the per-flag check.
 - Add `-g <group>` before the value to scope a flag to `OWNERS` / `MEMBERS` / `NON_OWNERS` / `NON_MEMBERS` / `ALL` (requires `region.flag.group`).
 
-Two flags are **declared but not yet enforced** (kept for save-format stability): `receive-chat` and `allowed-enchants`.
+The `on-entry` / `on-exit` flags run a console command (placeholders `%player%`, `%region%`, `%world%`) when a player crosses the border — settable by admins only, since the command runs with console authority.
 
 ## All flags
 
 | Flag | Type | Default | Permission | Description |
 | --- | --- | --- | --- | --- |
 | `allowed-cmds` | list | — | `worldguardneo.flag.allowed-cmds` | Whitelist of allowed commands (overrides blocked). |
-| `allowed-enchants` | list | — | `worldguardneo.flag.allowed-enchants` | Whitelist of permitted enchantments (DECLARED — not yet enforced). |
+| `on-entry` | text | — | `worldguardneo.flag.on-entry` | Console command run when a player enters (`%player%`/`%region%`/`%world%`). |
+| `on-exit` | text | — | `worldguardneo.flag.on-exit` | Console command run when a player leaves (`%player%`/`%region%`/`%world%`). |
 | `block-break` | state (allow/deny) | allow | `worldguardneo.flag.block-break` | Allow or deny block breaking specifically. |
 | `block-place` | state (allow/deny) | allow | `worldguardneo.flag.block-place` | Allow or deny block placement specifically. |
 | `blocked-cmds` | list | — | `worldguardneo.flag.blocked-cmds` | Commands forbidden inside the region. |
@@ -95,7 +96,7 @@ Two flags are **declared but not yet enforced** (kept for save-format stability)
 | `pistons` | state (allow/deny) | allow | `worldguardneo.flag.pistons` | Allow or deny pistons pushing/pulling blocks across the region border. |
 | `player-damage` | state (allow/deny) | allow | `worldguardneo.flag.player-damage` | Allow or deny generic damage to players from non-player sources. |
 | `pvp` | state (allow/deny) | allow | `worldguardneo.flag.pvp` | Allow or deny player-vs-player damage. |
-| `receive-chat` | state (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Allow or deny receiving chat while inside the region (DECLARED — not yet enforced). |
+| `receive-chat` | state (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Allow or deny receiving other players' chat while inside the region. |
 | `redstone` | state (allow/deny) | allow | `worldguardneo.flag.redstone` | Allow or deny redstone signal propagation within the region. |
 | `send-chat` | state (allow/deny) | allow | `worldguardneo.flag.send-chat` | Allow or deny sending chat from within the region. |
 | `sleep` | state (allow/deny) | allow | `worldguardneo.flag.sleep` | Allow or deny sleeping in beds. |

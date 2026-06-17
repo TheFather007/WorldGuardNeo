@@ -21,14 +21,15 @@
 - Каждый флаг защищён своим правом `worldguardneo.flag.<имя>` (по умолчанию OP 2). `region.flag.bypass` или `region.bypass` пропускает проверку.
 - `-g <группа>` перед значением ограничивает флаг группой `OWNERS` / `MEMBERS` / `NON_OWNERS` / `NON_MEMBERS` / `ALL` (нужно право `region.flag.group`).
 
-Два флага **объявлены, но пока не применяются** (сохранены ради совместимости формата): `receive-chat` и `allowed-enchants`.
+Флаги `on-entry` / `on-exit` выполняют консольную команду (плейсхолдеры `%player%`, `%region%`, `%world%`) при пересечении границы региона — задаются только администраторами, т.к. команда исполняется с правами консоли.
 
 ## Все флаги
 
 | Флаг | Тип | По умолчанию | Право | Описание |
 | --- | --- | --- | --- | --- |
 | `allowed-cmds` | список | — | `worldguardneo.flag.allowed-cmds` | Белый список разрешённых команд (имеет приоритет над blocked). |
-| `allowed-enchants` | список | — | `worldguardneo.flag.allowed-enchants` | Белый список разрешённых зачарований (ОБЪЯВЛЕН — пока не применяется). |
+| `on-entry` | текст | — | `worldguardneo.flag.on-entry` | Консольная команда при входе игрока (`%player%`/`%region%`/`%world%`). |
+| `on-exit` | текст | — | `worldguardneo.flag.on-exit` | Консольная команда при выходе игрока (`%player%`/`%region%`/`%world%`). |
 | `block-break` | состояние (allow/deny) | allow | `worldguardneo.flag.block-break` | Разрешить или запретить именно ломание блоков. |
 | `block-place` | состояние (allow/deny) | allow | `worldguardneo.flag.block-place` | Разрешить или запретить именно установку блоков. |
 | `blocked-cmds` | список | — | `worldguardneo.flag.blocked-cmds` | Команды, запрещённые в регионе. |
@@ -95,7 +96,7 @@
 | `pistons` | состояние (allow/deny) | allow | `worldguardneo.flag.pistons` | Разрешить или запретить поршням двигать блоки через границу региона. |
 | `player-damage` | состояние (allow/deny) | allow | `worldguardneo.flag.player-damage` | Разрешить или запретить общий урон игрокам от не-игроков. |
 | `pvp` | состояние (allow/deny) | allow | `worldguardneo.flag.pvp` | Разрешить или запретить урон между игроками. |
-| `receive-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Разрешить или запретить получение чата внутри региона (ОБЪЯВЛЕН — пока не применяется). |
+| `receive-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Разрешить или запретить получение чужого чата внутри региона. |
 | `redstone` | состояние (allow/deny) | allow | `worldguardneo.flag.redstone` | Разрешить или запретить распространение редстоун-сигнала в регионе. |
 | `send-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.send-chat` | Разрешить или запретить отправку чата из региона. |
 | `sleep` | состояние (allow/deny) | allow | `worldguardneo.flag.sleep` | Разрешить или запретить сон в кроватях. |

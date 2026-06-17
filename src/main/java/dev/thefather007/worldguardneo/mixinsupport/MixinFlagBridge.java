@@ -68,6 +68,26 @@ public final class MixinFlagBridge {
 
     /* ---- Per-flag conveniences. Inlined call sites reduce mixin verbosity. ---- */
 
+    /**
+     * Whether the given player may RECEIVE chat at their current position — false when standing in
+     * a region whose {@code receive-chat} flag denies it. Resolved with the player as the actor so
+     * group filters work. Fail-open (allow) on any error / pre-init / non-server level.
+     */
+    public static boolean receiveChat(net.minecraft.server.level.ServerPlayer player) {
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return true;
+        try {
+            if (!(player.level() instanceof ServerLevel sl)) return true;
+            if (!mod.isProtectionActive(sl)) return true;
+            RegionManager mgr = mod.regions().get(sl);
+            return mgr.testState(Flags.RECEIVE_CHAT, player.getUUID(),
+                    player.getX(), player.getY(), player.getZ());
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("receiveChat check failed", t);
+            return true;
+        }
+    }
+
     public static boolean iceForm(Level lvl, BlockPos p)        { return check(lvl, p, Flags.ICE_FORM); }
     public static boolean iceMelt(Level lvl, BlockPos p)        { return check(lvl, p, Flags.ICE_MELT); }
     public static boolean frostedIceMelt(Level lvl, BlockPos p) { return check(lvl, p, Flags.FROSTED_ICE_MELT); }

@@ -217,6 +217,7 @@ public final class PlayerEventHandler {
             // by reading flags themselves. Posted on the server thread synchronously.
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                     new dev.thefather007.worldguardneo.api.events.RegionEnterEvent(p, r));
+            runRegionCommand(p, r, r.getFlag(Flags.ON_ENTRY)); // on-entry command flag
             if (mod.config().global().announceGreetings) {
                 String g = r.getFlag(Flags.GREETING);
                 if (g != null) p.displayClientMessage(Component.literal(g), false);
@@ -293,6 +294,7 @@ public final class PlayerEventHandler {
                     // the message by reading flags themselves.
                     net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                             new dev.thefather007.worldguardneo.api.events.RegionLeaveEvent(p, r));
+                    runRegionCommand(p, r, r.getFlag(Flags.ON_EXIT)); // on-exit command flag
                     if (mod.config().global().announceFarewells) {
                         String f = r.getFlag(Flags.FAREWELL);
                         if (f != null) p.displayClientMessage(Component.literal(f), false);
@@ -472,6 +474,33 @@ public final class PlayerEventHandler {
 
     private boolean canBypass(ServerPlayer p) {
         return mod.perms().has(p, "worldguardneo.region.bypass");
+    }
+
+    /**
+     * Run a region's {@code on-entry}/{@code on-exit} command from the server console (elevated),
+     * substituting {@code %player%}, {@code %region%}, {@code %world%}. No-op for null/blank. The
+     * flag is settable only via its per-flag permission, so only admins can attach a command.
+     * Best-effort: a bad command never breaks the tick.
+     */
+    private void runRegionCommand(ServerPlayer p, ProtectedRegion r, String cmd) {
+        if (cmd == null || cmd.isBlank()) return;
+        try {
+            String c = cmd.trim();
+            if (c.startsWith("/")) c = c.substring(1);
+            c = c.replace("%player%", p.getGameProfile().getName())
+                 .replace("%region%", r.id())
+                 .replace("%world%",  p.serverLevel().dimension().location().toString());
+            var server = p.getServer();
+            if (server == null) return;
+            // Console source positioned at the player, silent (no command feedback spam).
+            var source = server.createCommandSourceStack()
+                    .withPosition(p.position())
+                    .withLevel(p.serverLevel())
+                    .withSuppressedOutput();
+            server.getCommands().performPrefixedCommand(source, c);
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("region command '{}' for {} failed", cmd, r.id(), t);
+        }
     }
 
     /**

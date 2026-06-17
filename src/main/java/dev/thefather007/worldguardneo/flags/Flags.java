@@ -89,8 +89,15 @@ public final class Flags {
     public static final SetFlag    BLOCKED_CMDS      = new SetFlag("blocked-cmds");
     public static final SetFlag    ALLOWED_CMDS      = new SetFlag("allowed-cmds");
     public static final SetFlag    DENY_SPAWN        = new SetFlag("deny-spawn");
-    public static final SetFlag    ALLOWED_ENCHANTS  = new SetFlag("allowed-enchants");
     public static final SetFlag    BLOCKED_EFFECTS   = new SetFlag("blocked-effects");
+
+    /**
+     * Command run (from the server console, elevated) when a player ENTERS / LEAVES the region.
+     * Placeholders: {@code %player%}, {@code %region%}, {@code %world%}. A leading '/' is optional.
+     * Settable only via the per-flag node (admins), since the command runs with console authority.
+     */
+    public static final StringFlag ON_ENTRY          = new StringFlag("on-entry");
+    public static final StringFlag ON_EXIT           = new StringFlag("on-exit");
 
     public static final StringFlag GAME_MODE         = new StringFlag("game-mode");
     public static final StringFlag TIME_LOCK         = new StringFlag("time-lock");
@@ -142,7 +149,7 @@ public final class Flags {
         register(MAX_SPEED); register(NOTIFY_ENTER); register(NOTIFY_LEAVE);
 
         register(BLOCKED_CMDS); register(ALLOWED_CMDS); register(DENY_SPAWN);
-        register(ALLOWED_ENCHANTS); register(BLOCKED_EFFECTS);
+        register(BLOCKED_EFFECTS); register(ON_ENTRY); register(ON_EXIT);
 
         register(GAME_MODE); register(TIME_LOCK); register(WEATHER_LOCK);
         register(TELE_LOC); register(SPAWN_LOC);
