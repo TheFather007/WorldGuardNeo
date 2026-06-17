@@ -206,8 +206,7 @@ vertical-expand-up = 0     # для режима "fixed"
 | `worldguardneo.region.delete` | OP 0 | Удаление своих регионов |
 | `worldguardneo.region.info` / `.list` | OP 0 | Просмотр / список своих регионов |
 | `worldguardneo.region.teleport` | OP 0 | Телепорт к регионам |
-| `worldguardneo.selection.use` | OP 0 | Палочка выделения / `pos1` / `pos2` / `point` |
-| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — получить предмет-палочку |
+| `worldguardneo.selection.*` | OP 0 | Выделение: `use` (клики палочкой), `wand`, `mode`, `pos1`, `pos2`, `point` — каждое выдаётся отдельно |
 | `worldguardneo.region.redefine` | OP 2 | Изменение размера |
 | `worldguardneo.region.flag` | OP 2 | Установка флагов |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Управление участниками / владельцами |

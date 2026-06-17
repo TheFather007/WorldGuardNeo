@@ -85,7 +85,7 @@ public final class WGCommands {
                         .executes(c -> giveWand(c.getSource(), mod)))
                 .then(Commands.literal("sel")
                         // Switch selection mode: cuboid (two corners) or poly (3+ points).
-                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.mode"))
                         .then(Commands.literal("cuboid")
                                 .executes(c -> setSelMode(c.getSource(), mod, SelectionStore.Mode.CUBOID)))
                         .then(Commands.literal("poly")
@@ -94,14 +94,14 @@ public final class WGCommands {
                                 .executes(c -> clearSelection(c.getSource(), mod))))
                 .then(Commands.literal("pos1")
                         // Set cuboid corner 1 to the player's current block position.
-                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.pos1"))
                         .executes(c -> setPosHere(c.getSource(), mod, 1)))
                 .then(Commands.literal("pos2")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.pos2"))
                         .executes(c -> setPosHere(c.getSource(), mod, 2)))
                 .then(Commands.literal("point")
                         // Append a polygon vertex at the player's current block position.
-                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.point"))
                         .executes(c -> addPointHere(c.getSource(), mod)))
                 .then(Commands.literal("remove")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.delete")

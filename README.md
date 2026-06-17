@@ -206,8 +206,7 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 | `worldguardneo.region.delete` | OP 0 | Delete your own regions |
 | `worldguardneo.region.info` / `.list` | OP 0 | View / list your regions |
 | `worldguardneo.region.teleport` | OP 0 | Teleport to regions |
-| `worldguardneo.selection.use` | OP 0 | Use the selection wand / `pos1` / `pos2` / `point` |
-| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — receive the selection wand item |
+| `worldguardneo.selection.*` | OP 0 | Selection: `use` (wand clicks), `wand`, `mode`, `pos1`, `pos2`, `point` — each granted separately |
 | `worldguardneo.region.redefine` | OP 2 | Resize regions |
 | `worldguardneo.region.flag` | OP 2 | Set flags |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Manage members / owners |

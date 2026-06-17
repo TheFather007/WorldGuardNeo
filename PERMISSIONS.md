@@ -66,8 +66,12 @@ In addition, **each individual flag** has its own node `worldguardneo.flag.<name
 
 | Node | Default | Controls |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | Using the built-in selection wand and `/rg pos1` `/rg pos2` `/rg point` `/rg sel`. |
+| `worldguardneo.selection.use` | OP 0 | Using the wand item itself (clicking blocks to pick corners/points). |
 | `worldguardneo.selection.wand` | OP 0 | `/rg wand` — receive the built-in selection wand item (one per player). |
+| `worldguardneo.selection.mode` | OP 0 | `/rg sel <cuboid\|poly\|clear>` — switch selection mode / clear. |
+| `worldguardneo.selection.pos1` | OP 0 | `/rg pos1` — set cuboid corner 1 at your position. |
+| `worldguardneo.selection.pos2` | OP 0 | `/rg pos2` — set cuboid corner 2 at your position. |
+| `worldguardneo.selection.point` | OP 0 | `/rg point` — add a polygon vertex at your position. |
 | `worldguardneo.region.admin` | OP 3 | Administrative region operations. |
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |

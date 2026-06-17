@@ -90,7 +90,14 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.region.flags.list",    mod);  // /rg flags: op-2 or node
 
         // Misc.
+        // selection.use gates the *wand item* (clicking blocks to pick corners). The selection
+        // commands each have their own node so admins can hand them out individually — all OP 0
+        // by default (everyone) to mirror open claiming.
         nodeToLevel.put("worldguardneo.selection.use",        0);
+        nodeToLevel.put("worldguardneo.selection.mode",       0);   // /rg sel cuboid|poly|clear
+        nodeToLevel.put("worldguardneo.selection.pos1",       0);   // /rg pos1
+        nodeToLevel.put("worldguardneo.selection.pos2",       0);   // /rg pos2
+        nodeToLevel.put("worldguardneo.selection.point",      0);   // /rg point
         // The wand-give command. OP 0 (everyone) by default so any player can grab the selection
         // wand and claim land, mirroring selection.use. Admins can restrict via LuckPerms.
         nodeToLevel.put("worldguardneo.selection.wand",       0);

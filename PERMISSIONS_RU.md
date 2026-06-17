@@ -66,8 +66,12 @@ WorldGuardNeo проверяет каждую команду и защищённ
 
 | Узел | По умолчанию | За что отвечает |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | Использование встроенной палочки выделения и `/rg pos1` `/rg pos2` `/rg point` `/rg sel`. |
+| `worldguardneo.selection.use` | OP 0 | Использование самой палочки (клики по блокам для выбора углов/точек). |
 | `worldguardneo.selection.wand` | OP 0 | `/rg wand` — получить встроенную палочку выделения (одна на игрока). |
+| `worldguardneo.selection.mode` | OP 0 | `/rg sel <cuboid\|poly\|clear>` — смена режима выделения / сброс. |
+| `worldguardneo.selection.pos1` | OP 0 | `/rg pos1` — задать угол куба 1 по вашей позиции. |
+| `worldguardneo.selection.pos2` | OP 0 | `/rg pos2` — задать угол куба 2 по вашей позиции. |
+| `worldguardneo.selection.point` | OP 0 | `/rg point` — добавить вершину полигона по вашей позиции. |
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |
