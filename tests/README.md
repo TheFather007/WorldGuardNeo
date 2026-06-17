@@ -26,7 +26,15 @@ bash tests/run.sh           # compile + run every suite; non-zero exit on any fa
 | `FlagContractTest` | Per-flag contract: type, default, permission node, value hint, registry round-trip, total flag count (85). |
 | `StorageRoundTripTest` | Whole-world JSON codec: every flag type, groups, parents, geometry survive save → JSON → load. |
 | `EngineExtrasTest` | **v1.3 additions:** per-region storage codec (incremental DB path), `RegionManager.crossesBoundary`, `PolygonalRegion.contains` floor-consistency (the +X/+Z edge fix), `SpatialIndex` extreme-coordinate handling. |
+| `GeometryTest` | Cuboid/Polygon/Global `contains` on all faces, negative coords, concave (L-shape) & triangle polygons, degenerate-polygon rejection, volume/overflow, `Vec3` math. |
+| `SpatialIndexTest` | Bucket add/remove symmetry (no stale entries), point & area queries, oversized routing (huge span + extreme coord), chunk-border spanning, negative chunks, rebuild/clear, key uniqueness. |
+| `ResolutionMatrixTest` | Exhaustive group×actor matrix, priority tiers, DENY-wins, group shadowing, parent inheritance (incl. inherited-flag group), build-access "private by default", `resolveValue`, `crossesBoundary`, overlap/ownership queries. |
+| `ParsingTest` | Every flag type's `parse`/`fromJson` (valid/invalid/empty/whitespace/case/synonyms/bounds), `RegionGroup.parse`, flag-name validation, `parseAndApply`. |
+| `RegionMechanicsTest` | `ProtectedRegion`: id validation, membership, lazy collections, parent-cycle detection, `flagEpoch` bumps, `copyFlagsFrom`, flag-group semantics, immutable raw views. |
+| `PerRegionCodecTest` | Per-region codec round-trip for every flag type + groups + owners/members + priority + polygon + valid parent links + global row. |
+| `LocalizationTest` | `format()` placeholder edge cases (unknown/`%%`/trailing-`%`/numeric/missing-key) via a temp lang file. |
+| `FuzzCodecTest` | **Property-based:** 200 randomized regions (cuboid+polygon, all flag types, random groups/owners/priorities/acyclic parents) round-tripped through BOTH the whole-world and per-region codecs, asserting every property survives identically (~8,800 assertions). |
 | `PerFlagReport` | Per-flag battery; writes a detailed human-readable report to `tests/FLAG_REPORT.txt`. |
 | `coverage.sh` | Static guard: every registered flag is referenced in an enforcement/command file (catches a flag that silently lost its handler). |
 
-Total: ~2,400+ assertions.
+Total: **~11,600 assertions** across 16 suites + the static coverage guard.

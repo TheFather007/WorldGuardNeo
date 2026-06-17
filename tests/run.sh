@@ -11,7 +11,9 @@ CP="$CLASSES:$FASTUTIL:$GSON"
 OUT=$(mktemp -d)
 javac -cp "$CP" -d "$OUT" "$ROOT"/tests/*.java
 rc=0
-for T in FlagLogicTest StorageRoundTripTest FlagScenarioTest FlagResolutionEdgeTest FlagContractTest EngineExtrasTest; do
+for T in FlagLogicTest StorageRoundTripTest FlagScenarioTest FlagResolutionEdgeTest FlagContractTest \
+         EngineExtrasTest GeometryTest SpatialIndexTest ResolutionMatrixTest ParsingTest \
+         RegionMechanicsTest PerRegionCodecTest LocalizationTest FuzzCodecTest; do
   printf '%-24s ' "$T:"
   java -cp "$OUT:$CP" "$T" | tail -1 || rc=1
 done
