@@ -4,7 +4,7 @@
 
 **Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created from WorldEdit selections and protected by 80+ per-region flags.**
 
-![Version](https://img.shields.io/badge/Version-1.2-44cc11)
+![Version](https://img.shields.io/badge/Version-1.3-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
 ![Optional](https://img.shields.io/badge/Optional-WorldEdit%207.3%2B-3b82f6)
@@ -187,7 +187,14 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg backup list` | List existing backups, newest first |
 | `/rg save` | Flush regions to storage |
 | `/rg reload` | Reload config and language |
+| `/rg cleanup` | Run the claim-expiry scan now (admin) |
 | `/rg debug` | Diagnostics: spatial-index stats, active integrations |
+| `/rg balance [player]` | Show your (or another player's) economy balance |
+| `/rg pay <player> <amount>` | Transfer funds to another player |
+| `/rg sell <id> <price>` | List a region you own for sale |
+| `/rg unsell <id>` | Remove a region from sale |
+| `/rg buy <id>` | Buy a region that's listed for sale |
+| `/rg eco <set\|give\|take> <player> <amount>` | Adjust a player's balance (admin) |
 
 ## Permissions
 

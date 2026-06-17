@@ -70,8 +70,10 @@ In addition, **each individual flag** has its own node `worldguardneo.flag.<name
 | `worldguardneo.region.admin` | OP 3 | Administrative region operations. |
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |
-| `worldguardneo.reload` | OP 4 | `/rg reload` — reload config & language. |
+| `worldguardneo.reload` | OP 4 | `/rg reload` — reload config & language. Also gates `/rg cleanup` (run the claim-expiry scan now). |
 | `worldguardneo.notify` | OP 2 | Receive broadcast messages when players cross regions flagged `notify-enter` / `notify-leave`. |
+| `worldguardneo.economy.use` | OP 0 | `/rg balance`, `/rg pay`, `/rg sell`, `/rg unsell`, `/rg buy` (economy must be enabled). |
+| `worldguardneo.economy.admin` | OP 3 | `/rg eco <set\|give\|take>` and `/rg balance <player>` (view/adjust others). |
 
 ## LuckPerms examples
 

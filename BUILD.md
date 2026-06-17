@@ -71,7 +71,7 @@ So `./gradlew build` works out of the box with nothing to install manually.
 
 ## Installing the built mod
 
-1. Drop `worldguardneo-1.2.jar` into the server's `mods/` folder.
+1. Drop `worldguardneo-1.3.jar` into the server's `mods/` folder.
 2. *(Optional)* add **WorldEdit** (needed only to create regions via `/rg claim` and `/rg redefine`), LuckPerms, BlueMap, squaremap, or a JDBC driver.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust the config if needed and run `/rg reload`.

@@ -71,7 +71,7 @@ worldguardneo/
 
 ## Установка собранного мода
 
-1. Положите `worldguardneo-1.2.jar` в каталог `mods/` сервера.
+1. Положите `worldguardneo-1.3.jar` в каталог `mods/` сервера.
 2. *(Опционально)* добавьте **WorldEdit** (нужен только для создания регионов через `/rg claim` и `/rg redefine`), LuckPerms, BlueMap, squaremap или JDBC-драйвер.
 3. Запустите сервер один раз — будет создан `config/worldguardneo/config.toml`.
 4. При необходимости отредактируйте конфиг и выполните `/rg reload`.

@@ -70,8 +70,10 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |
-| `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. |
+| `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. Также даёт `/rg cleanup` (запуск истечения клеймов вручную). |
 | `worldguardneo.notify` | OP 2 | Получение оповещений, когда игроки пересекают регионы с флагами `notify-enter` / `notify-leave`. |
+| `worldguardneo.economy.use` | OP 0 | `/rg balance`, `/rg pay`, `/rg sell`, `/rg unsell`, `/rg buy` (экономика должна быть включена). |
+| `worldguardneo.economy.admin` | OP 3 | `/rg eco <set\|give\|take>` и `/rg balance <игрок>` (просмотр/правка чужого баланса). |
 
 ## Примеры LuckPerms
 

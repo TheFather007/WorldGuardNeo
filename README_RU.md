@@ -4,7 +4,7 @@
 
 **Серверная защита регионов для NeoForge — переосмысление модели WorldGuard. Регионы создаются по выделению WorldEdit и защищаются 80+ флагами на регион.**
 
-![Version](https://img.shields.io/badge/Версия-1.2-44cc11)
+![Version](https://img.shields.io/badge/Версия-1.3-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
 ![Optional](https://img.shields.io/badge/Опционально-WorldEdit%207.3%2B-3b82f6)
@@ -187,7 +187,14 @@ vertical-expand-up = 0     # для режима "fixed"
 | `/rg backup list` | Список существующих бэкапов, новые сверху |
 | `/rg save` | Сбросить регионы в хранилище |
 | `/rg reload` | Перезагрузить конфиг и язык |
+| `/rg cleanup` | Запустить истечение клеймов сейчас (админ) |
 | `/rg debug` | Диагностика: статистика индекса, активные интеграции |
+| `/rg balance [игрок]` | Показать свой (или чужой) баланс экономики |
+| `/rg pay <игрок> <сумма>` | Перевести средства другому игроку |
+| `/rg sell <id> <цена>` | Выставить свой регион на продажу |
+| `/rg unsell <id>` | Снять регион с продажи |
+| `/rg buy <id>` | Купить выставленный на продажу регион |
+| `/rg eco <set\|give\|take> <игрок> <сумма>` | Изменить баланс игрока (админ) |
 
 ## Права
 
