@@ -41,7 +41,22 @@ bash tests/run.sh           # compile + run every suite; non-zero exit on any fa
 | `GetApplicableOrderingTest` | `getApplicable` ordering (priority desc, then id asc), list-vs-point resolution equivalence, `hasAnyAt` consistency, ownership-at-point queries. |
 | `SpatialIndexFuzzTest` | **Differential, ~120k assertions:** `getApplicable`/`hasAnyAt` (chunk-bucketed index) cross-checked against a brute-force linear scan over many random region sets, dense query grids, and add/remove churn — the index must return the identical region set at every point. |
 | `ResolutionFuzzTest` | **Property-based, ~85k assertions:** over thousands of random region stacks — list-overload vs point-overload equivalence (testState + resolveValue), and controlled-outcome dominance (strictly-highest-tier value wins; all-unset → flag default). |
+| `JsonStorageTest` | The REAL JSON disk backend (not just the codec): multi-world round-trip, empty world, world-key filename sanitization, atomic rewrite (no leftover `.tmp`), and the corrupt-file → `.corrupt-` quarantine. |
+| `ConfigTest` | The REAL config layer (night-config TOML): `loadOrCreate` writes a default `config.toml`; custom values (incl. the v1.3 `[economy]`/`[claim-expiry]` keys) read back; wrong-typed values fall back to field defaults. |
 | `PerFlagReport` | Per-flag battery; writes a detailed human-readable report to `tests/FLAG_REPORT.txt`. |
 | `coverage.sh` | Static guard: every registered flag is referenced in an enforcement/command file (catches a flag that silently lost its handler). |
 
-Total: **~261,000 assertions** across 23 suites + the static coverage guard.
+Total: **~261,000 assertions** across 25 suites + the static coverage guard.
+
+> `JsonStorageTest` and `ConfigTest` need the mojang-logging + slf4j (and night-config) jars on the
+> classpath; `run.sh` locates them in the Gradle cache automatically.
+
+### Not covered here — enforcement / in-game behavior
+
+The pure-JVM suites cover the engine (geometry, resolution, storage, parsing, config). They do **not**
+cover the NeoForge **event listeners and mixins** (block-break/place/interact protection, PvP/explosion
+gating, pressure-plate/tripwire/dispenser mixins, `on-entry`/`on-exit` command execution, economy
+buy/sell flow, claim expiry) — those need a live Minecraft server. The proper tool for them is the
+**NeoForge GameTest** framework (`@GameTest` structures run via the game-test server), which is a
+recommended follow-up: it would place blocks/players in a test world and assert the protection actually
+fires. That can't run in this headless JVM harness.
