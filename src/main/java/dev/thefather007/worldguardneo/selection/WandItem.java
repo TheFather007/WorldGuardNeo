@@ -58,11 +58,15 @@ public final class WandItem {
         return (item == null || item == Items.AIR) ? null : item;
     }
 
-    /** True only for a stack carrying our hidden marker tag (a renamed vanilla item won't match). */
+    /**
+     * True only for a stack carrying our hidden marker tag (a renamed vanilla item won't match).
+     * Uses {@link CustomData#contains} so the common case — clicking any non-wand item — never
+     * allocates a tag copy; this runs at {@code HIGHEST} priority for every block interaction.
+     */
     public static boolean isWand(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
         CustomData data = stack.get(DataComponents.CUSTOM_DATA);
-        return data != null && data.copyTag().getBoolean(WAND_MARKER);
+        return data != null && data.contains(WAND_MARKER);
     }
 
     /** True if the player already holds a WGN wand anywhere in their inventory. */

@@ -43,8 +43,6 @@ public final class SelectionStore {
         public final List<PolygonalRegion.Point2> polyPoints = new ArrayList<>();
         public int polyMinY = Integer.MAX_VALUE;
         public int polyMaxY = Integer.MIN_VALUE;
-        /** Server tick of the last edit — used only for diagnostics / potential TTL. */
-        public long lastTouched;
     }
 
     private final Map<UUID, Selection> selections = new HashMap<>();
@@ -71,7 +69,6 @@ public final class SelectionStore {
         Selection sel = getOrCreate(p.getUUID());
         ensureWorld(p, sel);
         sel.pos1 = pos;
-        sel.lastTouched = tick(p);
         render(p, sel);
     }
 
@@ -80,7 +77,6 @@ public final class SelectionStore {
         Selection sel = getOrCreate(p.getUUID());
         ensureWorld(p, sel);
         sel.pos2 = pos;
-        sel.lastTouched = tick(p);
         render(p, sel);
     }
 
@@ -91,7 +87,6 @@ public final class SelectionStore {
         sel.polyPoints.add(new PolygonalRegion.Point2(pos.x(), pos.z()));
         sel.polyMinY = Math.min(sel.polyMinY, pos.y());
         sel.polyMaxY = Math.max(sel.polyMaxY, pos.y());
-        sel.lastTouched = tick(p);
         render(p, sel);
         return sel.polyPoints.size();
     }
@@ -101,15 +96,6 @@ public final class SelectionStore {
         selections.remove(p.getUUID());
         // An empty cuboid shape with no points tells WorldEditCUI to drop the box.
         send(p, "s|cuboid");
-    }
-
-    /** Drop all polygon vertices (keeps the mode). */
-    public void clearPolyPoints(ServerPlayer p) {
-        Selection sel = getOrCreate(p.getUUID());
-        sel.polyPoints.clear();
-        sel.polyMinY = Integer.MAX_VALUE;
-        sel.polyMaxY = Integer.MIN_VALUE;
-        render(p, sel);
     }
 
     /**
@@ -148,11 +134,6 @@ public final class SelectionStore {
             sel.world = cur;
             resetGeometry(sel);
         }
-    }
-
-    private static long tick(ServerPlayer p) {
-        var srv = p.getServer();
-        return srv != null && srv.overworld() != null ? srv.overworld().getGameTime() : 0L;
     }
 
     /* ----------------------------------------------------------------- CUI rendering */
@@ -204,13 +185,17 @@ public final class SelectionStore {
         return "p|" + id + "|" + v.x() + "|" + v.y() + "|" + v.z() + "|" + size;
     }
 
-    /** Send one CUI command, swallowing the case where the client never negotiated the channel. */
+    /**
+     * Send one CUI command, but only to clients that actually negotiated the {@code worldedit:cui}
+     * channel (i.e. have WorldEditCUI). Gating on {@code hasChannel} rather than catching a send
+     * failure means vanilla clients cost nothing — no exception thrown/caught per selection action.
+     */
     private static void send(ServerPlayer p, String command) {
+        if (!p.connection.hasChannel(CuiPayload.TYPE)) return;
         try {
             net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, new CuiPayload(command));
         } catch (Throwable t) {
-            // Client without WorldEditCUI: the optional channel isn't negotiated. Harmless.
-            WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] CUI send skipped ({})", t.toString());
+            WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] CUI send failed ({})", t.toString());
         }
     }
 }

@@ -257,7 +257,8 @@ public final class WorldGuardNeo {
 
     /**
      * Returns the current tick of the running MinecraftServer's overworld, or 0 if no
-     * server is currently active. Used by the selection-store TTL.
+     * server is currently active. Drives the per-tick region-save flush, backup scheduling
+     * and the claim-expiry scan (see {@link #onServerTick}).
      */
     public long currentServerTick() {
         try {

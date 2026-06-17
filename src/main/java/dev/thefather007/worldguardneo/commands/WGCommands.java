@@ -280,6 +280,9 @@ public final class WGCommands {
     private static int setPosHere(CommandSourceStack src, WorldGuardNeo mod, int which)
             throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
+        // pos1/pos2 are cuboid operations — switch into cuboid mode so the corner is actually used
+        // (mirrors /rg point switching to polygon). No-op if already in cuboid mode.
+        mod.selections().setMode(p, SelectionStore.Mode.CUBOID);
         Vec3 v = new Vec3(p.getBlockX(), p.getBlockY(), p.getBlockZ());
         if (which == 1) {
             mod.selections().setPos1(p, v);
