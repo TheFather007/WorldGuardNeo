@@ -1,0 +1,1536 @@
+WorldGuardNeo — per-flag test report
+generated: 2026-06-17T04:22:58.132587152Z
+flags: 85
+==============================================================================
+
+=== FLAG: allowed-cmds ===
+  type=SetFlag | default=— | perm=worldguardneo.flag.allowed-cmds | enforced=yes | hint=comma-separated list
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'alpha,beta' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: block-break ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.block-break | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] buildAccess owner
+  [PASS] buildAccess member
+  [PASS] buildAccess stranger denied
+  [PASS] buildAccess null denied
+  [PASS] buildAccess explicit-allow opens stranger
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: block-place ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.block-place | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] buildAccess owner
+  [PASS] buildAccess member
+  [PASS] buildAccess stranger denied
+  [PASS] buildAccess null denied
+  [PASS] buildAccess explicit-allow opens stranger
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: blocked-cmds ===
+  type=SetFlag | default=— | perm=worldguardneo.flag.blocked-cmds | enforced=yes | hint=comma-separated list
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'alpha,beta' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: blocked-effects ===
+  type=SetFlag | default=— | perm=worldguardneo.flag.blocked-effects | enforced=yes | hint=comma-separated list
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'alpha,beta' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: build ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.build | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] buildAccess owner
+  [PASS] buildAccess member
+  [PASS] buildAccess stranger denied
+  [PASS] buildAccess null denied
+  [PASS] buildAccess explicit-allow opens stranger
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: chest-access ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.chest-access | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] buildAccess owner
+  [PASS] buildAccess member
+  [PASS] buildAccess stranger denied
+  [PASS] buildAccess null denied
+  [PASS] buildAccess explicit-allow opens stranger
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: chorus-teleport ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.chorus-teleport | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: creeper-explosion ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.creeper-explosion | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: crop-growth ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.crop-growth | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: deny-message ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.deny-message | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: deny-spawn ===
+  type=SetFlag | default=— | perm=worldguardneo.flag.deny-spawn | enforced=yes | hint=comma-separated list
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'alpha,beta' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: dispenser-output ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.dispenser-output | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: drown-damage ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.drown-damage | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: enderdragon ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.enderdragon | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: enderpearl ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.enderpearl | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: entry ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.entry | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: entry-deny-message ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.entry-deny-message | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: entry-vehicle ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.entry-vehicle | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: exit ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.exit | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: exit-deny-message ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.exit-deny-message | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: exit-vehicle ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.exit-vehicle | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: exp-drops ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.exp-drops | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: fall-damage ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.fall-damage | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: farewell ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.farewell | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: farewell-title ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.farewell-title | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: feed-amount ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.feed-amount | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: feed-delay ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.feed-delay | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: feed-max-hunger ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.feed-max-hunger | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: feed-min-hunger ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.feed-min-hunger | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: fire-damage ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.fire-damage | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: fire-spread ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.fire-spread | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: frosted-ice-melt ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.frosted-ice-melt | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: game-mode ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.game-mode | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: ghast-fireball ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.ghast-fireball | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: grass-spread ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.grass-spread | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: greeting ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.greeting | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: greeting-title ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.greeting-title | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: heal-amount ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.heal-amount | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: heal-delay ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.heal-delay | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: heal-max-hp ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.heal-max-hp | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: heal-min-hp ===
+  type=IntegerFlag | default=— | perm=worldguardneo.flag.heal-min-hp | enforced=yes | hint=integer
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: hunger-drain ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.hunger-drain | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: ice-form ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.ice-form | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: ice-melt ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.ice-melt | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: interact ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.interact | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] buildAccess owner
+  [PASS] buildAccess member
+  [PASS] buildAccess stranger denied
+  [PASS] buildAccess null denied
+  [PASS] buildAccess explicit-allow opens stranger
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: invincible ===
+  type=StateFlag | default=deny | perm=worldguardneo.flag.invincible | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==deny
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: item-drop ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.item-drop | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: item-pickup ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.item-pickup | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: keep-inventory ===
+  type=StateFlag | default=deny | perm=worldguardneo.flag.keep-inventory | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==deny
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: keep-xp ===
+  type=StateFlag | default=deny | perm=worldguardneo.flag.keep-xp | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==deny
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: lava-fire ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.lava-fire | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: lava-flow ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.lava-flow | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: leaf-decay ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.leaf-decay | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: lightning ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.lightning | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: max-speed ===
+  type=DoubleFlag | default=— | perm=worldguardneo.flag.max-speed | enforced=yes | hint=number
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse '0.5' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: mob-damage ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.mob-damage | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: mob-grief ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.mob-grief | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: mob-spawning ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.mob-spawning | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: mob-teleport ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.mob-teleport | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: mycelium-spread ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.mycelium-spread | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: notify-enter ===
+  type=BooleanFlag | default=— | perm=worldguardneo.flag.notify-enter | enforced=yes | hint=true|false
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'true' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: notify-leave ===
+  type=BooleanFlag | default=— | perm=worldguardneo.flag.notify-leave | enforced=yes | hint=true|false
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'true' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: on-entry ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.on-entry | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: on-exit ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.on-exit | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: other-explosion ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.other-explosion | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: pistons ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.pistons | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: player-damage ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.player-damage | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: pvp ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.pvp | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: receive-chat ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.receive-chat | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: redstone ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.redstone | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: send-chat ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.send-chat | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: sleep ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.sleep | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: snow-fall ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.snow-fall | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: snow-melt ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.snow-melt | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: spawn ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.spawn | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: suffocation-damage ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.suffocation-damage | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: teleport ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.teleport | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: time-lock ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.time-lock | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: tnt ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.tnt | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: use ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.use | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] buildAccess owner
+  [PASS] buildAccess member
+  [PASS] buildAccess stranger denied
+  [PASS] buildAccess null denied
+  [PASS] buildAccess explicit-allow opens stranger
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: vehicle-destroy ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.vehicle-destroy | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: vine-growth ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.vine-growth | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: water-flow ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.water-flow | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: weather-lock ===
+  type=StringFlag | default=— | perm=worldguardneo.flag.weather-lock | enforced=yes | hint=text
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+
+==============================================================================
+SUMMARY: 1187 passed, 0 failed across 85 flags
+RESULT: ALL GREEN
