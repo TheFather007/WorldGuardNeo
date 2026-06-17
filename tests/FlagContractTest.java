@@ -84,7 +84,7 @@ public final class FlagContractTest {
 
         check("all 6 build flags present", buildSeen == 6);
         check("at least 50 state flags", stateCount >= 50);
-        check("85 flags registered total", Flags.all().size() == 85);
+        check("95 flags registered total", Flags.all().size() == 95);
 
         // 7. RegionGroup.parse is total and case/locale-insensitive
         check("group parse upper", RegionGroup.parse("OWNERS") == RegionGroup.OWNERS);

@@ -1,6 +1,6 @@
 WorldGuardNeo — per-flag test report
-generated: 2026-06-17T20:15:14.843081920Z
-flags: 85
+generated: 2026-06-17T23:03:58.299938411Z
+flags: 95
 ==============================================================================
 
 === FLAG: allowed-cmds ===
@@ -14,6 +14,26 @@ flags: 85
   [PASS] group MEMBERS → member sees value
   [PASS] group MEMBERS → stranger gets null
   [PASS] round-trip value
+  -> OK
+
+=== FLAG: armor-stand-use ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.armor-stand-use | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
   -> OK
 
 === FLAG: block-break ===
@@ -90,6 +110,46 @@ flags: 85
   [PASS] group MEMBERS → member sees value
   [PASS] group MEMBERS → stranger gets null
   [PASS] round-trip value
+  -> OK
+
+=== FLAG: bucket-empty ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.bucket-empty | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: bucket-fill ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.bucket-fill | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
   -> OK
 
 === FLAG: build ===
@@ -625,6 +685,26 @@ flags: 85
   [PASS] round-trip DENY
   -> OK
 
+=== FLAG: glide ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.glide | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
 === FLAG: grass-spread ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.grass-spread | enforced=yes | hint=allow|deny|none
   [PASS] perm node
@@ -848,6 +928,26 @@ flags: 85
   [PASS] round-trip DENY
   -> OK
 
+=== FLAG: item-frame-rotate ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.item-frame-rotate | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
 === FLAG: item-pickup ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.item-pickup | enforced=yes | hint=allow|deny|none
   [PASS] perm node
@@ -950,6 +1050,26 @@ flags: 85
 
 === FLAG: leaf-decay ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.leaf-decay | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: lectern-take ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.lectern-take | enforced=yes | hint=allow|deny|none
   [PASS] perm node
   [PASS] desc key
   [PASS] registry round-trip
@@ -1293,6 +1413,26 @@ flags: 85
   [PASS] round-trip DENY
   -> OK
 
+=== FLAG: sign-edit ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.sign-edit | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
 === FLAG: sleep ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.sleep | enforced=yes | hint=allow|deny|none
   [PASS] perm node
@@ -1360,6 +1500,19 @@ flags: 85
   [PASS] registry round-trip
   [PASS] value hint non-empty
   [PASS] parse 'sample-value' non-null
+  [PASS] resolveValue returns set value
+  [PASS] group MEMBERS → member sees value
+  [PASS] group MEMBERS → stranger gets null
+  [PASS] round-trip value
+  -> OK
+
+=== FLAG: spawn-limit ===
+  type=SetFlag | default=— | perm=worldguardneo.flag.spawn-limit | enforced=yes | hint=comma-separated list
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] parse 'alpha,beta' non-null
   [PASS] resolveValue returns set value
   [PASS] group MEMBERS → member sees value
   [PASS] group MEMBERS → stranger gets null
@@ -1477,6 +1630,46 @@ flags: 85
   [PASS] round-trip DENY
   -> OK
 
+=== FLAG: vehicle-enter ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.vehicle-enter | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: vehicle-place ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.vehicle-place | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
 === FLAG: vine-growth ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.vine-growth | enforced=yes | hint=allow|deny|none
   [PASS] perm node
@@ -1532,5 +1725,5 @@ flags: 85
 
 
 ==============================================================================
-SUMMARY: 1187 passed, 0 failed across 85 flags
+SUMMARY: 1340 passed, 0 failed across 95 flags
 RESULT: ALL GREEN
