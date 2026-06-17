@@ -78,6 +78,8 @@
 
   "msg.reloaded": "§8[§3WGN§8] §a✔ §7Конфигурация перезагружена.",
   "msg.saved": "§8[§3WGN§8] §a✔ §7Регионы сохранены.",
+  "msg.cleanup.done": "§8[§3WGN§8] §a✔ §7Истечение клеймов удалило §e%count% §7регион(ов).",
+  "msg.cleanup.disabled": "§8[§3WGN§8] §e⚠ §7Истечение клеймов выключено §8(§7включите §fclaim-expiry.enabled = true§8)§7.",
   "msg.backup.started": "§8[§3WGN§8] §a✔ §7Бэкап запущен в фоне §8(§7метка §6%label%§8)§7.",
   "msg.backup.skipped": "§8[§3WGN§8] §e⚠ §7Бэкап не запущен — другой уже выполняется.",
   "msg.backup.list-header": "§3§m       §r §b§l◆ Бэкапы §8(§e%count%§8) §r§3§m       ",

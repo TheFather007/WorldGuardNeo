@@ -1110,7 +1110,13 @@ public final class PlayerEventHandler {
     /* ---------------- Cleanup ---------------- */
 
     @SubscribeEvent
+    public void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
+        mod.expiry().record(e.getEntity().getUUID()); // claim-expiry activity tracking
+    }
+
+    @SubscribeEvent
     public void onLogout(PlayerEvent.PlayerLoggedOutEvent e) {
+        mod.expiry().record(e.getEntity().getUUID()); // mark active at the moment of leaving
         states.remove(e.getEntity().getUUID());
         lastPickupDenyMsg.remove(e.getEntity().getUUID());
     }

@@ -108,6 +108,14 @@ public final class WGConfig {
             g.backupRetainCount       = intOf(toml, "backup.retain-count", g.backupRetainCount);
             g.backupCompress          = bool(toml, "backup.compress", g.backupCompress);
 
+            g.claimExpiryEnabled      = bool(toml, "claim-expiry.enabled", g.claimExpiryEnabled);
+            g.claimExpiryDays         = intOf(toml, "claim-expiry.days", g.claimExpiryDays);
+            g.claimExpiryCheckHours   = intOf(toml, "claim-expiry.check-hours", g.claimExpiryCheckHours);
+
+            g.economyEnabled          = bool(toml, "economy.enabled", g.economyEnabled);
+            g.economyStartBalance     = dbl(toml, "economy.starting-balance", g.economyStartBalance);
+            g.economyCurrency         = str(toml, "economy.currency-name", g.economyCurrency);
+
             g.mysqlHost              = str(toml, "mysql.host", g.mysqlHost);
             g.mysqlPort              = intOf(toml, "mysql.port", g.mysqlPort);
             g.mysqlDatabase          = str(toml, "mysql.database", g.mysqlDatabase);
@@ -180,6 +188,12 @@ public final class WGConfig {
     private static int intOf(Config c, String path, int def) {
         Object v = c.get(path);
         if (v instanceof Number n) return n.intValue();
+        return def;
+    }
+
+    private static double dbl(Config c, String path, double def) {
+        Object v = c.get(path);
+        if (v instanceof Number n) return n.doubleValue();
         return def;
     }
     private static Map<String, Integer> readIntMap(Config c, String path, Map<String, Integer> def) {
@@ -378,6 +392,30 @@ public final class WGConfig {
                 " Gzip each region file inside a backup (typically 6-12x smaller). false = no compression.");
         c.set("backup.compress", g.backupCompress);
 
+        /* ───────────────────────── CLAIM EXPIRY ───────────────────────── */
+        c.setComment("claim-expiry",
+                " ======================= CLAIM EXPIRY =======================\n" +
+                " Auto-delete player regions whose owners have ALL been offline too long.\n" +
+                " Admin/unowned regions are never touched. Scan runs at start + every check-hours.");
+        c.setComment("claim-expiry.enabled", " Master switch (default false).");
+        c.set("claim-expiry.enabled", g.claimExpiryEnabled);
+        c.setComment("claim-expiry.days", " Days all owners must be offline before a region expires.");
+        c.set("claim-expiry.days", g.claimExpiryDays);
+        c.setComment("claim-expiry.check-hours", " Hours between expiry scans.");
+        c.set("claim-expiry.check-hours", g.claimExpiryCheckHours);
+
+        /* ───────────────────────── ECONOMY ───────────────────────── */
+        c.setComment("economy",
+                " ======================= CLAIM ECONOMY =======================\n" +
+                " Buy/sell regions with a built-in per-player balance (no external mod needed).\n" +
+                " /rg sell <id> <price> lists a region; /rg buy <id> purchases it; /rg balance shows funds.");
+        c.setComment("economy.enabled", " Master switch (default false).");
+        c.set("economy.enabled", g.economyEnabled);
+        c.setComment("economy.starting-balance", " Balance granted to a player on first join.");
+        c.set("economy.starting-balance", g.economyStartBalance);
+        c.setComment("economy.currency-name", " Display name of the currency unit.");
+        c.set("economy.currency-name", g.economyCurrency);
+
         /* ───────────────────────── PER-WORLD DEFAULTS ───────────────────────── */
         c.setComment("defaults",
                 " ======================= PER-WORLD DEFAULTS =======================\n" +
@@ -543,6 +581,20 @@ public final class WGConfig {
         public int     backupIntervalMinutes = 60;
         public int     backupRetainCount     = 10;
         public boolean backupCompress        = true;
+
+        // Claim expiry — automatically delete player regions whose owners have ALL been offline
+        // for longer than claim-expiry.days. Admin/unowned regions are never touched. Disabled by
+        // default. The scan runs at server start and every claim-expiry.check-hours.
+        public boolean claimExpiryEnabled    = false;
+        public int     claimExpiryDays       = 60;
+        public int     claimExpiryCheckHours = 6;
+
+        // Claim economy — buy/sell regions with an internal per-player balance (no external mod
+        // required). Disabled by default. Owners list a region with /rg sell <id> <price>; a buyer
+        // runs /rg buy <id>. Admins adjust balances with /rg balance.
+        public boolean economyEnabled        = false;
+        public double  economyStartBalance   = 0.0;
+        public String  economyCurrency       = "coins";
 
         // MySQL connection settings — used only when storage-format = "mysql".
         public String  mysqlHost     = "localhost";

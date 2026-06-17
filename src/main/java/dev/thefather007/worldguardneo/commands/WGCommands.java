@@ -205,9 +205,24 @@ public final class WGCommands {
                         .then(Commands.argument("label", StringArgumentType.word())
                                 .executes(c -> doBackupNow(c.getSource(), mod,
                                         StringArgumentType.getString(c, "label")))))
+                .then(Commands.literal("cleanup")
+                        // Admin maintenance: trigger the claim-expiry scan immediately.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
+                        .executes(c -> cleanupClaims(c.getSource(), mod)))
                 .then(Commands.literal("flags")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flags.list"))
                         .executes(c -> listFlags(c.getSource(), mod)));
+    }
+
+    /** /rg cleanup — run the claim-expiry scan now (admin). */
+    private static int cleanupClaims(CommandSourceStack src, WorldGuardNeo mod) {
+        if (!mod.config().global().claimExpiryEnabled) {
+            err(src, mod, "msg.cleanup.disabled");
+            return 0;
+        }
+        int n = mod.expiry().runCleanup(mod);
+        ok(src, mod, "msg.cleanup.done", "count", n);
+        return 1;
     }
 
     /* -------------------- handlers -------------------- */

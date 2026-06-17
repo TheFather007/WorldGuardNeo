@@ -53,6 +53,7 @@ public final class WorldGuardNeo {
     private final WorldEditAdapter worldEditAdapter;
     private final dev.thefather007.worldguardneo.backup.BackupManager backupManager;
     private final dev.thefather007.worldguardneo.util.ViolationLog violationLog;
+    private final dev.thefather007.worldguardneo.expiry.ClaimExpiry claimExpiry;
     private WorldEventHandler worldEvents;
 
     public WorldGuardNeo(IEventBus modBus, ModContainer container) {
@@ -81,6 +82,8 @@ public final class WorldGuardNeo {
         // so routine "player tried to grief a claim" events don't bury real errors.
         this.violationLog     = new dev.thefather007.worldguardneo.util.ViolationLog(
                 FMLPaths.GAMEDIR.get().resolve("logs"));
+        // Claim-expiry activity tracker (loads activity.json; cleanup only runs if enabled in config).
+        this.claimExpiry      = new dev.thefather007.worldguardneo.expiry.ClaimExpiry(dataDir);
 
         // Lifecycle.
         modBus.addListener(this::onCommonSetup);
@@ -153,6 +156,10 @@ public final class WorldGuardNeo {
 
     private void onServerStarted(ServerStartedEvent event) {
         LOGGER.info("[WorldGuardNeo] Ready.");
+        // Run an expiry scan at startup (no-op unless claim-expiry.enabled). The player list now
+        // exists so currently-online owners are correctly treated as active.
+        try { claimExpiry.runCleanup(this); }
+        catch (Throwable t) { LOGGER.warn("[WorldGuardNeo] startup claim-expiry scan failed", t); }
         // Initial sync for any active map integrations. Idempotent — runs once at start.
         var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
         if (bm != null && bm.isActive()) bm.publishAll();
@@ -172,6 +179,8 @@ public final class WorldGuardNeo {
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] backup manager close failed", ex); }
         try { violationLog.close(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] violation log close failed", ex); }
+        try { claimExpiry.save(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] activity save failed", ex); }
         LOGGER.info("[WorldGuardNeo] All regions saved.");
     }
 
@@ -185,6 +194,7 @@ public final class WorldGuardNeo {
         if (config.global().backupEnabled) {
             backupManager.tick(t, config.global().backupIntervalMinutes);
         }
+        claimExpiry.tick(this, t);
     }
 
     /**
@@ -226,6 +236,7 @@ public final class WorldGuardNeo {
     public dev.thefather007.worldguardneo.util.ViolationLog violations() { return violationLog; }
     public WorldEventHandler   worldEvents()    { return worldEvents; }
     public dev.thefather007.worldguardneo.backup.BackupManager backups() { return backupManager; }
+    public dev.thefather007.worldguardneo.expiry.ClaimExpiry    expiry()  { return claimExpiry; }
 
     /**
      * Returns the current tick of the running MinecraftServer's overworld, or 0 if no
