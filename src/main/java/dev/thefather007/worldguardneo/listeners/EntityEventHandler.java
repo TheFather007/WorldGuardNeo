@@ -117,17 +117,75 @@ public final class EntityEventHandler {
                 }
                 if (denied.contains(entityId)) {
                     e.setSpawnCancelled(true);
+                    return;
                 } else if (entityId.startsWith("minecraft:")
                         && denied.contains(entityId.substring("minecraft:".length()))) {
                     // Support short form "zombie" as well as full "minecraft:zombie" in the
                     // deny-spawn set. substring() only allocates when the full form didn't
                     // match — saves a string per spawn in the typical "full id matches" case.
                     e.setSpawnCancelled(true);
+                    return;
                 }
             } catch (Throwable t) {
                 WorldGuardNeo.LOGGER.debug("DENY_SPAWN match failed", t);
             }
         }
+
+        // Per-type spawn caps (spawn-limit). For each applicable region that sets a cap matching
+        // this entity type, count live entities of that type within the region's bounds and cancel
+        // the spawn once the cap is reached. We use each region's OWN value (not inherited) so a
+        // cap applies to exactly the area that declares it. The count scan only runs when a
+        // matching "type:max" entry exists, so the common no-cap spawn pays nothing.
+        try {
+            for (int i = 0, n = applicable.size(); i < n; i++) {
+                var reg = applicable.get(i);
+                var caps = reg.getFlag(Flags.SPAWN_LIMIT);
+                if (caps == null || caps.isEmpty()) continue;
+                if (entityId == null) {
+                    var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(e.getEntity().getType());
+                    if (key == null) break; // unregistered type — can't match a cap
+                    entityId = key.toString();
+                }
+                int max = matchSpawnCap(caps, entityId);
+                if (max < 0) continue;
+                if (countOfTypeIn(sl, reg, e.getEntity().getType()) >= max) {
+                    e.setSpawnCancelled(true);
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("SPAWN_LIMIT check failed", t);
+        }
+    }
+
+    /**
+     * Parse a {@code spawn-limit} set for a cap on {@code entityId} ("type:max" entries, full or
+     * short {@code minecraft:} form). Returns the max, or -1 if no entry matches this type.
+     */
+    private static int matchSpawnCap(java.util.Set<String> caps, String entityId) {
+        String shortId = entityId.startsWith("minecraft:") ? entityId.substring("minecraft:".length()) : null;
+        for (String entry : caps) {
+            int colon = entry.lastIndexOf(':');
+            if (colon <= 0 || colon == entry.length() - 1) continue; // malformed "type:max"
+            String type = entry.substring(0, colon);
+            if (type.equals(entityId) || (shortId != null && type.equals(shortId))) {
+                try { return Math.max(0, Integer.parseInt(entry.substring(colon + 1).trim())); }
+                catch (NumberFormatException ignored) { return -1; }
+            }
+        }
+        return -1;
+    }
+
+    /** Count live entities of {@code type} whose position lies within {@code reg}'s bounding box. */
+    private static int countOfTypeIn(ServerLevel sl,
+                                     dev.thefather007.worldguardneo.region.ProtectedRegion reg,
+                                     net.minecraft.world.entity.EntityType<?> type) {
+        var mn = reg.minimumBound();
+        var mx = reg.maximumBound();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
+                mn.x(), mn.y(), mn.z(), mx.x() + 1.0, mx.y() + 1.0, mx.z() + 1.0);
+        return sl.getEntitiesOfClass(Entity.class, box, ent -> ent.getType() == type).size();
     }
 
     /* ---------------- Player-attacks-entity (covers PVP, mob-damage, vehicle-destroy) ---------------- */

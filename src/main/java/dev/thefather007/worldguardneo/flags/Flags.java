@@ -98,6 +98,9 @@ public final class Flags {
     public static final SetFlag    BLOCKED_CMDS      = new SetFlag("blocked-cmds");
     public static final SetFlag    ALLOWED_CMDS      = new SetFlag("allowed-cmds");
     public static final SetFlag    DENY_SPAWN        = new SetFlag("deny-spawn");
+    // Per-type spawn caps: each entry is "<entity-id>:<max>" (e.g. "minecraft:zombie:5"). When a
+    // region is at/over the cap for that type within its bounds, further spawns of it are cancelled.
+    public static final SetFlag    SPAWN_LIMIT       = new SetFlag("spawn-limit");
     public static final SetFlag    BLOCKED_EFFECTS   = new SetFlag("blocked-effects");
 
     /**
@@ -160,7 +163,7 @@ public final class Flags {
         register(FEED_DELAY); register(FEED_AMOUNT); register(FEED_MAX); register(FEED_MIN);
         register(MAX_SPEED); register(NOTIFY_ENTER); register(NOTIFY_LEAVE);
 
-        register(BLOCKED_CMDS); register(ALLOWED_CMDS); register(DENY_SPAWN);
+        register(BLOCKED_CMDS); register(ALLOWED_CMDS); register(DENY_SPAWN); register(SPAWN_LIMIT);
         register(BLOCKED_EFFECTS); register(ON_ENTRY); register(ON_EXIT);
 
         register(GAME_MODE); register(TIME_LOCK); register(WEATHER_LOCK);

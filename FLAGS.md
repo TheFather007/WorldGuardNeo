@@ -41,6 +41,7 @@ The `on-entry` / `on-exit` flags run a console command (placeholders `%player%`,
 | `crop-growth` | state (allow/deny) | allow | `worldguardneo.flag.crop-growth` | Allow or deny crop growth (wheat, beets, etc). |
 | `deny-message` | text | — | `worldguardneo.flag.deny-message` | Custom message shown on protection denial. |
 | `deny-spawn` | list | — | `worldguardneo.flag.deny-spawn` | Entity IDs whose spawn is denied. |
+| `spawn-limit` | list | — | `worldguardneo.flag.spawn-limit` | Per-type spawn caps as `entity-id:max` (e.g. `minecraft:zombie:5`); spawns of that type are denied once the region holds `max` of them. |
 | `dispenser-output` | state (allow/deny) | allow | `worldguardneo.flag.dispenser-output` | Allow or deny dispenser/dropper output (items, fluids, projectiles). Also blocks firing across a region border. |
 | `drown-damage` | state (allow/deny) | allow | `worldguardneo.flag.drown-damage` | Allow or deny drowning damage. |
 | `enderdragon` | state (allow/deny) | allow | `worldguardneo.flag.enderdragon` | Allow or deny ender-dragon block destruction. |

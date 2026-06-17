@@ -41,6 +41,7 @@
 | `crop-growth` | состояние (allow/deny) | allow | `worldguardneo.flag.crop-growth` | Разрешить или запретить рост культур (пшеница, свёкла и т.д.). |
 | `deny-message` | текст | — | `worldguardneo.flag.deny-message` | Своё сообщение при отказе защиты. |
 | `deny-spawn` | список | — | `worldguardneo.flag.deny-spawn` | ID сущностей, спавн которых запрещён. |
+| `spawn-limit` | список | — | `worldguardneo.flag.spawn-limit` | Лимиты на тип в виде `entity-id:max` (напр. `minecraft:zombie:5`); спавн типа запрещается, когда в регионе уже `max` таких сущностей. |
 | `dispenser-output` | состояние (allow/deny) | allow | `worldguardneo.flag.dispenser-output` | Разрешить или запретить выдачу из раздатчика/дропера (предметы, жидкости, снаряды). Также блокирует стрельбу через границу региона. |
 | `drown-damage` | состояние (allow/deny) | allow | `worldguardneo.flag.drown-damage` | Разрешить или запретить урон от утопления. |
 | `enderdragon` | состояние (allow/deny) | allow | `worldguardneo.flag.enderdragon` | Разрешить или запретить разрушение блоков драконом Края. |
