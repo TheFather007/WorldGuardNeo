@@ -56,6 +56,8 @@ public final class WorldGuardNeo {
     private final SelectionStore selectionStore;
     private final dev.thefather007.worldguardneo.backup.BackupManager backupManager;
     private final dev.thefather007.worldguardneo.util.ViolationLog violationLog;
+    private final dev.thefather007.worldguardneo.util.AuditLog auditLog;
+    private final dev.thefather007.worldguardneo.region.RegionTrash regionTrash = new dev.thefather007.worldguardneo.region.RegionTrash();
     private final dev.thefather007.worldguardneo.expiry.ClaimExpiry claimExpiry;
     private WorldEventHandler worldEvents;
 
@@ -86,6 +88,9 @@ public final class WorldGuardNeo {
         // Violations go to logs/worldguardneo-violations.log, separate from the main console,
         // so routine "player tried to grief a claim" events don't bury real errors.
         this.violationLog     = new dev.thefather007.worldguardneo.util.ViolationLog(
+                FMLPaths.GAMEDIR.get().resolve("logs"));
+        // Admin audit trail (region create/delete/redefine/transfer, flag/member edits).
+        this.auditLog         = new dev.thefather007.worldguardneo.util.AuditLog(
                 FMLPaths.GAMEDIR.get().resolve("logs"));
         // Claim-expiry activity tracker (loads activity.json; cleanup only runs if enabled in config).
         this.claimExpiry      = new dev.thefather007.worldguardneo.expiry.ClaimExpiry(dataDir);
@@ -196,6 +201,8 @@ public final class WorldGuardNeo {
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] backup manager close failed", ex); }
         try { violationLog.close(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] violation log close failed", ex); }
+        try { auditLog.close(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] audit log close failed", ex); }
         try { claimExpiry.save(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] activity save failed", ex); }
         LOGGER.info("[WorldGuardNeo] All regions saved.");
@@ -251,6 +258,8 @@ public final class WorldGuardNeo {
     public RegionContainer     regions()        { return regionContainer; }
     public SelectionStore      selections()     { return selectionStore; }
     public dev.thefather007.worldguardneo.util.ViolationLog violations() { return violationLog; }
+    public dev.thefather007.worldguardneo.util.AuditLog       audit()    { return auditLog; }
+    public dev.thefather007.worldguardneo.region.RegionTrash  trash()    { return regionTrash; }
     public WorldEventHandler   worldEvents()    { return worldEvents; }
     public dev.thefather007.worldguardneo.backup.BackupManager backups() { return backupManager; }
     public dev.thefather007.worldguardneo.expiry.ClaimExpiry    expiry()  { return claimExpiry; }

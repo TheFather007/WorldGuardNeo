@@ -1,0 +1,107 @@
+package dev.thefather007.worldguardneo.util;
+
+import net.minecraft.commands.CommandSourceStack;
+
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Dedicated, asynchronous audit log for administrative region changes — who changed what, when.
+ * Records region create/redefine/delete/transfer, flag/priority/parent edits, and owner/member
+ * changes to {@code logs/worldguardneo-audit.log}. Separate from the violation log (routine griefing
+ * attempts) so the audit trail stays clean and reviewable.
+ *
+ * <p>Same async single-writer / bounded-queue / best-effort design as {@link ViolationLog}: callers
+ * on the game thread just hand over a pre-formatted line, so a slow disk never stalls the tick.
+ */
+public final class AuditLog {
+
+    private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    private final BlockingQueue<String> queue = new ArrayBlockingQueue<>(2048);
+    private final Thread worker;
+    private final Path file;
+    private volatile boolean running = true;
+    private volatile boolean warnedOnce = false;
+
+    public AuditLog(Path logsDir) {
+        this.file = logsDir.resolve("worldguardneo-audit.log");
+        try { Files.createDirectories(logsDir); } catch (IOException ignored) { }
+        this.worker = new Thread(this::drainLoop, "WGN-AuditLog");
+        this.worker.setDaemon(true);
+        this.worker.start();
+        offer("=== WorldGuardNeo audit log started " + TS.format(LocalDateTime.now()) + " ===");
+    }
+
+    /**
+     * Record an administrative change.
+     *
+     * @param src    the command source performing the change (player name or "CONSOLE")
+     * @param action short action key, e.g. "claim", "remove", "flag", "transfer"
+     * @param region the region id affected
+     * @param detail extra context (flag=value, target player, etc.); may be null
+     */
+    public void record(CommandSourceStack src, String action, String region, String detail) {
+        if (!running) return;
+        String actor;
+        var p = src.getPlayer();
+        actor = p != null ? p.getGameProfile().getName() + " (" + p.getUUID() + ")" : "CONSOLE";
+        String line = TS.format(LocalDateTime.now())
+                + " [" + action + "] " + actor
+                + " region=" + region
+                + (detail != null ? " " + detail : "");
+        queue.offer(line); // never blocks the game thread; drops if saturated
+    }
+
+    private void offer(String line) { if (running) queue.offer(line); }
+
+    private void drainLoop() {
+        try (Writer w = new OutputStreamWriter(
+                Files.newOutputStream(file, StandardOpenOption.CREATE, StandardOpenOption.APPEND),
+                StandardCharsets.UTF_8)) {
+            while (running || !queue.isEmpty()) {
+                String line = queue.poll(1, TimeUnit.SECONDS);
+                if (line == null) continue;
+                w.write(line);
+                w.write(System.lineSeparator());
+                String more;
+                while ((more = queue.poll()) != null) {
+                    w.write(more);
+                    w.write(System.lineSeparator());
+                }
+                w.flush();
+            }
+        } catch (IOException e) {
+            if (!warnedOnce) {
+                warnedOnce = true;
+                dev.thefather007.worldguardneo.WorldGuardNeo.LOGGER.warn(
+                        "[WorldGuardNeo] Could not write audit log ({}); changes will not be recorded to file.",
+                        file, e);
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Flush and stop the writer thread on server shutdown. */
+    public void close() {
+        running = false;
+        try {
+            worker.join(3000);
+            if (worker.isAlive()) { worker.interrupt(); worker.join(1000); }
+        } catch (InterruptedException ie) {
+            worker.interrupt();
+            Thread.currentThread().interrupt();
+        }
+    }
+}

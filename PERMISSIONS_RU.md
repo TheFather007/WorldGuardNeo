@@ -30,6 +30,7 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.claim` | OP 0 | `/rg claim` — создать регион. Применяются все лимиты (счётчики на игрока/группу, объём, площадь, оверлап). |
 | `worldguardneo.region.delete` | OP 0 | `/rg remove` — удалить **свой** регион. |
 | `worldguardneo.region.delete.others` | OP 3 | Удалить **любой** регион. |
+| `worldguardneo.region.undo` | OP 2 | `/rg undo` — восстановить последний удалённый регион в этом мире (сессионная корзина). |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — изменить размер региона под выделение. |
 | `worldguardneo.region.select` | OP 2 | `/rg select` — загрузить геометрию региона в своё выделение. |
 | `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — передать единоличное владение другому игроку. |

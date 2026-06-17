@@ -118,6 +118,10 @@ public final class WGCommands {
                                     || mod.perms().has(s, "worldguardneo.region.delete.others"))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .executes(c -> removeRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
+                .then(Commands.literal("undo")
+                        // Restore the most recently removed region in this world (session trash).
+                        .requires(s -> mod.perms().has(s, "worldguardneo.region.undo"))
+                        .executes(c -> undoRemove(c.getSource(), mod)))
                 .then(Commands.literal("info")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.info"))
                         .then(Commands.argument("id", StringArgumentType.word())
@@ -394,6 +398,7 @@ public final class WGCommands {
                 new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
                         self.serverLevel(), r,
                         dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.UPDATED, self));
+        mod.audit().record(c.getSource(), "transfer", id, "to=" + target);
         ok(c.getSource(), mod, "msg.region.transferred", "id", id,
                 "player", dev.thefather007.worldguardneo.util.UuidResolver.nameOf(self.getServer(), target));
         return 1;
@@ -513,6 +518,7 @@ public final class WGCommands {
                     new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
                             p.serverLevel(), finalRegion,
                             dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.CREATED, p));
+            mod.audit().record(src, "claim", finalId, "vol=" + finalRegion.volume());
             ok(src, mod, "msg.region.defined", "id", finalId, "volume", finalRegion.volume());
             // If the id was auto-generated, also tell the player what id was chosen so they
             // know how to address the region later (/rg info, /rg flag, etc.).
@@ -694,6 +700,7 @@ public final class WGCommands {
                     new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
                             p.serverLevel(), newRegion,
                             dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.UPDATED, p));
+            mod.audit().record(src, "redefine", id, null);
             ok(src, mod, "msg.region.redefined", "id", id);
             return 1;
         }).orElseGet(() -> { err(src, mod, "msg.selection.none"); return 0; }))
@@ -731,13 +738,44 @@ public final class WGCommands {
                 new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
                         p.serverLevel(), r.get(),
                         dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.DELETED, p));
+        // Soft-delete: keep the region object in the per-world trash so /rg undo can restore it.
+        mod.trash().push(p.serverLevel().dimension(), r.get());
         mgr.remove(id);
         mod.regions().save(p.serverLevel());
         var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
         if (bm != null) bm.removeRegion(p.serverLevel(), id);
         var sq = dev.thefather007.worldguardneo.integrations.SquaremapIntegration.get();
         if (sq != null) sq.removeRegion(p.serverLevel(), id);
+        mod.audit().record(src, "remove", id, null);
         ok(src, mod, "msg.region.removed", "id", id);
+        return 1;
+    }
+
+    /**
+     * /rg undo — restore the most recently removed region in the caller's current world from the
+     * session trash. No-op (with a message) if the trash is empty or the id is now taken again.
+     */
+    private static int undoRemove(CommandSourceStack src, WorldGuardNeo mod) throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        ProtectedRegion restored = mod.trash().pop(p.serverLevel().dimension());
+        if (restored == null) { err(src, mod, "msg.undo.empty"); return 0; }
+        if (mgr.get(restored.id()).isPresent()) {
+            err(src, mod, "msg.region.exists", "id", restored.id());
+            return 0;
+        }
+        mgr.add(restored);
+        mod.regions().saveRegion(p.serverLevel(), restored.id());
+        var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
+        if (bm != null) bm.updateRegion(p.serverLevel(), restored);
+        var sq = dev.thefather007.worldguardneo.integrations.SquaremapIntegration.get();
+        if (sq != null) sq.updateRegion(p.serverLevel(), restored);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
+                new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
+                        p.serverLevel(), restored,
+                        dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.CREATED, p));
+        mod.audit().record(src, "undo", restored.id(), null);
+        ok(src, mod, "msg.undo.restored", "id", restored.id());
         return 1;
     }
 
@@ -1151,7 +1189,8 @@ public final class WGCommands {
             Object parsed = flag.parseAndApply(region, value, rg);
             mod.regions().saveRegion(p.serverLevel(), region.id()); // incremental: just this region
 
-            ok(src, mod, "msg.flag.set", "id", id, "flag", flagName, "value", parsed == null ? "<unset>" : parsed);
+            mod.audit().record(src, "flag", id, flagName + "=" + (parsed == null ? "<unset>" : parsed));
+        ok(src, mod, "msg.flag.set", "id", id, "flag", flagName, "value", parsed == null ? "<unset>" : parsed);
             return 1;
         } catch (Flag.FlagParseException e) {
             err(src, mod, "msg.flag.parse-error", "flag", flagName, "error", e.getMessage());
@@ -1187,6 +1226,7 @@ public final class WGCommands {
         }
         ropt.get().setPriority(value);
         mod.regions().saveRegion(p.serverLevel(), ropt.get().id()); // incremental: just this region
+        mod.audit().record(src, "priority", id, String.valueOf(value));
         ok(src, mod, "msg.priority.set", "id", id, "value", value);
         return 1;
     }
@@ -1229,6 +1269,7 @@ public final class WGCommands {
             ok(src, mod, "msg.parent.set", "child", id, "parent", parent);
         }
         mod.regions().saveRegion(p.serverLevel(), ropt.get().id()); // incremental: just this child
+        mod.audit().record(src, "setparent", id, parent == null ? "<none>" : parent);
         return 1;
     }
 
@@ -1276,6 +1317,8 @@ public final class WGCommands {
             return 0;
         }
         mod.regions().saveRegion(self.serverLevel(), r.id()); // incremental: just this region
+        mod.audit().record(c.getSource(), (add ? "add-" : "remove-") + (owner ? "owner" : "member"),
+                id, "player=" + target);
         ok(c.getSource(), mod, add ? "msg.member.added" : "msg.member.removed",
                 "player", dev.thefather007.worldguardneo.util.UuidResolver.nameOf(self.getServer(), target),
                 "id", id, "role", owner ? "owner" : "member");

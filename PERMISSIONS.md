@@ -30,6 +30,7 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.claim` | OP 0 | `/rg claim` — create a region. All limits apply (per-player/group counts, volume, area, overlap). |
 | `worldguardneo.region.delete` | OP 0 | `/rg remove` — delete **your own** region. |
 | `worldguardneo.region.delete.others` | OP 3 | Delete **anyone's** region. |
+| `worldguardneo.region.undo` | OP 2 | `/rg undo` — restore the most recently removed region in this world (session trash). |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — resize a region to your selection. |
 | `worldguardneo.region.select` | OP 2 | `/rg select` — load a region's geometry into your selection. |
 | `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — hand sole ownership to another player. |

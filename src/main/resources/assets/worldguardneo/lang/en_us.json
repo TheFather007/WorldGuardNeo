@@ -25,6 +25,8 @@
   "msg.wand.already": "§8[§3WGN§8] §e⚠ §7You already have the selection wand.",
   "msg.wand.bad-item": "§8[§3WGN§8] §c✘ §7Configured wand item §f%item% §7is invalid — check §fselection.wand-item§7.",
   "msg.region.selected": "§8[§3WGN§8] §a✔ §7Loaded region §6%id% §7into your selection — edit it and §f/rg redefine %id%§7.",
+  "msg.undo.empty": "§8[§3WGN§8] §e⚠ §7Nothing to undo — no recently removed region in this world.",
+  "msg.undo.restored": "§8[§3WGN§8] §a✔ §7Restored region §6%id%§7.",
   "msg.region.transferred": "§8[§3WGN§8] §a✔ §7Region §6%id% §7transferred to §f%player%§7.",
   "msg.region.global-select": "§8[§3WGN§8] §e⚠ §7Region §6%id% §7is the §fglobal §7region — it has no geometry.",
   "msg.region.global-remove": "§8[§3WGN§8] §c✘ §7The global region cannot be deleted §8(§7holds world-wide defaults§8)§7.",
