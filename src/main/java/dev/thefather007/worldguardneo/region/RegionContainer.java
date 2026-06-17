@@ -97,7 +97,19 @@ public final class RegionContainer {
             catch (Exception ex) { WorldGuardNeo.LOGGER.error("Failed to save regions for {}", m.world(), ex); }
         }
         dirty.clear();
+        // saveAll() fully synced every world, so any pending incremental work is subsumed.
+        regionDirty.clear();
+        regionDeleted.clear();
     }
+
+    /**
+     * Per-region incremental dirty/deleted sets, keyed by world. Used so a single-region edit
+     * (e.g. {@code /rg flag}) persists only that region instead of rewriting the whole world.
+     * Cascade-heavy operations (remove, redefine, global-flag edits) use the full-world {@link #dirty}
+     * path instead. A full-dirty world subsumes (and is processed instead of) its per-region sets.
+     */
+    private final Map<String, java.util.Set<String>> regionDirty   = new HashMap<>();
+    private final Map<String, java.util.Set<String>> regionDeleted = new HashMap<>();
 
     /**
      * Mark a world as dirty so the next {@link #flushDirty} writes it.
@@ -116,19 +128,47 @@ public final class RegionContainer {
     }
 
     /**
+     * Mark a SINGLE region for incremental save (upsert one row). Use after a single-region edit
+     * — flag/priority/parent/membership change, or a claim — so the flush touches only that region.
+     * Pass {@code "__global__"} after editing the global region's flags.
+     */
+    public void saveRegion(Level level, String regionId) {
+        RegionManager m = byLevel.get(level);
+        if (m == null) m = get(level);
+        String w = m.world();
+        regionDirty.computeIfAbsent(w, k -> new java.util.HashSet<>()).add(regionId);
+        var del = regionDeleted.get(w);
+        if (del != null) del.remove(regionId); // an upsert supersedes a pending delete
+    }
+
+    /** Mark a SINGLE region for incremental deletion (drop its row) after {@code /rg remove}. */
+    public void deleteRegion(Level level, String regionId) {
+        RegionManager m = byLevel.get(level);
+        if (m == null) m = get(level);
+        String w = m.world();
+        regionDeleted.computeIfAbsent(w, k -> new java.util.HashSet<>()).add(regionId);
+        var dty = regionDirty.get(w);
+        if (dty != null) dty.remove(regionId); // a delete supersedes a pending upsert
+    }
+
+    /**
      * Called from the server tick. Writes pending dirty worlds to disk if enough ticks
      * have elapsed since the last flush. The 5-second interval is a good trade-off:
      * frequent enough that crashes only lose a few seconds of edits; rare enough that
      * batch operations don't hammer the disk.
      */
     public void flushDirty(long currentTick) {
-        if (dirty.isEmpty()) return;
+        if (dirty.isEmpty() && regionDirty.isEmpty() && regionDeleted.isEmpty()) return;
         if (currentTick - lastFlushTick < FLUSH_INTERVAL_TICKS) return;
         lastFlushTick = currentTick;
-        // Copy to avoid concurrent-modification issues if a save() races during the write.
-        var snapshot = new java.util.ArrayList<>(dirty);
+
+        // Full-world saves first. A full save fully syncs the world, so drop any pending
+        // per-region work for the same world (it's subsumed).
+        var fullSnapshot = new java.util.ArrayList<>(dirty);
         dirty.clear();
-        for (String key : snapshot) {
+        for (String key : fullSnapshot) {
+            regionDirty.remove(key);
+            regionDeleted.remove(key);
             RegionManager m = managers.get(key);
             if (m == null) continue;
             try {
@@ -137,11 +177,38 @@ public final class RegionContainer {
                 WorldGuardNeo.LOGGER.error("Failed to save regions for {}", key, ex);
                 // CRITICAL: re-mark dirty so a transient failure (disk full, locked file)
                 // gets retried on the next flush instead of silently dropping the world's
-                // unsaved edits until someone happens to modify it again. Without this, a
-                // single failed write could lose region data on the next crash.
+                // unsaved edits until someone happens to modify it again.
                 dirty.add(key);
             }
         }
+
+        // Per-region incremental deletes, then upserts.
+        var delSnapshot = new java.util.HashMap<>(regionDeleted);
+        regionDeleted.clear();
+        delSnapshot.forEach((world, ids) -> {
+            RegionManager m = managers.get(world);
+            if (m == null) return;
+            for (String id : ids) {
+                try { storage.deleteRegion(world, m, id); }
+                catch (Exception ex) {
+                    WorldGuardNeo.LOGGER.error("Failed to delete region {}/{}", world, id, ex);
+                    regionDeleted.computeIfAbsent(world, k -> new java.util.HashSet<>()).add(id);
+                }
+            }
+        });
+        var dirtySnapshot = new java.util.HashMap<>(regionDirty);
+        regionDirty.clear();
+        dirtySnapshot.forEach((world, ids) -> {
+            RegionManager m = managers.get(world);
+            if (m == null) return;
+            for (String id : ids) {
+                try { storage.saveRegion(world, m, id); }
+                catch (Exception ex) {
+                    WorldGuardNeo.LOGGER.error("Failed to save region {}/{}", world, id, ex);
+                    regionDirty.computeIfAbsent(world, k -> new java.util.HashSet<>()).add(id);
+                }
+            }
+        });
     }
 
     /** Remove the cached Level→manager mapping (call when a world is unloaded). */

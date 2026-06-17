@@ -99,6 +99,60 @@ public final class RegionJsonCodec {
         }
     }
 
+    /* ------------------ per-region (incremental storage) ------------------ */
+
+    /** JSON for a single region — identical shape to one entry of the whole-world document. */
+    public static JsonObject regionToJson(ProtectedRegion r) { return writeRegion(r); }
+
+    /** JSON holding just the global region's flags (the per-world {@code __global__} row). */
+    public static JsonObject globalToJson(ProtectedRegion global) { return writeFlagsOnly(global); }
+
+    /**
+     * Parse one region from its JSON (geometry, priority, owners/members, flags). The parent link
+     * is deferred into {@code parentOut} (childId → parentId) so the caller resolves it via
+     * {@link #linkParents} once all regions are loaded. Returns null on unusable JSON (logged).
+     */
+    public static ProtectedRegion readRegion(String id, JsonObject obj, Map<String, String> parentOut) {
+        ProtectedRegion region;
+        try {
+            region = parseRegion(id, obj);
+        } catch (Exception ex) {
+            WorldGuardNeo.LOGGER.warn("Skipping region '{}' due to parse error", id, ex);
+            return null;
+        }
+        if (region == null) return null;
+        if (obj.has("priority") && obj.get("priority").isJsonPrimitive()) {
+            try { region.setPriority(obj.get("priority").getAsInt()); } catch (Exception ignored) {}
+        }
+        if (obj.has("parent") && obj.get("parent").isJsonPrimitive()) {
+            parentOut.put(id, obj.get("parent").getAsString());
+        }
+        fillOwnersMembers(region, obj);
+        fillFlags(region, obj);
+        return region;
+    }
+
+    /** Apply a per-row {@code __global__} flags payload onto the manager's global region. */
+    public static void applyGlobalJson(JsonObject obj, RegionManager into) {
+        fillFlags(into.globalRegion(), obj);
+    }
+
+    /** Resolve deferred parent links collected by {@link #readRegion}. */
+    public static void linkParents(Map<String, String> parentDeferred, RegionManager into) {
+        for (Map.Entry<String, String> e : parentDeferred.entrySet()) {
+            var child  = into.get(e.getKey()).orElse(null);
+            var parent = into.get(e.getValue()).orElse(null);
+            if (child == null || parent == null) {
+                WorldGuardNeo.LOGGER.warn("Dropping parent link {} → {}: target missing", e.getKey(), e.getValue());
+                continue;
+            }
+            try { child.setParent(parent); }
+            catch (IllegalStateException ex) {
+                WorldGuardNeo.LOGGER.warn("Dropping parent link {} → {}: would create a cycle", e.getKey(), e.getValue());
+            }
+        }
+    }
+
     /* ------------------ parse helpers ------------------ */
 
     private static ProtectedRegion parseRegion(String id, JsonObject obj) {

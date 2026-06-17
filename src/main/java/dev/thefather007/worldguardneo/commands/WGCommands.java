@@ -314,7 +314,7 @@ public final class WGCommands {
             // Apply automatic flags (config, per-world) to the freshly claimed region.
             applyAutoFlags(finalRegion, ws, mod);
             mgr.add(finalRegion);
-            mod.regions().save(p.serverLevel());
+            mod.regions().saveRegion(p.serverLevel(), finalId); // incremental: just this new region
             // Notify map integrations of the new region. No-op if no integration is active.
             var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
             if (bm != null) bm.updateRegion(p.serverLevel(), finalRegion);
@@ -965,7 +965,8 @@ public final class WGCommands {
             // parseAndApply runs entirely inside Flag<T>'s generic context, so there's no raw
             // type or unchecked cast here — the flag binds its own T for parse + setFlag.
             Object parsed = flag.parseAndApply(region, value, rg);
-            mod.regions().save(p.serverLevel());
+            mod.regions().saveRegion(p.serverLevel(), region.id()); // incremental: just this region
+
             ok(src, mod, "msg.flag.set", "id", id, "flag", flagName, "value", parsed == null ? "<unset>" : parsed);
             return 1;
         } catch (Flag.FlagParseException e) {
@@ -1001,7 +1002,7 @@ public final class WGCommands {
             return 0;
         }
         ropt.get().setPriority(value);
-        mod.regions().save(p.serverLevel());
+        mod.regions().saveRegion(p.serverLevel(), ropt.get().id()); // incremental: just this region
         ok(src, mod, "msg.priority.set", "id", id, "value", value);
         return 1;
     }
@@ -1043,7 +1044,7 @@ public final class WGCommands {
             catch (Exception e) { err(src, mod, "msg.parent.cycle"); return 0; }
             ok(src, mod, "msg.parent.set", "child", id, "parent", parent);
         }
-        mod.regions().save(p.serverLevel());
+        mod.regions().saveRegion(p.serverLevel(), ropt.get().id()); // incremental: just this child
         return 1;
     }
 
@@ -1090,7 +1091,7 @@ public final class WGCommands {
                     "id", id, "role", owner ? "owner" : "member");
             return 0;
         }
-        mod.regions().save(self.serverLevel());
+        mod.regions().saveRegion(self.serverLevel(), r.id()); // incremental: just this region
         ok(c.getSource(), mod, add ? "msg.member.added" : "msg.member.removed",
                 "player", dev.thefather007.worldguardneo.util.UuidResolver.nameOf(self.getServer(), target),
                 "id", id, "role", owner ? "owner" : "member");
