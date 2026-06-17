@@ -54,6 +54,7 @@ public final class WorldGuardNeo {
     private final dev.thefather007.worldguardneo.backup.BackupManager backupManager;
     private final dev.thefather007.worldguardneo.util.ViolationLog violationLog;
     private final dev.thefather007.worldguardneo.expiry.ClaimExpiry claimExpiry;
+    private final dev.thefather007.worldguardneo.economy.EconomyService economy;
     private WorldEventHandler worldEvents;
 
     public WorldGuardNeo(IEventBus modBus, ModContainer container) {
@@ -84,6 +85,8 @@ public final class WorldGuardNeo {
                 FMLPaths.GAMEDIR.get().resolve("logs"));
         // Claim-expiry activity tracker (loads activity.json; cleanup only runs if enabled in config).
         this.claimExpiry      = new dev.thefather007.worldguardneo.expiry.ClaimExpiry(dataDir);
+        // Built-in claim economy (active only when economy.enabled in config).
+        this.economy          = new dev.thefather007.worldguardneo.economy.EconomyService(dataDir);
 
         // Lifecycle.
         modBus.addListener(this::onCommonSetup);
@@ -181,6 +184,8 @@ public final class WorldGuardNeo {
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] violation log close failed", ex); }
         try { claimExpiry.save(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] activity save failed", ex); }
+        try { economy.save(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] economy save failed", ex); }
         LOGGER.info("[WorldGuardNeo] All regions saved.");
     }
 
@@ -237,6 +242,7 @@ public final class WorldGuardNeo {
     public WorldEventHandler   worldEvents()    { return worldEvents; }
     public dev.thefather007.worldguardneo.backup.BackupManager backups() { return backupManager; }
     public dev.thefather007.worldguardneo.expiry.ClaimExpiry    expiry()  { return claimExpiry; }
+    public dev.thefather007.worldguardneo.economy.EconomyService economy() { return economy; }
 
     /**
      * Returns the current tick of the running MinecraftServer's overworld, or 0 if no

@@ -1112,6 +1112,10 @@ public final class PlayerEventHandler {
     @SubscribeEvent
     public void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
         mod.expiry().record(e.getEntity().getUUID()); // claim-expiry activity tracking
+        if (mod.config().global().economyEnabled) {   // grant starting balance once
+            mod.economy().grantStartingIfNew(e.getEntity().getUUID(),
+                    mod.config().global().economyStartBalance);
+        }
     }
 
     @SubscribeEvent

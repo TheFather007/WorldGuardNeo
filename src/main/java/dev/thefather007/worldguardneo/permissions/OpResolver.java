@@ -99,6 +99,11 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.reload",               4);
         nodeToLevel.put("worldguardneo.backup",               4);
         nodeToLevel.put("worldguardneo.notify",               mod);
+
+        // Economy — basic use (balance/pay/sell/buy) is for everyone (op-0); admin balance edits
+        // and viewing others' balances require the admin node.
+        nodeToLevel.put("worldguardneo.economy.use",          0);
+        nodeToLevel.put("worldguardneo.economy.admin",        admin);
     }
 
     public void setLevel(String node, int level) { nodeToLevel.put(node, level); }

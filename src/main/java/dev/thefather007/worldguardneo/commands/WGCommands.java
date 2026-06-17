@@ -1,6 +1,7 @@
 package dev.thefather007.worldguardneo.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -209,6 +210,41 @@ public final class WGCommands {
                         // Admin maintenance: trigger the claim-expiry scan immediately.
                         .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
                         .executes(c -> cleanupClaims(c.getSource(), mod)))
+                .then(Commands.literal("balance")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
+                        .executes(c -> ecoBalance(c.getSource(), null, mod))
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .requires(s -> mod.perms().has(s, "worldguardneo.economy.admin"))
+                                .executes(c -> ecoBalance(c.getSource(), StringArgumentType.getString(c, "player"), mod))))
+                .then(Commands.literal("pay")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
+                        .then(Commands.argument("player", StringArgumentType.word())
+                                .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0.01))
+                                        .executes(c -> ecoPay(c.getSource(), StringArgumentType.getString(c, "player"),
+                                                DoubleArgumentType.getDouble(c, "amount"), mod)))))
+                .then(Commands.literal("sell")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
+                                        .executes(c -> ecoSell(c.getSource(), StringArgumentType.getString(c, "id"),
+                                                DoubleArgumentType.getDouble(c, "price"), mod)))))
+                .then(Commands.literal("unsell")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .executes(c -> ecoUnsell(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
+                .then(Commands.literal("buy")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
+                        .then(Commands.argument("id", StringArgumentType.word())
+                                .executes(c -> ecoBuy(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
+                .then(Commands.literal("eco")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.admin"))
+                        .then(Commands.argument("op", StringArgumentType.word())
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0))
+                                                .executes(c -> ecoAdmin(c.getSource(),
+                                                        StringArgumentType.getString(c, "op"),
+                                                        StringArgumentType.getString(c, "player"),
+                                                        DoubleArgumentType.getDouble(c, "amount"), mod))))))
                 .then(Commands.literal("flags")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flags.list"))
                         .executes(c -> listFlags(c.getSource(), mod)));
@@ -222,6 +258,142 @@ public final class WGCommands {
         }
         int n = mod.expiry().runCleanup(mod);
         ok(src, mod, "msg.cleanup.done", "count", n);
+        return 1;
+    }
+
+    /* -------------------- economy -------------------- */
+
+    private static boolean ecoEnabled(CommandSourceStack src, WorldGuardNeo mod) {
+        if (mod.config().global().economyEnabled) return true;
+        err(src, mod, "msg.eco.disabled");
+        return false;
+    }
+
+    /** Pretty-print money: drop the ".0" for whole numbers, else 2 decimals. */
+    private static String fmt(double v) {
+        if (v == Math.floor(v) && !Double.isInfinite(v)) return String.valueOf((long) v);
+        return String.valueOf(Math.round(v * 100.0) / 100.0);
+    }
+
+    private static int ecoBalance(CommandSourceStack src, String playerArg, WorldGuardNeo mod) throws CommandSyntaxException {
+        if (!ecoEnabled(src, mod)) return 0;
+        String cur = mod.config().global().economyCurrency;
+        if (playerArg == null) {
+            ServerPlayer p = src.getPlayerOrException();
+            ok(src, mod, "msg.eco.balance", "amount", fmt(mod.economy().balance(p.getUUID())), "currency", cur);
+            return 1;
+        }
+        var uid = dev.thefather007.worldguardneo.util.UuidResolver.resolve(src.getServer(), playerArg);
+        if (uid.isEmpty()) { err(src, mod, "msg.player.unknown", "player", playerArg); return 0; }
+        String name = dev.thefather007.worldguardneo.util.UuidResolver.nameOf(src.getServer(), uid.get());
+        ok(src, mod, "msg.eco.balance-other", "player", name, "amount", fmt(mod.economy().balance(uid.get())), "currency", cur);
+        return 1;
+    }
+
+    private static int ecoPay(CommandSourceStack src, String playerArg, double amount, WorldGuardNeo mod) throws CommandSyntaxException {
+        if (!ecoEnabled(src, mod)) return 0;
+        ServerPlayer p = src.getPlayerOrException();
+        var uid = dev.thefather007.worldguardneo.util.UuidResolver.resolve(src.getServer(), playerArg);
+        if (uid.isEmpty()) { err(src, mod, "msg.player.unknown", "player", playerArg); return 0; }
+        UUID target = uid.get();
+        if (target.equals(p.getUUID())) { err(src, mod, "msg.eco.pay-self"); return 0; }
+        String cur = mod.config().global().economyCurrency;
+        if (!mod.economy().withdraw(p.getUUID(), amount)) { err(src, mod, "msg.eco.insufficient"); return 0; }
+        mod.economy().deposit(target, amount);
+        String tname = dev.thefather007.worldguardneo.util.UuidResolver.nameOf(src.getServer(), target);
+        ok(src, mod, "msg.eco.pay-sent", "amount", fmt(amount), "currency", cur, "player", tname);
+        var online = src.getServer().getPlayerList().getPlayer(target);
+        if (online != null) online.displayClientMessage(Component.literal(mod.i18n().format(
+                "msg.eco.pay-received", "amount", fmt(amount), "currency", cur,
+                "player", p.getGameProfile().getName())), false);
+        return 1;
+    }
+
+    private static int ecoSell(CommandSourceStack src, String id, double price, WorldGuardNeo mod) throws CommandSyntaxException {
+        if (!ecoEnabled(src, mod)) return 0;
+        ServerPlayer p = src.getPlayerOrException();
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        var ropt = mgr.get(id);
+        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        ProtectedRegion r = ropt.get();
+        if (r instanceof GlobalRegion) { err(src, mod, "msg.region.global-select", "id", id); return 0; }
+        if (!mod.perms().has(p, "worldguardneo.region.bypass") && !r.isOwner(p.getUUID())) {
+            err(src, mod, "msg.region.notyours", "id", id); return 0;
+        }
+        String world = p.serverLevel().dimension().location().toString();
+        mod.economy().listForSale(world, r.id(), price);
+        ok(src, mod, "msg.eco.sell-listed", "id", r.id(), "price", fmt(price),
+                "currency", mod.config().global().economyCurrency);
+        return 1;
+    }
+
+    private static int ecoUnsell(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
+        if (!ecoEnabled(src, mod)) return 0;
+        ServerPlayer p = src.getPlayerOrException();
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        var ropt = mgr.get(id);
+        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        ProtectedRegion r = ropt.get();
+        if (!mod.perms().has(p, "worldguardneo.region.bypass") && !r.isOwner(p.getUUID())) {
+            err(src, mod, "msg.region.notyours", "id", id); return 0;
+        }
+        mod.economy().unlist(p.serverLevel().dimension().location().toString(), r.id());
+        ok(src, mod, "msg.eco.unsell-done", "id", r.id());
+        return 1;
+    }
+
+    private static int ecoBuy(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
+        if (!ecoEnabled(src, mod)) return 0;
+        ServerPlayer p = src.getPlayerOrException();
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        var ropt = mgr.get(id);
+        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        ProtectedRegion r = ropt.get();
+        String world = p.serverLevel().dimension().location().toString();
+        Double price = mod.economy().price(world, r.id());
+        if (price == null) { err(src, mod, "msg.eco.not-for-sale", "id", r.id()); return 0; }
+        if (r.isOwner(p.getUUID())) { err(src, mod, "msg.eco.buy-own"); return 0; }
+        if (!mod.perms().has(p, "worldguardneo.region.bypass")) {
+            int owned = mod.regions().countOwnedGlobal(p.getUUID());
+            int limit = mod.effectiveRegionLimit(p);
+            if (owned >= limit) { err(src, mod, "msg.claim.limit", "limit", limit); return 0; }
+        }
+        if (!mod.economy().has(p.getUUID(), price)) { err(src, mod, "msg.eco.insufficient"); return 0; }
+        UUID seller = r.ownersView().isEmpty() ? null : r.ownersView().iterator().next();
+        mod.economy().withdraw(p.getUUID(), price);
+        if (seller != null) mod.economy().deposit(seller, price);
+        // Transfer sole ownership to the buyer; clear prior owners/members.
+        r.owners().clear();
+        r.members().clear();
+        r.owners().add(p.getUUID());
+        mod.economy().unlist(world, r.id());
+        mod.regions().saveRegion(p.serverLevel(), r.id());
+        String cur = mod.config().global().economyCurrency;
+        ok(src, mod, "msg.eco.buy-done", "id", r.id(), "price", fmt(price), "currency", cur);
+        if (seller != null) {
+            var so = src.getServer().getPlayerList().getPlayer(seller);
+            if (so != null) so.displayClientMessage(Component.literal(mod.i18n().format(
+                    "msg.eco.sold", "id", r.id(), "price", fmt(price), "currency", cur,
+                    "player", p.getGameProfile().getName())), false);
+        }
+        return 1;
+    }
+
+    private static int ecoAdmin(CommandSourceStack src, String op, String playerArg, double amount, WorldGuardNeo mod) {
+        if (!ecoEnabled(src, mod)) return 0;
+        var uid = dev.thefather007.worldguardneo.util.UuidResolver.resolve(src.getServer(), playerArg);
+        if (uid.isEmpty()) { err(src, mod, "msg.player.unknown", "player", playerArg); return 0; }
+        UUID target = uid.get();
+        var eco = mod.economy();
+        switch (op.toLowerCase(java.util.Locale.ROOT)) {
+            case "set"  -> eco.set(target, amount);
+            case "give" -> eco.deposit(target, amount);
+            case "take" -> eco.set(target, Math.max(0.0, eco.balance(target) - amount));
+            default -> { err(src, mod, "msg.eco.admin-usage"); return 0; }
+        }
+        String name = dev.thefather007.worldguardneo.util.UuidResolver.nameOf(src.getServer(), target);
+        ok(src, mod, "msg.eco.admin-set", "player", name, "amount", fmt(eco.balance(target)),
+                "currency", mod.config().global().economyCurrency);
         return 1;
     }
 
