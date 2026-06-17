@@ -149,6 +149,20 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
     }
 
     @Override
+    public void prepareForBackup() {
+        // Checkpoint the WAL into the main .sqlite file so a plain file-copy backup captures all
+        // committed data. Without this, recent commits live only in the -wal sidecar (which the
+        // copy omits), so the snapshot could be stale or internally inconsistent. TRUNCATE also
+        // resets the -wal file. Best-effort: never propagate failures into the backup path.
+        if (!driverPresent) return;
+        try (Statement s = conn().createStatement()) {
+            s.execute("PRAGMA wal_checkpoint(TRUNCATE)");
+        } catch (SQLException ex) {
+            WorldGuardNeo.LOGGER.debug("SQLite WAL checkpoint before backup failed", ex);
+        }
+    }
+
+    @Override
     public void close() {
         if (conn != null) {
             try { conn.close(); }

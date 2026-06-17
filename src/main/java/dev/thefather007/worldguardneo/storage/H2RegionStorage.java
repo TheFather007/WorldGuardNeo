@@ -147,6 +147,17 @@ public final class H2RegionStorage implements RegionStorage, AutoCloseable {
     }
 
     @Override
+    public void prepareForBackup() {
+        // Flush H2's MVStore to the main .mv.db file so a file-copy backup is consistent.
+        if (!driverPresent) return;
+        try (Statement s = conn().createStatement()) {
+            s.execute("CHECKPOINT SYNC");
+        } catch (SQLException ex) {
+            WorldGuardNeo.LOGGER.debug("H2 checkpoint before backup failed", ex);
+        }
+    }
+
+    @Override
     public void close() {
         if (conn != null) {
             try { conn.close(); }

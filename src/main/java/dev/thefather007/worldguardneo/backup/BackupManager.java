@@ -106,6 +106,16 @@ public final class BackupManager implements AutoCloseable {
             WorldGuardNeo.LOGGER.info("[WorldGuardNeo] Backup already in progress; skipping new request.");
             return false;
         }
+        // Checkpoint embedded DBs NOW, on the calling (server) thread, before the async file copy.
+        // runAsync is only ever invoked from the server tick or the /rg backup command, both on the
+        // server thread — the same thread that owns the single DB connection — so this is safe.
+        // It flushes the SQLite WAL / H2 MVStore into the main file so the copy is consistent.
+        try {
+            var mod = WorldGuardNeo.get();
+            if (mod != null && mod.regions() != null) mod.regions().storage().prepareForBackup();
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] prepareForBackup failed", t);
+        }
         executor.submit(() -> {
             try {
                 doBackup(label);
