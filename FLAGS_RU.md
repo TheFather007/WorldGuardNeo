@@ -109,6 +109,15 @@
 | `tnt` | состояние (allow/deny) | allow | `worldguardneo.flag.tnt` | Разрешить или запретить урон блокам от взрыва ТНТ. |
 | `use` | состояние (allow/deny) | allow | `worldguardneo.flag.use` | Разрешить или запретить использование предметов (еда, зелья, двери). |
 | `vehicle-destroy` | состояние (allow/deny) | allow | `worldguardneo.flag.vehicle-destroy` | Разрешить или запретить уничтожение вагонеток и лодок. |
+| `vehicle-place` | состояние (allow/deny) | allow | `worldguardneo.flag.vehicle-place` | Разрешить или запретить установку вагонеток и лодок. |
+| `vehicle-enter` | состояние (allow/deny) | allow | `worldguardneo.flag.vehicle-enter` | Разрешить или запретить посадку игроков в вагонетки и лодки. |
+| `item-frame-rotate` | состояние (allow/deny) | allow | `worldguardneo.flag.item-frame-rotate` | Разрешить или запретить вращение предмета в заполненной рамке (установка/изъятие — по build-доступу). |
+| `sign-edit` | состояние (allow/deny) | allow | `worldguardneo.flag.sign-edit` | Разрешить или запретить редактирование табличек. |
+| `lectern-take` | состояние (allow/deny) | allow | `worldguardneo.flag.lectern-take` | Разрешить или запретить использование кафедры с книгой. |
+| `armor-stand-use` | состояние (allow/deny) | allow | `worldguardneo.flag.armor-stand-use` | Разрешить или запретить использование (смену экипировки) стоек для брони. |
+| `glide` | состояние (allow/deny) | allow | `worldguardneo.flag.glide` | Разрешить или запретить полёт на элитрах; запрет принудительно прерывает планирование в регионе. |
+| `bucket-fill` | состояние (allow/deny) | allow | `worldguardneo.flag.bucket-fill` | Разрешить или запретить наполнение вёдер (вода, лава, снег). |
+| `bucket-empty` | состояние (allow/deny) | allow | `worldguardneo.flag.bucket-empty` | Разрешить или запретить выливание вёдер (установку жидкостей). |
 | `vine-growth` | состояние (allow/deny) | allow | `worldguardneo.flag.vine-growth` | Разрешить или запретить рост лиан. |
 | `water-flow` | состояние (allow/deny) | allow | `worldguardneo.flag.water-flow` | Разрешить или запретить течение воды. |
 | `weather-lock` | текст | — | `worldguardneo.flag.weather-lock` | Фиксация клиентской погоды (clear, rain, thunder). |

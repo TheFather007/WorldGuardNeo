@@ -452,6 +452,13 @@ public final class PlayerEventHandler {
             }
         } catch (Throwable ignored) {}
 
+        // glide (elytra): when denied, force-stop fall-flying so a player can't soar across the
+        // region. stopFallFlying clears the gliding flag; the player simply falls/walks. Only
+        // touched while actually gliding, so it costs nothing for grounded players.
+        if (p.isFallFlying() && !mgr.testState(Flags.GLIDE, applicable, id)) {
+            p.stopFallFlying();
+        }
+
         // per-player time / weather lock — sent every 40 ticks (2 s) while active,
         // and a one-shot restore packet when the player leaves a locked region.
         if ((lvl.getGameTime() - st.lastTimePacket) >= 40) {

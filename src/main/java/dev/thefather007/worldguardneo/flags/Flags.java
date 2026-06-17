@@ -36,6 +36,15 @@ public final class Flags {
     public static final StateFlag DROWN_DAMAGE      = new StateFlag("drown-damage",      true);
     public static final StateFlag SUFFOCATION_DAMAGE= new StateFlag("suffocation-damage",true);
     public static final StateFlag VEHICLE_DESTROY   = new StateFlag("vehicle-destroy",   true);
+    public static final StateFlag VEHICLE_PLACE     = new StateFlag("vehicle-place",     true);
+    public static final StateFlag VEHICLE_ENTER     = new StateFlag("vehicle-enter",     true);
+    public static final StateFlag ITEM_FRAME_ROTATE = new StateFlag("item-frame-rotate", true);
+    public static final StateFlag SIGN_EDIT         = new StateFlag("sign-edit",         true);
+    public static final StateFlag LECTERN_TAKE      = new StateFlag("lectern-take",      true);
+    public static final StateFlag ARMOR_STAND_USE   = new StateFlag("armor-stand-use",   true);
+    public static final StateFlag GLIDE             = new StateFlag("glide",             true);
+    public static final StateFlag BUCKET_FILL       = new StateFlag("bucket-fill",       true);
+    public static final StateFlag BUCKET_EMPTY      = new StateFlag("bucket-empty",      true);
     public static final StateFlag ITEM_PICKUP       = new StateFlag("item-pickup",       true);
     public static final StateFlag ITEM_DROP         = new StateFlag("item-drop",         true);
     public static final StateFlag ENDER_BUILD       = new StateFlag("enderpearl",        true);
@@ -131,7 +140,10 @@ public final class Flags {
         register(OTHER_EXPLOSION); register(FIRE_SPREAD); register(LAVA_FIRE); register(LIGHTNING);
         register(MOB_SPAWNING); register(MOB_DAMAGE); register(PLAYER_DAMAGE);
         register(FALL_DAMAGE); register(FIRE_DAMAGE); register(DROWN_DAMAGE); register(SUFFOCATION_DAMAGE);
-        register(VEHICLE_DESTROY); register(ITEM_PICKUP); register(ITEM_DROP);
+        register(VEHICLE_DESTROY); register(VEHICLE_PLACE); register(VEHICLE_ENTER);
+        register(ITEM_FRAME_ROTATE); register(SIGN_EDIT); register(LECTERN_TAKE);
+        register(ARMOR_STAND_USE); register(GLIDE); register(BUCKET_FILL); register(BUCKET_EMPTY);
+        register(ITEM_PICKUP); register(ITEM_DROP);
         register(ENDER_BUILD); register(CHORUS_FRUIT); register(ENTRY); register(EXIT);
         register(ENTRY_VEHICLE); register(EXIT_VEHICLE); register(PISTONS);
         register(REDSTONE); register(DISPENSER_OUTPUT);

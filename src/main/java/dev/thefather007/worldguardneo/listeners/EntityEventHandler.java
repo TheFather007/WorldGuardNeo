@@ -199,6 +199,31 @@ public final class EntityEventHandler {
         }
     }
 
+    /* ---------------- Vehicle mounting (boats / minecarts) ---------------- */
+
+    /**
+     * Gate a player boarding a boat or minecart by the per-region {@code vehicle-enter} flag
+     * (default ALLOW). Only player→vehicle mounts are considered; mob mounts and dismounts pass
+     * through. Bypass holders are exempt. Useful for show-arenas or spawn regions that should keep
+     * players on foot.
+     */
+    @SubscribeEvent
+    public void onEntityMount(net.neoforged.neoforge.event.entity.EntityMountEvent e) {
+        if (!e.isMounting()) return;
+        if (!(e.getEntityMounting() instanceof ServerPlayer p)) return;
+        Entity vehicle = e.getEntityBeingMounted();
+        if (!(vehicle instanceof AbstractMinecart) && !(vehicle instanceof Boat)) return;
+        if (e.getLevel().isClientSide()) return;
+        if (!mod.isProtectionActive(e.getLevel())) return;
+        if (mod.perms().has(p, "worldguardneo.region.bypass")) return;
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        if (!mgr.testState(Flags.VEHICLE_ENTER, p.getUUID(), vehicle.getX(), vehicle.getY(), vehicle.getZ())) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.vehicle.enter-denied")), true);
+        }
+    }
+
     /* ---------------- Right-click EXACTLY on an entity (armor stand armor swap) ---------------- */
 
     /**
@@ -228,6 +253,15 @@ public final class EntityEventHandler {
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
+        // Dedicated armor-stand-use toggle (default ALLOW) — an explicit deny blocks use even for
+        // members, layered on top of the build-access gate below.
+        if (target instanceof net.minecraft.world.entity.decoration.ArmorStand
+                && !mgr.testState(Flags.ARMOR_STAND_USE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
+            return;
+        }
         if (!mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor)
                 || !mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)) {
             e.setCanceled(true);
@@ -266,6 +300,24 @@ public final class EntityEventHandler {
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
+        // Dedicated decoration toggles (default ALLOW): an explicit deny blocks the action even for
+        // members. item-frame-rotate only applies to a frame that already holds an item (rotating);
+        // placing/removing the item still falls under the build-access gate below.
+        if (target instanceof net.minecraft.world.entity.decoration.ItemFrame frame
+                && !frame.getItem().isEmpty()
+                && !mgr.testState(Flags.ITEM_FRAME_ROTATE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
+            return;
+        }
+        if (target instanceof net.minecraft.world.entity.decoration.ArmorStand
+                && !mgr.testState(Flags.ARMOR_STAND_USE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
+            return;
+        }
         // INTERACT and BUILD both must allow — same gate as left-click but uses INTERACT
         // (right-click is logically interaction, not destruction). Membership protection via
         // testBuildAccess: owners/members pass, strangers are blocked when flags are unset.

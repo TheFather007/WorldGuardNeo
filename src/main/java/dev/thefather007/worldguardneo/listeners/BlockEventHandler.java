@@ -150,6 +150,35 @@ public final class BlockEventHandler {
             return;
         }
         UUID id = p.getUUID();
+        // Dedicated right-click toggles (all default ALLOW): each is an explicit state flag that,
+        // when set to deny, blocks that specific action even for members — independent of the
+        // generic interact/use gate below. Bypass holders skip them. Checked here so an admin can,
+        // e.g., allow interact but forbid sign editing, or forbid emptying buckets in a region.
+        if (!canBypass(p)) {
+            StateFlag ded = null;
+            String dmsg = null;
+            if (heldItem instanceof net.minecraft.world.item.MinecartItem) {
+                ded = Flags.VEHICLE_PLACE; dmsg = "msg.vehicle.place-denied";
+            } else if (heldItem instanceof net.minecraft.world.item.BucketItem) {
+                boolean empty = heldItem == net.minecraft.world.item.Items.BUCKET;
+                ded  = empty ? Flags.BUCKET_FILL : Flags.BUCKET_EMPTY;
+                dmsg = empty ? "msg.bucket.fill-denied" : "msg.bucket.empty-denied";
+            } else {
+                BlockState st = sl.getBlockState(bp);
+                if (st.getBlock() instanceof net.minecraft.world.level.block.LecternBlock
+                        && st.getValue(net.minecraft.world.level.block.LecternBlock.HAS_BOOK)) {
+                    ded = Flags.LECTERN_TAKE; dmsg = "msg.lectern.take-denied";
+                } else if (st.getBlock() instanceof net.minecraft.world.level.block.SignBlock) {
+                    ded = Flags.SIGN_EDIT; dmsg = "msg.sign.edit-denied";
+                }
+            }
+            if (ded != null && !mgr.testState(ded, id, x, y, z)) {
+                e.setCanceled(true);
+                syncInventory(p);
+                p.displayClientMessage(Component.literal(mod.i18n().raw(dmsg)), true);
+                return;
+            }
+        }
         // INTERACT/USE use build-access semantics (members interact freely, strangers are
         // blocked unless a flag explicitly opens it). Containers additionally require chest-access.
         boolean allowed = mgr.testBuildAccess(Flags.INTERACT, x, y, z, id)
@@ -205,6 +234,27 @@ public final class BlockEventHandler {
             return;
         }
         denyMessage(p, mgr, bp, action, blockId(sl.getBlockState(bp).getBlock()));
+    }
+
+    /**
+     * Boats are placed via a right-click of the item (not a block click), so they bypass
+     * {@link #onRightClickBlock}. Gate them with {@code vehicle-place} at the player's position
+     * (the boat lands a few blocks along the look vector — close enough for region gating).
+     * Minecarts are placed on rails and go through the block-click path above.
+     */
+    @SubscribeEvent
+    public void onRightClickItem(PlayerInteractEvent.RightClickItem e) {
+        if (e.getLevel().isClientSide()) return;
+        if (!(e.getEntity() instanceof ServerPlayer p)) return;
+        if (!(e.getItemStack().getItem() instanceof net.minecraft.world.item.BoatItem)) return;
+        if (!mod.isProtectionActive(p.serverLevel())) return;
+        if (canBypass(p)) return;
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        if (!mgr.testState(Flags.VEHICLE_PLACE, p.getUUID(), p.getX(), p.getY(), p.getZ())) {
+            e.setCanceled(true);
+            syncInventory(p);
+            p.displayClientMessage(Component.literal(mod.i18n().raw("msg.vehicle.place-denied")), true);
+        }
     }
 
     /**

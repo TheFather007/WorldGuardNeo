@@ -109,6 +109,15 @@ The `on-entry` / `on-exit` flags run a console command (placeholders `%player%`,
 | `tnt` | state (allow/deny) | allow | `worldguardneo.flag.tnt` | Allow or deny TNT explosion damage to blocks. |
 | `use` | state (allow/deny) | allow | `worldguardneo.flag.use` | Allow or deny using items (food, potions, doors). |
 | `vehicle-destroy` | state (allow/deny) | allow | `worldguardneo.flag.vehicle-destroy` | Allow or deny destroying minecarts and boats. |
+| `vehicle-place` | state (allow/deny) | allow | `worldguardneo.flag.vehicle-place` | Allow or deny placing minecarts and boats. |
+| `vehicle-enter` | state (allow/deny) | allow | `worldguardneo.flag.vehicle-enter` | Allow or deny players boarding minecarts and boats. |
+| `item-frame-rotate` | state (allow/deny) | allow | `worldguardneo.flag.item-frame-rotate` | Allow or deny rotating the item in a filled item frame (placing/removing still uses build access). |
+| `sign-edit` | state (allow/deny) | allow | `worldguardneo.flag.sign-edit` | Allow or deny editing signs. |
+| `lectern-take` | state (allow/deny) | allow | `worldguardneo.flag.lectern-take` | Allow or deny using a lectern that holds a book. |
+| `armor-stand-use` | state (allow/deny) | allow | `worldguardneo.flag.armor-stand-use` | Allow or deny using (swapping gear on) armor stands. |
+| `glide` | state (allow/deny) | allow | `worldguardneo.flag.glide` | Allow or deny elytra gliding; denying force-stops fall-flight in the region. |
+| `bucket-fill` | state (allow/deny) | allow | `worldguardneo.flag.bucket-fill` | Allow or deny filling buckets (water, lava, powder snow). |
+| `bucket-empty` | state (allow/deny) | allow | `worldguardneo.flag.bucket-empty` | Allow or deny emptying buckets (placing fluids). |
 | `vine-growth` | state (allow/deny) | allow | `worldguardneo.flag.vine-growth` | Allow or deny vines growing. |
 | `water-flow` | state (allow/deny) | allow | `worldguardneo.flag.water-flow` | Allow or deny water flowing. |
 | `weather-lock` | text | — | `worldguardneo.flag.weather-lock` | Lock client-side weather (clear, rain, thunder). |

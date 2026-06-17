@@ -108,6 +108,12 @@
   "msg.attack.vehicle-denied": "§c✘ §7Здесь нельзя ломать транспорт.",
   "msg.attack.build-denied": "§c✘ §7Здесь нельзя ломать декорации.",
   "msg.interact.decoration-denied": "§c✘ §7Здесь нельзя использовать декорации.",
+  "msg.vehicle.enter-denied": "§c✘ §7Здесь нельзя садиться в транспорт.",
+  "msg.vehicle.place-denied": "§c✘ §7Здесь нельзя ставить транспорт.",
+  "msg.bucket.fill-denied": "§c✘ §7Здесь нельзя наполнять вёдра.",
+  "msg.bucket.empty-denied": "§c✘ §7Здесь нельзя выливать вёдра.",
+  "msg.sign.edit-denied": "§c✘ §7Здесь нельзя редактировать таблички.",
+  "msg.lectern.take-denied": "§c✘ §7Здесь нельзя пользоваться этой кафедрой.",
 
   "msg.region.enter-actionbar": "§a➤ §6%region%   §8· §r%pvp%",
   "msg.region.leave-actionbar": "§7➤ Покинут §6%region%",

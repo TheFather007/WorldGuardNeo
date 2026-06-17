@@ -108,6 +108,12 @@
   "msg.attack.vehicle-denied": "§c✘ §7You can't destroy vehicles in this region.",
   "msg.attack.build-denied": "§c✘ §7You can't break decorations in this region.",
   "msg.interact.decoration-denied": "§c✘ §7You can't use decorations in this region.",
+  "msg.vehicle.enter-denied": "§c✘ §7You can't board vehicles in this region.",
+  "msg.vehicle.place-denied": "§c✘ §7You can't place vehicles in this region.",
+  "msg.bucket.fill-denied": "§c✘ §7You can't fill buckets in this region.",
+  "msg.bucket.empty-denied": "§c✘ §7You can't empty buckets in this region.",
+  "msg.sign.edit-denied": "§c✘ §7You can't edit signs in this region.",
+  "msg.lectern.take-denied": "§c✘ §7You can't use this lectern in this region.",
 
   "msg.region.enter-actionbar": "§a➤ §6%region%   §8· §r%pvp%",
   "msg.region.leave-actionbar": "§7➤ Left §6%region%",
