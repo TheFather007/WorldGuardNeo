@@ -8,16 +8,17 @@ import dev.thefather007.worldguardneo.lang.Localization;
 import dev.thefather007.worldguardneo.listeners.BlockEventHandler;
 import dev.thefather007.worldguardneo.listeners.EntityEventHandler;
 import dev.thefather007.worldguardneo.listeners.PlayerEventHandler;
-import dev.thefather007.worldguardneo.listeners.WandCommandHandler;
+import dev.thefather007.worldguardneo.listeners.SelectionWandHandler;
 import dev.thefather007.worldguardneo.listeners.WorldEventHandler;
 import dev.thefather007.worldguardneo.permissions.PermissionService;
 import dev.thefather007.worldguardneo.region.RegionContainer;
+import dev.thefather007.worldguardneo.selection.CuiPayload;
+import dev.thefather007.worldguardneo.selection.SelectionStore;
 import dev.thefather007.worldguardneo.storage.JsonRegionStorage;
 import dev.thefather007.worldguardneo.storage.RegionStorage;
 import dev.thefather007.worldguardneo.storage.SqliteRegionStorage;
 import dev.thefather007.worldguardneo.storage.H2RegionStorage;
 import dev.thefather007.worldguardneo.storage.MySqlRegionStorage;
-import dev.thefather007.worldguardneo.worldedit.WorldEditAdapter;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
@@ -25,6 +26,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -50,11 +53,10 @@ public final class WorldGuardNeo {
     private final Localization localization;
     private final PermissionService permissions;
     private final RegionContainer regionContainer;
-    private final WorldEditAdapter worldEditAdapter;
+    private final SelectionStore selectionStore;
     private final dev.thefather007.worldguardneo.backup.BackupManager backupManager;
     private final dev.thefather007.worldguardneo.util.ViolationLog violationLog;
     private final dev.thefather007.worldguardneo.expiry.ClaimExpiry claimExpiry;
-    private final dev.thefather007.worldguardneo.economy.EconomyService economy;
     private WorldEventHandler worldEvents;
 
     public WorldGuardNeo(IEventBus modBus, ModContainer container) {
@@ -76,7 +78,9 @@ public final class WorldGuardNeo {
         this.permissions      = PermissionService.detect(this.config.global().useLuckPerms);
         RegionStorage storage = createStorage(this.config.global(), dataDir);
         this.regionContainer  = new RegionContainer(storage);
-        this.worldEditAdapter = WorldEditAdapter.detect();
+        // Built-in region selection (replaces WorldEdit). Per-player cuboid/polygon state, rendered
+        // to the client over the WorldEdit-CUI plugin channel.
+        this.selectionStore   = new SelectionStore();
         // Backups also go under config/worldguardneo (passing dataDir, the mod's data root).
         this.backupManager    = new dev.thefather007.worldguardneo.backup.BackupManager(dataDir);
         // Violations go to logs/worldguardneo-violations.log, separate from the main console,
@@ -85,11 +89,10 @@ public final class WorldGuardNeo {
                 FMLPaths.GAMEDIR.get().resolve("logs"));
         // Claim-expiry activity tracker (loads activity.json; cleanup only runs if enabled in config).
         this.claimExpiry      = new dev.thefather007.worldguardneo.expiry.ClaimExpiry(dataDir);
-        // Built-in claim economy (active only when economy.enabled in config).
-        this.economy          = new dev.thefather007.worldguardneo.economy.EconomyService(dataDir);
 
         // Lifecycle.
         modBus.addListener(this::onCommonSetup);
+        modBus.addListener(this::onRegisterPayloads);
 
         // Game events.
         IEventBus forge = NeoForge.EVENT_BUS;
@@ -105,7 +108,7 @@ public final class WorldGuardNeo {
         this.worldEvents = new WorldEventHandler(this);
         forge.register(this.worldEvents);
         forge.register(new PlayerEventHandler(this));
-        forge.register(new WandCommandHandler(this));
+        forge.register(new SelectionWandHandler(this));
 
         // Report only the optional integrations that are actually present, instead of printing
         // a "detected: false" line for every soft-dep. Cleaner console, and it makes it obvious
@@ -113,7 +116,6 @@ public final class WorldGuardNeo {
         // sqlite-jdbc library (detected by classpath, not ModList, since it's a library mod).
         String[][] softDeps = {
                 {"luckperms", "LuckPerms"},
-                {"worldedit", "WorldEdit"},
                 {"bluemap",   "BlueMap"},
                 {"squaremap", "squaremap"},
                 {"sqlite_jdbc", "SQLite JDBC"},
@@ -139,6 +141,18 @@ public final class WorldGuardNeo {
 
     private void onCommonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> LOGGER.info("[WorldGuardNeo] Common setup complete."));
+    }
+
+    /**
+     * Register the WorldEdit-CUI plugin channel so the built-in selection can be drawn on clients
+     * running WorldEditCUI. Registered {@code optional()} and send-only ({@code playToClient}) so
+     * vanilla clients (and clients without WorldEditCUI) connect fine — the channel simply isn't
+     * negotiated and the selection packets are dropped. The handler is a no-op: we never read CUI
+     * messages from the client, we only push the current selection out.
+     */
+    private void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar("1").optional();
+        registrar.playToClient(CuiPayload.TYPE, CuiPayload.CODEC, (payload, context) -> { /* send-only */ });
     }
 
     private void onRegisterCommands(RegisterCommandsEvent event) {
@@ -184,8 +198,6 @@ public final class WorldGuardNeo {
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] violation log close failed", ex); }
         try { claimExpiry.save(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] activity save failed", ex); }
-        try { economy.save(); }
-        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] economy save failed", ex); }
         LOGGER.info("[WorldGuardNeo] All regions saved.");
     }
 
@@ -237,12 +249,11 @@ public final class WorldGuardNeo {
     public Localization        i18n()           { return localization; }
     public PermissionService   perms()          { return permissions; }
     public RegionContainer     regions()        { return regionContainer; }
-    public WorldEditAdapter    worldEdit()      { return worldEditAdapter; }
+    public SelectionStore      selections()     { return selectionStore; }
     public dev.thefather007.worldguardneo.util.ViolationLog violations() { return violationLog; }
     public WorldEventHandler   worldEvents()    { return worldEvents; }
     public dev.thefather007.worldguardneo.backup.BackupManager backups() { return backupManager; }
     public dev.thefather007.worldguardneo.expiry.ClaimExpiry    expiry()  { return claimExpiry; }
-    public dev.thefather007.worldguardneo.economy.EconomyService economy() { return economy; }
 
     /**
      * Returns the current tick of the running MinecraftServer's overworld, or 0 if no

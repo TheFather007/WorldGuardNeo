@@ -1,7 +1,6 @@
 package dev.thefather007.worldguardneo.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
-import com.mojang.brigadier.arguments.DoubleArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -12,6 +11,8 @@ import dev.thefather007.worldguardneo.flags.Flag;
 import dev.thefather007.worldguardneo.flags.Flags;
 import dev.thefather007.worldguardneo.region.*;
 import dev.thefather007.worldguardneo.config.WGConfig;
+import dev.thefather007.worldguardneo.selection.SelectionStore;
+import dev.thefather007.worldguardneo.selection.WandItem;
 import dev.thefather007.worldguardneo.util.Vec3;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -30,15 +31,6 @@ import java.util.stream.Collectors;
 public final class WGCommands {
 
     private WGCommands() {}
-
-    /**
-     * True when WorldEdit is installed. In that case WorldGuardNeo defers ALL selection to
-     * WorldEdit's wand: the built-in {@code //pos1}, {@code //pos2}, {@code /rg wand} and the
-     * WGN wand item are disabled, and {@code /rg claim}/{@code redefine} read only the WE
-     * selection. This avoids two competing selection systems and matches the behaviour admins
-     * expect from the Bukkit WorldGuard + WorldEdit combo.
-     */
-
 
     /**
      * Should the {@code /rg flag} subcommand (and its tab-complete) be visible to this source?
@@ -87,6 +79,30 @@ public final class WGCommands {
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.redefine"))
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .executes(c -> redefineRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
+                .then(Commands.literal("wand")
+                        // Hand out the built-in selection wand (configurable item). Obtainable once.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.wand"))
+                        .executes(c -> giveWand(c.getSource(), mod)))
+                .then(Commands.literal("sel")
+                        // Switch selection mode: cuboid (two corners) or poly (3+ points).
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .then(Commands.literal("cuboid")
+                                .executes(c -> setSelMode(c.getSource(), mod, SelectionStore.Mode.CUBOID)))
+                        .then(Commands.literal("poly")
+                                .executes(c -> setSelMode(c.getSource(), mod, SelectionStore.Mode.POLYGON)))
+                        .then(Commands.literal("clear")
+                                .executes(c -> clearSelection(c.getSource(), mod))))
+                .then(Commands.literal("pos1")
+                        // Set cuboid corner 1 to the player's current block position.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .executes(c -> setPosHere(c.getSource(), mod, 1)))
+                .then(Commands.literal("pos2")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .executes(c -> setPosHere(c.getSource(), mod, 2)))
+                .then(Commands.literal("point")
+                        // Append a polygon vertex at the player's current block position.
+                        .requires(s -> mod.perms().has(s, "worldguardneo.selection.use"))
+                        .executes(c -> addPointHere(c.getSource(), mod)))
                 .then(Commands.literal("remove")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.delete")
                                     || mod.perms().has(s, "worldguardneo.region.delete.others"))
@@ -210,41 +226,6 @@ public final class WGCommands {
                         // Admin maintenance: trigger the claim-expiry scan immediately.
                         .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
                         .executes(c -> cleanupClaims(c.getSource(), mod)))
-                .then(Commands.literal("balance")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
-                        .executes(c -> ecoBalance(c.getSource(), null, mod))
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .requires(s -> mod.perms().has(s, "worldguardneo.economy.admin"))
-                                .executes(c -> ecoBalance(c.getSource(), StringArgumentType.getString(c, "player"), mod))))
-                .then(Commands.literal("pay")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
-                        .then(Commands.argument("player", StringArgumentType.word())
-                                .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0.01))
-                                        .executes(c -> ecoPay(c.getSource(), StringArgumentType.getString(c, "player"),
-                                                DoubleArgumentType.getDouble(c, "amount"), mod)))))
-                .then(Commands.literal("sell")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
-                                        .executes(c -> ecoSell(c.getSource(), StringArgumentType.getString(c, "id"),
-                                                DoubleArgumentType.getDouble(c, "price"), mod)))))
-                .then(Commands.literal("unsell")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(c -> ecoUnsell(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
-                .then(Commands.literal("buy")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.use"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .executes(c -> ecoBuy(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
-                .then(Commands.literal("eco")
-                        .requires(s -> mod.perms().has(s, "worldguardneo.economy.admin"))
-                        .then(Commands.argument("op", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
-                                        .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0))
-                                                .executes(c -> ecoAdmin(c.getSource(),
-                                                        StringArgumentType.getString(c, "op"),
-                                                        StringArgumentType.getString(c, "player"),
-                                                        DoubleArgumentType.getDouble(c, "amount"), mod))))))
                 .then(Commands.literal("flags")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flags.list"))
                         .executes(c -> listFlags(c.getSource(), mod)));
@@ -261,139 +242,63 @@ public final class WGCommands {
         return 1;
     }
 
-    /* -------------------- economy -------------------- */
+    /* -------------------- selection -------------------- */
 
-    private static boolean ecoEnabled(CommandSourceStack src, WorldGuardNeo mod) {
-        if (mod.config().global().economyEnabled) return true;
-        err(src, mod, "msg.eco.disabled");
-        return false;
-    }
-
-    /** Pretty-print money: drop the ".0" for whole numbers, else 2 decimals. */
-    private static String fmt(double v) {
-        if (v == Math.floor(v) && !Double.isInfinite(v)) return String.valueOf((long) v);
-        return String.valueOf(Math.round(v * 100.0) / 100.0);
-    }
-
-    private static int ecoBalance(CommandSourceStack src, String playerArg, WorldGuardNeo mod) throws CommandSyntaxException {
-        if (!ecoEnabled(src, mod)) return 0;
-        String cur = mod.config().global().economyCurrency;
-        if (playerArg == null) {
-            ServerPlayer p = src.getPlayerOrException();
-            ok(src, mod, "msg.eco.balance", "amount", fmt(mod.economy().balance(p.getUUID())), "currency", cur);
-            return 1;
-        }
-        var uid = dev.thefather007.worldguardneo.util.UuidResolver.resolve(src.getServer(), playerArg);
-        if (uid.isEmpty()) { err(src, mod, "msg.player.unknown", "player", playerArg); return 0; }
-        String name = dev.thefather007.worldguardneo.util.UuidResolver.nameOf(src.getServer(), uid.get());
-        ok(src, mod, "msg.eco.balance-other", "player", name, "amount", fmt(mod.economy().balance(uid.get())), "currency", cur);
-        return 1;
-    }
-
-    private static int ecoPay(CommandSourceStack src, String playerArg, double amount, WorldGuardNeo mod) throws CommandSyntaxException {
-        if (!ecoEnabled(src, mod)) return 0;
+    /** /rg wand — hand out the built-in selection wand (once per player). */
+    private static int giveWand(CommandSourceStack src, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        var uid = dev.thefather007.worldguardneo.util.UuidResolver.resolve(src.getServer(), playerArg);
-        if (uid.isEmpty()) { err(src, mod, "msg.player.unknown", "player", playerArg); return 0; }
-        UUID target = uid.get();
-        if (target.equals(p.getUUID())) { err(src, mod, "msg.eco.pay-self"); return 0; }
-        String cur = mod.config().global().economyCurrency;
-        if (!mod.economy().withdraw(p.getUUID(), amount)) { err(src, mod, "msg.eco.insufficient"); return 0; }
-        mod.economy().deposit(target, amount);
-        String tname = dev.thefather007.worldguardneo.util.UuidResolver.nameOf(src.getServer(), target);
-        ok(src, mod, "msg.eco.pay-sent", "amount", fmt(amount), "currency", cur, "player", tname);
-        var online = src.getServer().getPlayerList().getPlayer(target);
-        if (online != null) online.displayClientMessage(Component.literal(mod.i18n().format(
-                "msg.eco.pay-received", "amount", fmt(amount), "currency", cur,
-                "player", p.getGameProfile().getName())), false);
+        if (WandItem.hasWand(p)) { err(src, mod, "msg.wand.already"); return 0; }
+        var wand = WandItem.create(mod);
+        if (wand.isEmpty()) {
+            err(src, mod, "msg.wand.bad-item", "item", mod.config().global().wandItem);
+            return 0;
+        }
+        // Give it; if the inventory is full, drop it at the player's feet so it's never lost.
+        if (!p.getInventory().add(wand)) p.drop(wand, false);
+        ok(src, mod, "msg.wand.given", "item", mod.config().global().wandItem);
         return 1;
     }
 
-    private static int ecoSell(CommandSourceStack src, String id, double price, WorldGuardNeo mod) throws CommandSyntaxException {
-        if (!ecoEnabled(src, mod)) return 0;
+    /** /rg sel cuboid|poly — switch selection mode. */
+    private static int setSelMode(CommandSourceStack src, WorldGuardNeo mod, SelectionStore.Mode mode)
+            throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
-        var ropt = mgr.get(id);
-        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
-        ProtectedRegion r = ropt.get();
-        if (r instanceof GlobalRegion) { err(src, mod, "msg.region.global-select", "id", id); return 0; }
-        if (!mod.perms().has(p, "worldguardneo.region.bypass") && !r.isOwner(p.getUUID())) {
-            err(src, mod, "msg.region.notyours", "id", id); return 0;
-        }
-        String world = p.serverLevel().dimension().location().toString();
-        mod.economy().listForSale(world, r.id(), price);
-        ok(src, mod, "msg.eco.sell-listed", "id", r.id(), "price", fmt(price),
-                "currency", mod.config().global().economyCurrency);
+        mod.selections().setMode(p, mode);
+        ok(src, mod, mode == SelectionStore.Mode.CUBOID ? "msg.selection.mode-cuboid" : "msg.selection.mode-poly");
         return 1;
     }
 
-    private static int ecoUnsell(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
-        if (!ecoEnabled(src, mod)) return 0;
+    /** /rg sel clear — drop the player's pending selection and clear the outline. */
+    private static int clearSelection(CommandSourceStack src, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
-        var ropt = mgr.get(id);
-        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
-        ProtectedRegion r = ropt.get();
-        if (!mod.perms().has(p, "worldguardneo.region.bypass") && !r.isOwner(p.getUUID())) {
-            err(src, mod, "msg.region.notyours", "id", id); return 0;
-        }
-        mod.economy().unlist(p.serverLevel().dimension().location().toString(), r.id());
-        ok(src, mod, "msg.eco.unsell-done", "id", r.id());
+        mod.selections().reset(p);
+        ok(src, mod, "msg.selection.poly-cleared");
         return 1;
     }
 
-    private static int ecoBuy(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
-        if (!ecoEnabled(src, mod)) return 0;
+    /** /rg pos1 | /rg pos2 — set a cuboid corner to the player's current block position. */
+    private static int setPosHere(CommandSourceStack src, WorldGuardNeo mod, int which)
+            throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
-        var ropt = mgr.get(id);
-        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
-        ProtectedRegion r = ropt.get();
-        String world = p.serverLevel().dimension().location().toString();
-        Double price = mod.economy().price(world, r.id());
-        if (price == null) { err(src, mod, "msg.eco.not-for-sale", "id", r.id()); return 0; }
-        if (r.isOwner(p.getUUID())) { err(src, mod, "msg.eco.buy-own"); return 0; }
-        if (!mod.perms().has(p, "worldguardneo.region.bypass")) {
-            int owned = mod.regions().countOwnedGlobal(p.getUUID());
-            int limit = mod.effectiveRegionLimit(p);
-            if (owned >= limit) { err(src, mod, "msg.claim.limit", "limit", limit); return 0; }
-        }
-        if (!mod.economy().has(p.getUUID(), price)) { err(src, mod, "msg.eco.insufficient"); return 0; }
-        UUID seller = r.ownersView().isEmpty() ? null : r.ownersView().iterator().next();
-        mod.economy().withdraw(p.getUUID(), price);
-        if (seller != null) mod.economy().deposit(seller, price);
-        // Transfer sole ownership to the buyer; clear prior owners/members.
-        r.owners().clear();
-        r.members().clear();
-        r.owners().add(p.getUUID());
-        mod.economy().unlist(world, r.id());
-        mod.regions().saveRegion(p.serverLevel(), r.id());
-        String cur = mod.config().global().economyCurrency;
-        ok(src, mod, "msg.eco.buy-done", "id", r.id(), "price", fmt(price), "currency", cur);
-        if (seller != null) {
-            var so = src.getServer().getPlayerList().getPlayer(seller);
-            if (so != null) so.displayClientMessage(Component.literal(mod.i18n().format(
-                    "msg.eco.sold", "id", r.id(), "price", fmt(price), "currency", cur,
-                    "player", p.getGameProfile().getName())), false);
+        Vec3 v = new Vec3(p.getBlockX(), p.getBlockY(), p.getBlockZ());
+        if (which == 1) {
+            mod.selections().setPos1(p, v);
+            ok(src, mod, "msg.selection.pos1", "pos", v.x() + "," + v.y() + "," + v.z());
+        } else {
+            mod.selections().setPos2(p, v);
+            ok(src, mod, "msg.selection.pos2", "pos", v.x() + "," + v.y() + "," + v.z());
         }
         return 1;
     }
 
-    private static int ecoAdmin(CommandSourceStack src, String op, String playerArg, double amount, WorldGuardNeo mod) {
-        if (!ecoEnabled(src, mod)) return 0;
-        var uid = dev.thefather007.worldguardneo.util.UuidResolver.resolve(src.getServer(), playerArg);
-        if (uid.isEmpty()) { err(src, mod, "msg.player.unknown", "player", playerArg); return 0; }
-        UUID target = uid.get();
-        var eco = mod.economy();
-        switch (op.toLowerCase(java.util.Locale.ROOT)) {
-            case "set"  -> eco.set(target, amount);
-            case "give" -> eco.deposit(target, amount);
-            case "take" -> eco.set(target, Math.max(0.0, eco.balance(target) - amount));
-            default -> { err(src, mod, "msg.eco.admin-usage"); return 0; }
-        }
-        String name = dev.thefather007.worldguardneo.util.UuidResolver.nameOf(src.getServer(), target);
-        ok(src, mod, "msg.eco.admin-set", "player", name, "amount", fmt(eco.balance(target)),
-                "currency", mod.config().global().economyCurrency);
+    /** /rg point — append a polygon vertex at the player's current block position. */
+    private static int addPointHere(CommandSourceStack src, WorldGuardNeo mod) throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        // Auto-switch to polygon mode so /rg point "just works" without a prior /rg sel poly.
+        mod.selections().setMode(p, SelectionStore.Mode.POLYGON);
+        Vec3 v = new Vec3(p.getBlockX(), p.getBlockY(), p.getBlockZ());
+        int n = mod.selections().addPolyPoint(p, v);
+        ok(src, mod, "msg.selection.point", "n", n, "pos", v.x() + "," + v.y() + "," + v.z());
         return 1;
     }
 
@@ -412,9 +317,8 @@ public final class WGCommands {
      */
     private static int claimRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        // Claiming reads the player's WorldEdit selection, so WorldEdit must be present. The mod
-        // loads fine without it (worldedit is an optional dependency) — only claim/redefine need it.
-        if (!mod.worldEdit().isAvailable()) { err(src, mod, "msg.selection.no-worldedit"); return 0; }
+        // Claiming reads the player's built-in selection (see SelectionStore) — made with the
+        // /rg wand item or /rg pos1 //rg pos2 //rg point. No WorldEdit required.
         RegionManager mgr = mod.regions().get(p.serverLevel());
         boolean bypass = mod.perms().has(p, "worldguardneo.region.bypass");
 
@@ -451,7 +355,7 @@ public final class WGCommands {
         if (mgr.get(id).isPresent()) { err(src, mod, "msg.region.exists", "id", id); return 0; }
 
         final String finalId = id; // for use in the lambda below
-        return mod.worldEdit().toProtectedRegion(p, finalId).map(region -> {
+        return mod.selections().buildRegion(p, finalId).map(region -> {
             long vol = region.volume();
             var gc = mod.config().global();
             // Absolute hard cap — applies even to bypass holders to keep storage sane.
@@ -614,11 +518,10 @@ public final class WGCommands {
 
     private static int redefineRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        // Redefine reads the player's WorldEdit selection — requires WorldEdit (optional dependency).
-        if (!mod.worldEdit().isAvailable()) { err(src, mod, "msg.selection.no-worldedit"); return 0; }
+        // Redefine reads the player's built-in selection (see SelectionStore). No WorldEdit required.
         RegionManager mgr = mod.regions().get(p.serverLevel());
         boolean bypass = mod.perms().has(p, "worldguardneo.region.bypass");
-        return mgr.get(id).map(existing -> mod.worldEdit().toProtectedRegion(p, id).map(newRegion -> {
+        return mgr.get(id).map(existing -> mod.selections().buildRegion(p, id).map(newRegion -> {
             // Global region cannot be redefined — it's a singleton without geometry. Allowing
             // this would create a fake cuboid with id "__global__" in the regions map and
             // break global-region semantics. Refuse explicitly.
@@ -874,16 +777,13 @@ public final class WGCommands {
         }).collect(Collectors.joining(", "));
         src.sendSuccess(() -> Component.literal(i18n.format("msg.info.flags", "list", flagDump)), false);
 
-        // Show the region outline to the player via WorldEdit's selection (WECUI renders it).
-        // This replaces the old standalone /rg select command — viewing a region now also
-        // highlights it. No-op for console senders and the geometry-less global region.
+        // Show the region outline to the player via the built-in CUI sender (WorldEditCUI renders
+        // it client-side). This replaces the old standalone /rg select command — viewing a region
+        // now also highlights it. No-op for console senders and the geometry-less global region,
+        // and harmless for clients without WorldEditCUI.
         ServerPlayer viewer = src.getPlayer();
         if (viewer != null && !(r instanceof GlobalRegion)) {
-            if (r instanceof CuboidRegion c) {
-                mod.worldEdit().selectCuboid(viewer, c.minimumBound(), c.maximumBound());
-            } else if (r instanceof PolygonalRegion poly) {
-                mod.worldEdit().selectPolygon(viewer, poly.points(), poly.minY(), poly.maxY());
-            }
+            mod.selections().renderRegion(viewer, r);
         }
     }
 
@@ -1351,7 +1251,6 @@ public final class WGCommands {
                             + " §7refs: §f" + idx.totalRefs()), false);
             src.sendSuccess(() -> Component.literal(
                     "§7perms: §f" + mod.perms().name()
-                            + " §7worldedit: §f" + net.neoforged.fml.ModList.get().isLoaded("worldedit")
                             + " §7luckperms: §f" + net.neoforged.fml.ModList.get().isLoaded("luckperms")
                             + " §7bluemap: §f" + net.neoforged.fml.ModList.get().isLoaded("bluemap")
                             + " §7squaremap: §f" + net.neoforged.fml.ModList.get().isLoaded("squaremap")), false);
@@ -1365,7 +1264,6 @@ public final class WGCommands {
             src.sendSuccess(() -> Component.literal(
                     "§7worlds tracked: §f" + mod.regions().size()
                             + " §7perms: §f" + mod.perms().name()
-                            + " §7worldedit: §f" + net.neoforged.fml.ModList.get().isLoaded("worldedit")
                             + " §7luckperms: §f" + net.neoforged.fml.ModList.get().isLoaded("luckperms")
                             + " §7bluemap: §f" + net.neoforged.fml.ModList.get().isLoaded("bluemap")
                             + " §7squaremap: §f" + net.neoforged.fml.ModList.get().isLoaded("squaremap")), false);

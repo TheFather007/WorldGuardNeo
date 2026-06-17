@@ -66,14 +66,13 @@ In addition, **each individual flag** has its own node `worldguardneo.flag.<name
 
 | Node | Default | Controls |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | Receiving the custom WorldGuardNeo `//wand`. |
+| `worldguardneo.selection.use` | OP 0 | Using the built-in selection wand and `/rg pos1` `/rg pos2` `/rg point` `/rg sel`. |
+| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — receive the built-in selection wand item (one per player). |
 | `worldguardneo.region.admin` | OP 3 | Administrative region operations. |
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |
 | `worldguardneo.reload` | OP 4 | `/rg reload` — reload config & language. Also gates `/rg cleanup` (run the claim-expiry scan now). |
 | `worldguardneo.notify` | OP 2 | Receive broadcast messages when players cross regions flagged `notify-enter` / `notify-leave`. |
-| `worldguardneo.economy.use` | OP 0 | `/rg balance`, `/rg pay`, `/rg sell`, `/rg unsell`, `/rg buy` (economy must be enabled). |
-| `worldguardneo.economy.admin` | OP 3 | `/rg eco <set\|give\|take>` and `/rg balance <player>` (view/adjust others). |
 
 ## LuckPerms examples
 
@@ -97,10 +96,11 @@ Grant trusted staff full bypass (the only way to get `region.bypass`):
 /lp group admin permission set worldguardneo.region.bypass true
 ```
 
-Lock the WorldEdit wand away from normal players (see [Permissions FAQ in README](README.md#permissions)):
+Lock the selection wand away from normal players (see [Permissions FAQ in README](README.md#permissions)):
 
 ```
 /lp group default permission set worldguardneo.selection.use false
+/lp group default permission set worldguardneo.selection.wand false
 ```
 
 ## License

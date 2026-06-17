@@ -1112,10 +1112,6 @@ public final class PlayerEventHandler {
     @SubscribeEvent
     public void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
         mod.expiry().record(e.getEntity().getUUID()); // claim-expiry activity tracking
-        if (mod.config().global().economyEnabled) {   // grant starting balance once
-            mod.economy().grantStartingIfNew(e.getEntity().getUUID(),
-                    mod.config().global().economyStartBalance);
-        }
     }
 
     @SubscribeEvent
@@ -1123,6 +1119,7 @@ public final class PlayerEventHandler {
         mod.expiry().record(e.getEntity().getUUID()); // mark active at the moment of leaving
         states.remove(e.getEntity().getUUID());
         lastPickupDenyMsg.remove(e.getEntity().getUUID());
+        mod.selections().clear(e.getEntity().getUUID()); // drop the player's pending selection
     }
 
     @SubscribeEvent
@@ -1130,5 +1127,8 @@ public final class PlayerEventHandler {
         // Wipe region snapshot so greetings fire again in the new world.
         PlayerState st = states.get(e.getEntity().getUUID());
         if (st != null) { st.lastRegions = Set.of(); st.lastSafeValid = false; }
+        // Drop the pending selection — its corners belong to the old world, and clearing here
+        // also removes any lingering CUI outline on the client after the dimension hop.
+        mod.selections().clear(e.getEntity().getUUID());
     }
 }

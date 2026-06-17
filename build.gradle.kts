@@ -62,12 +62,10 @@ dependencies {
     // resolution. Used by SpatialIndex to avoid Long autoboxing on the region-lookup hot path.
     compileOnly("it.unimi.dsi:fastutil:8.5.12")
 
-    // NOTE: WorldEdit is NOT a compile dependency. Every WorldEdit call in WorldEditAdapter goes
-    // through reflection (Class.forName / Method.invoke), so the mod compiles without WorldEdit on
-    // the classpath. It remains a REQUIRED *runtime* dependency, declared in neoforge.mods.toml —
-    // the server won't load without it. (The Maven artifact is published per-MC version as
-    // worldedit-neoforge-mc<version>, not as a plain "worldedit-neoforge"; since we don't need it
-    // at compile time, we don't declare it and avoid coordinate/version coupling entirely.)
+    // NOTE: WorldGuardNeo has NO WorldEdit dependency (compile or runtime). Region selection is
+    // built in (see the dev.thefather007.worldguardneo.selection package); the selection outline is
+    // pushed to clients over the worldedit:cui plugin channel, which WorldEditCUI renders — but that
+    // is a purely optional CLIENT mod and is never on the server classpath.
 
     // Mixin annotations — must match the SpongeMixin version NeoForge 1.21.1 bundles at runtime.
     compileOnly("org.spongepowered:mixin:0.8.6")

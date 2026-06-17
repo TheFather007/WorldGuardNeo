@@ -112,9 +112,7 @@ public final class WGConfig {
             g.claimExpiryDays         = intOf(toml, "claim-expiry.days", g.claimExpiryDays);
             g.claimExpiryCheckHours   = intOf(toml, "claim-expiry.check-hours", g.claimExpiryCheckHours);
 
-            g.economyEnabled          = bool(toml, "economy.enabled", g.economyEnabled);
-            g.economyStartBalance     = dbl(toml, "economy.starting-balance", g.economyStartBalance);
-            g.economyCurrency         = str(toml, "economy.currency-name", g.economyCurrency);
+            g.wandItem                = str(toml, "selection.wand-item", g.wandItem);
 
             g.mysqlHost              = str(toml, "mysql.host", g.mysqlHost);
             g.mysqlPort              = intOf(toml, "mysql.port", g.mysqlPort);
@@ -191,11 +189,6 @@ public final class WGConfig {
         return def;
     }
 
-    private static double dbl(Config c, String path, double def) {
-        Object v = c.get(path);
-        if (v instanceof Number n) return n.doubleValue();
-        return def;
-    }
     private static Map<String, Integer> readIntMap(Config c, String path, Map<String, Integer> def) {
         Object v = c.get(path);
         if (!(v instanceof Config sub)) return def;
@@ -404,17 +397,16 @@ public final class WGConfig {
         c.setComment("claim-expiry.check-hours", " Hours between expiry scans.");
         c.set("claim-expiry.check-hours", g.claimExpiryCheckHours);
 
-        /* ───────────────────────── ECONOMY ───────────────────────── */
-        c.setComment("economy",
-                " ======================= CLAIM ECONOMY =======================\n" +
-                " Buy/sell regions with a built-in per-player balance (no external mod needed).\n" +
-                " /rg sell <id> <price> lists a region; /rg buy <id> purchases it; /rg balance shows funds.");
-        c.setComment("economy.enabled", " Master switch (default false).");
-        c.set("economy.enabled", g.economyEnabled);
-        c.setComment("economy.starting-balance", " Balance granted to a player on first join.");
-        c.set("economy.starting-balance", g.economyStartBalance);
-        c.setComment("economy.currency-name", " Display name of the currency unit.");
-        c.set("economy.currency-name", g.economyCurrency);
+        /* ───────────────────────── SELECTION ───────────────────────── */
+        c.setComment("selection",
+                " ======================= REGION SELECTION =======================\n" +
+                " Built-in selection wand (no WorldEdit required). Give it with /rg wand.\n" +
+                " Left-click sets position 1 (cuboid) or adds a polygon point; right-click sets\n" +
+                " position 2. The selection is drawn client-side via WorldEdit-CUI if installed.");
+        c.setComment("selection.wand-item",
+                " Item id handed out by /rg wand (default minecraft:stick). The wand can only be\n" +
+                " obtained once per player and is consumed for selection only.");
+        c.set("selection.wand-item", g.wandItem);
 
         /* ───────────────────────── PER-WORLD DEFAULTS ───────────────────────── */
         c.setComment("defaults",
@@ -478,7 +470,7 @@ public final class WGConfig {
         c.setComment("vertical-expansion",
                 " Automatically expand a region vertically when it is claimed, so players are\n" +
                 " protected from tunnelling in from below and bridging in from above:\n" +
-                "   \"none\"  — keep the WorldEdit selection's height (default).\n" +
+                "   \"none\"  — keep the selection's height (default).\n" +
                 "   \"full\"  — expand to the world's full build height (bedrock-to-sky). Best\n" +
                 "             protection: no digging under or building over the claim.\n" +
                 "   \"fixed\" — expand vertical-expand-down blocks down and vertical-expand-up\n" +
@@ -589,12 +581,9 @@ public final class WGConfig {
         public int     claimExpiryDays       = 60;
         public int     claimExpiryCheckHours = 6;
 
-        // Claim economy — buy/sell regions with an internal per-player balance (no external mod
-        // required). Disabled by default. Owners list a region with /rg sell <id> <price>; a buyer
-        // runs /rg buy <id>. Admins adjust balances with /rg balance.
-        public boolean economyEnabled        = false;
-        public double  economyStartBalance   = 0.0;
-        public String  economyCurrency       = "coins";
+        // Selection wand — the item handed out by /rg wand for picking region corners/points.
+        // Built in, no WorldEdit needed. Defaults to a wooden stick; change to any item id.
+        public String  wandItem             = "minecraft:stick";
 
         // MySQL connection settings — used only when storage-format = "mysql".
         public String  mysqlHost     = "localhost";
@@ -656,7 +645,7 @@ public final class WGConfig {
         // "flag-name=value" (e.g. "pvp=deny"). Empty list = none.
         public java.util.List<String> autoFlags     = new java.util.ArrayList<>();
         // Automatic vertical expansion on claim: "none" | "full" | "fixed".
-        //   none  — keep the WorldEdit selection's Y span.
+        //   none  — keep the selection's Y span.
         //   full  — expand to the world's full build height (protects against tunnelling from
         //           below and bridging in from above).
         //   fixed — expand vertical-expand-down blocks down and vertical-expand-up blocks up

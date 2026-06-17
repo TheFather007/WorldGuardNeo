@@ -2,12 +2,11 @@
 
 # WorldGuardNeo
 
-**Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created from WorldEdit selections and protected by 80+ per-region flags.**
+**Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created with a built-in selection wand and protected by 80+ per-region flags. No WorldEdit required.**
 
 ![Version](https://img.shields.io/badge/Version-1.3-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
 ![NeoForge](https://img.shields.io/badge/NeoForge-21.1.x-e87b1e)
-![Optional](https://img.shields.io/badge/Optional-WorldEdit%207.3%2B-3b82f6)
 ![Optional](https://img.shields.io/badge/Optional-LuckPerms%205.4%2B-9b59b6)
 ![Side](https://img.shields.io/badge/Side-Server%20only-6b7280)
 ![License](https://img.shields.io/badge/License-GPL--3.0-3b82f6)
@@ -20,11 +19,11 @@
 
 ---
 
-WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an area with **WorldEdit**, claim it as a region, and control what can happen inside with a large set of flags — building, PvP, mob spawning, fire, explosions, redstone, fluids, and much more. It also protects **between adjacent regions**, so a neighbour can't grief you across a shared border. Everything is configured in a commented TOML file and applies live with `/rg reload`.
+WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an area with the **built-in selection wand** (no WorldEdit needed), claim it as a region, and control what can happen inside with a large set of flags — building, PvP, mob spawning, fire, explosions, redstone, fluids, and much more. It also protects **between adjacent regions**, so a neighbour can't grief you across a shared border. Everything is configured in a commented TOML file and applies live with `/rg reload`.
 
 ## Features
 
-- **Regions from WorldEdit** — select with `//wand` (cuboid or polygon) and claim. No separate wand to learn.
+- **Built-in selection wand** — `/rg wand` hands out a selection item (a stick by default, configurable). Left/right-click two corners for a cuboid, or build a polygon point-by-point. No WorldEdit dependency. The outline renders client-side for players who have [WorldEditCUI](https://www.curseforge.com/minecraft/mc-mods/worldedit-cui).
 - **80+ flags** — build, block-break/place, interact, use, chest-access, pvp, mob-spawning, mob-damage, tnt/creeper/other explosions, fire-spread, lava-fire, lightning, redstone, pistons, dispenser-output, fluids, growth, entry/exit, greetings, game-mode/time/weather locks, keep-inventory/xp, and more.
 - **Per-region & per-world** — flags per region; world-wide toggles per dimension via override files.
 - **Membership model** — owners and members; build-type flags respect them (WorldGuard "private by default").
@@ -44,7 +43,6 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 
 - Minecraft **1.21.1**
 - NeoForge **21.1.x**
-- **WorldEdit** for NeoForge **7.3+** — *optional*, needed only to create regions (`/rg claim`, `/rg redefine`) from its selections; the mod loads and all other features work without it
 
 **Optional**
 
@@ -53,16 +51,17 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 | **LuckPerms** 5.4+ | Permission nodes + per-group region limits (otherwise OP levels) |
 | **BlueMap** | Region rendering on the 3D web map |
 | **squaremap** | Region rendering on the 2D web map |
+| **WorldEditCUI** (client) | Renders the selection/region outline client-side |
 | **sqlite-jdbc** jar | `storage-format = "sqlite"` |
 | **H2** jar | `storage-format = "h2"` (LuckPerms already ships H2) |
 | **mysql-connector-j** jar | `storage-format = "mysql"` |
 | **JDK 21** | Building from source only |
 
-The mod is **server-side only**. Vanilla clients connect normally; no client-side installation is required. WorldEdit renders the selection box (via WECUI) for clients that have it. Any database backend whose driver is absent falls back to JSON automatically, so a missing optional jar never stops the server.
+The mod is **server-side only**. Vanilla clients connect normally; no client-side installation is required. The selection outline is drawn for clients that have the **WorldEditCUI** client mod (the server speaks the `worldedit:cui` protocol directly); clients without it still select and claim normally, just without the visual box. Any database backend whose driver is absent falls back to JSON automatically, so a missing optional jar never stops the server.
 
 ## Installation
 
-1. Drop WorldGuardNeo's `.jar` into the server's `mods/` folder. Add **WorldEdit** too if you want to create regions (`/rg claim`).
+1. Drop WorldGuardNeo's `.jar` into the server's `mods/` folder.
 2. *(Optional)* add LuckPerms, BlueMap, or squaremap.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust settings if needed and run `/rg reload`.
@@ -70,13 +69,16 @@ The mod is **server-side only**. Vanilla clients connect normally; no client-sid
 ## Quick start
 
 ```
-//wand                 (WorldEdit) left/right-click two corners
+/rg wand               get the selection wand (a stick by default)
+                       left-click corner 1, right-click corner 2
 /rg claim myregion     claim the selection as a region named "myregion"
 /rg flag myregion pvp deny
 /rg addmember myregion Steve
 ```
 
-`/rg info myregion` also highlights the region's outline by loading its bounds into your WorldEdit selection (rendered by WECUI), so `/rg redefine myregion` can resize it after making a new selection.
+For a polygon: `/rg sel poly`, then left/right-click each vertex (or `/rg point` at your feet) — at least 3 — and `/rg claim`. You can also set cuboid corners without the wand via `/rg pos1` and `/rg pos2`.
+
+`/rg info myregion` highlights the region's outline (rendered by WorldEditCUI), so `/rg redefine myregion` can resize it after making a new selection.
 
 ## Configuration
 
@@ -170,7 +172,11 @@ Both `/region` and `/rg` work. Region ids are single words.
 
 | Command | Description |
 | --- | --- |
-| `/rg claim <id>` | Claim your WorldEdit selection as a new region |
+| `/rg wand` | Get the built-in selection wand item (one per player) |
+| `/rg sel <cuboid\|poly\|clear>` | Switch selection mode, or clear the current selection |
+| `/rg pos1` / `/rg pos2` | Set cuboid corner 1 / 2 to your current position |
+| `/rg point` | Add a polygon vertex at your current position |
+| `/rg claim <id>` | Claim your current selection as a new region |
 | `/rg redefine <id>` | Resize a region to your current selection |
 | `/rg remove <id>` | Delete a region |
 | `/rg info [id]` | Show a region's type, size, bounds, owners, members, flags — and highlight its outline |
@@ -189,12 +195,6 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg reload` | Reload config and language |
 | `/rg cleanup` | Run the claim-expiry scan now (admin) |
 | `/rg debug` | Diagnostics: spatial-index stats, active integrations |
-| `/rg balance [player]` | Show your (or another player's) economy balance |
-| `/rg pay <player> <amount>` | Transfer funds to another player |
-| `/rg sell <id> <price>` | List a region you own for sale |
-| `/rg unsell <id>` | Remove a region from sale |
-| `/rg buy <id>` | Buy a region that's listed for sale |
-| `/rg eco <set\|give\|take> <player> <amount>` | Adjust a player's balance (admin) |
 
 ## Permissions
 
@@ -206,7 +206,8 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 | `worldguardneo.region.delete` | OP 0 | Delete your own regions |
 | `worldguardneo.region.info` / `.list` | OP 0 | View / list your regions |
 | `worldguardneo.region.teleport` | OP 0 | Teleport to regions |
-| `worldguardneo.selection.use` | OP 0 | Receive the custom `//wand` |
+| `worldguardneo.selection.use` | OP 0 | Use the selection wand / `pos1` / `pos2` / `point` |
+| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — receive the selection wand item |
 | `worldguardneo.region.redefine` | OP 2 | Resize regions |
 | `worldguardneo.region.flag` | OP 2 | Set flags |
 | `worldguardneo.region.addmember` / `addowner` | OP 2 | Manage members / owners |
@@ -230,7 +231,7 @@ JDK 21 is required. From the project folder:
 ./gradlew clean build
 ```
 
-The finished `.jar` is written to `build/libs/`. WorldEdit is **not** a compile-time dependency — the mod talks to it purely through reflection, so it builds without WorldEdit on the classpath. WorldEdit is an **optional** runtime dependency (declared in `neoforge.mods.toml`); it is only needed to create regions.
+The finished `.jar` is written to `build/libs/`. WorldGuardNeo has **no** WorldEdit dependency — region selection is built in. The only runtime soft-deps are LuckPerms, BlueMap and squaremap (all optional, declared in `neoforge.mods.toml`).
 
 ## License
 

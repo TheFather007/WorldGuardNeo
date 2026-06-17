@@ -66,14 +66,13 @@ WorldGuardNeo проверяет каждую команду и защищённ
 
 | Узел | По умолчанию | За что отвечает |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | Получение кастомного WorldGuardNeo `//wand`. |
+| `worldguardneo.selection.use` | OP 0 | Использование встроенной палочки выделения и `/rg pos1` `/rg pos2` `/rg point` `/rg sel`. |
+| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — получить встроенную палочку выделения (одна на игрока). |
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |
 | `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. Также даёт `/rg cleanup` (запуск истечения клеймов вручную). |
 | `worldguardneo.notify` | OP 2 | Получение оповещений, когда игроки пересекают регионы с флагами `notify-enter` / `notify-leave`. |
-| `worldguardneo.economy.use` | OP 0 | `/rg balance`, `/rg pay`, `/rg sell`, `/rg unsell`, `/rg buy` (экономика должна быть включена). |
-| `worldguardneo.economy.admin` | OP 3 | `/rg eco <set\|give\|take>` и `/rg balance <игрок>` (просмотр/правка чужого баланса). |
 
 ## Примеры LuckPerms
 
@@ -97,10 +96,11 @@ WorldGuardNeo проверяет каждую команду и защищённ
 /lp group admin permission set worldguardneo.region.bypass true
 ```
 
-Закрыть палочку WorldEdit от обычных игроков (см. [FAQ по правам в README](README_RU.md#права)):
+Закрыть палочку выделения от обычных игроков (см. [FAQ по правам в README](README_RU.md#права)):
 
 ```
 /lp group default permission set worldguardneo.selection.use false
+/lp group default permission set worldguardneo.selection.wand false
 ```
 
 ## Лицензия

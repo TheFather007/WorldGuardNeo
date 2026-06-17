@@ -91,6 +91,9 @@ public final class OpResolver implements PermissionResolver {
 
         // Misc.
         nodeToLevel.put("worldguardneo.selection.use",        0);
+        // The wand-give command. OP 0 (everyone) by default so any player can grab the selection
+        // wand and claim land, mirroring selection.use. Admins can restrict via LuckPerms.
+        nodeToLevel.put("worldguardneo.selection.wand",       0);
         // reload and backup are top-tier (OP 4) — reload swaps live config state and could
         // brick a busy server if mis-edited config.toml reaches production; backup writes
         // to disk and rotates retention. Both are dangerous enough to keep alongside bypass
@@ -99,11 +102,6 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.reload",               4);
         nodeToLevel.put("worldguardneo.backup",               4);
         nodeToLevel.put("worldguardneo.notify",               mod);
-
-        // Economy — basic use (balance/pay/sell/buy) is for everyone (op-0); admin balance edits
-        // and viewing others' balances require the admin node.
-        nodeToLevel.put("worldguardneo.economy.use",          0);
-        nodeToLevel.put("worldguardneo.economy.admin",        admin);
     }
 
     public void setLevel(String node, int level) { nodeToLevel.put(node, level); }
