@@ -15,7 +15,7 @@ for T in FlagLogicTest StorageRoundTripTest FlagScenarioTest FlagResolutionEdgeT
          EngineExtrasTest GeometryTest SpatialIndexTest ResolutionMatrixTest ParsingTest \
          RegionMechanicsTest PerRegionCodecTest LocalizationTest FuzzCodecTest \
          FlagSerializationTest FlagRegistryTest GeometryCrossCheckTest ParentChainTest \
-         GetApplicableOrderingTest; do
+         GetApplicableOrderingTest SpatialIndexFuzzTest ResolutionFuzzTest; do
   printf '%-24s ' "$T:"
   java -cp "$OUT:$CP" "$T" | tail -1 || rc=1
 done
