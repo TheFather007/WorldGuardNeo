@@ -485,8 +485,11 @@ public final class WGCommands {
         var uuidOpt = dev.thefather007.worldguardneo.util.UuidResolver.resolve(self.getServer(), who);
         if (uuidOpt.isEmpty()) { err(c.getSource(), mod, "msg.player.unknown", "player", who); return 0; }
         UUID target = uuidOpt.get();
-        // Sole-ownership transfer: clear existing owners, then set the target as the only owner.
+        // Sole-ownership transfer: clear ALL existing ownership — both UUID owners and owner GROUPS
+        // (LuckPerms group-owners) — then set the target as the only owner. Without clearing the
+        // groups, members of a former owner group would keep owner rights after a "sole" transfer.
         r.owners().clear();
+        if (!r.ownerGroupsView().isEmpty()) r.ownerGroups().clear();
         r.owners().add(target);
         mod.regions().saveRegion(self.serverLevel(), r.id());
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(

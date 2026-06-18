@@ -273,9 +273,10 @@ public final class EntityEventHandler {
         if (!(vehicle instanceof AbstractMinecart) && !(vehicle instanceof Boat)) return;
         if (e.getLevel().isClientSide()) return;
         if (!mod.isProtectionActive(e.getLevel())) return;
-        if (mod.perms().has(p, "worldguardneo.region.bypass")) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
-        if (!mgr.testState(Flags.VEHICLE_ENTER, p.getUUID(), vehicle.getX(), vehicle.getY(), vehicle.getZ())) {
+        // Resolve the flag first; only consult region.bypass when it denies (lazy-bypass pattern).
+        if (!mgr.testState(Flags.VEHICLE_ENTER, p.getUUID(), vehicle.getX(), vehicle.getY(), vehicle.getZ())
+                && !mod.perms().has(p, "worldguardneo.region.bypass")) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.vehicle.enter-denied")), true);

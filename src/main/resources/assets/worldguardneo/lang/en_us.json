@@ -95,7 +95,7 @@
   "msg.reloaded": "§8[§3WGN§8] §a✔ §7Configuration reloaded.",
   "msg.saved": "§8[§3WGN§8] §a✔ §7Regions saved.",
   "msg.cleanup.done": "§8[§3WGN§8] §a✔ §7Claim expiry removed §e%count% §7region(s).",
-  "msg.migrate.done": "§8[§3WGN§8] §a✔ §7Migrated §e%regions% §7region(s) across §e%worlds% §7world(s) to §b%format%§7. Restart the server to activate §8(§7DB backends need their JDBC driver§8)§7.",
+  "msg.migrate.done": "§8[§3WGN§8] §a✔ §7Migrated §e%regions% §7region(s) across §e%worlds% §7loaded world(s) to §b%format%§7. §e⚠ Restart the server NOW §7— region edits made before the restart still go to the old backend. §8(§7DB backends need their JDBC driver; only loaded worlds are migrated.§8)",
   "msg.migrate.same": "§8[§3WGN§8] §e⚠ §7Storage is already §b%format%§7.",
   "msg.migrate.failed": "§8[§3WGN§8] §c✘ §7Migration to §b%format% §7failed — see the server log.",
   "msg.cleanup.disabled": "§8[§3WGN§8] §e⚠ §7Claim expiry is disabled §8(§7set §fclaim-expiry.enabled = true§8)§7.",
