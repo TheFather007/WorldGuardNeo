@@ -9,7 +9,7 @@ import java.util.stream.Collectors;
 
 /**
  * Builds the small HTML popup shown when a region marker is clicked on a web map (BlueMap,
- * squaremap, Dynmap). Lists the region's priority, owners, members and any non-default flags —
+ * squaremap). Lists the region's priority, owners, members and any non-default flags —
  * the "click a region → see its info/flags" feature. Kept HTML-light and self-contained so it
  * works in every map mod's info panel.
  */
