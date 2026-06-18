@@ -6,6 +6,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flag;
 import dev.thefather007.worldguardneo.flags.Flags;
@@ -16,6 +17,7 @@ import dev.thefather007.worldguardneo.selection.WandItem;
 import dev.thefather007.worldguardneo.util.Vec3;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -68,18 +70,58 @@ public final class WGCommands {
 
     }
 
+    /* ---- tab-completion suggestion providers (shared across the command tree) ---- */
+
+    /** Suggest region ids in the source's current world (works for players and console). */
+    private static SuggestionProvider<CommandSourceStack> regionIdSuggest(WorldGuardNeo mod) {
+        return (c, b) -> SharedSuggestionProvider.suggest(
+                mod.regions().get(c.getSource().getLevel()).all().stream()
+                        .map(dev.thefather007.worldguardneo.region.ProtectedRegion::id), b);
+    }
+
+    /** Suggest every registered flag name. */
+    private static SuggestionProvider<CommandSourceStack> flagNameSuggest() {
+        return (c, b) -> SharedSuggestionProvider.suggest(Flags.all().stream().map(Flag::name), b);
+    }
+
+    /**
+     * Suggest values for the flag already typed in the {@code flag} argument: allow/deny/none for
+     * state flags, true/false/none for boolean flags. Other flag types get no suggestion (free text).
+     */
+    private static SuggestionProvider<CommandSourceStack> flagValueSuggest() {
+        return (c, b) -> {
+            try {
+                Flag<?> f = Flags.get(StringArgumentType.getString(c, "flag"));
+                if (f instanceof dev.thefather007.worldguardneo.flags.StateFlag)
+                    return SharedSuggestionProvider.suggest(java.util.List.of("allow", "deny", "none"), b);
+                if (f instanceof dev.thefather007.worldguardneo.flags.BooleanFlag)
+                    return SharedSuggestionProvider.suggest(java.util.List.of("true", "false", "none"), b);
+            } catch (IllegalArgumentException ignored) { /* flag arg not present yet */ }
+            return b.buildFuture();
+        };
+    }
+
+    /** Suggest online player names. */
+    private static final SuggestionProvider<CommandSourceStack> PLAYER_SUGGEST =
+            (c, b) -> SharedSuggestionProvider.suggest(c.getSource().getOnlinePlayerNames(), b);
+
     private static LiteralArgumentBuilder<CommandSourceStack> buildRoot(String alias, WorldGuardNeo mod) {
+        final SuggestionProvider<CommandSourceStack> RID = regionIdSuggest(mod);
+        final SuggestionProvider<CommandSourceStack> FLAGN = flagNameSuggest();
+        final SuggestionProvider<CommandSourceStack> FLAGV = flagValueSuggest();
+        final SuggestionProvider<CommandSourceStack> PLR = PLAYER_SUGGEST;
         return Commands.literal(alias)
                 .then(Commands.literal("claim")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.claim"))
                         // /rg claim — auto-generate id from player name + counter
                         .executes(c -> claimRegion(c.getSource(), null, mod))
                         // /rg claim <id> — explicit id
+                        // No id suggestions here — claim needs a NEW id, not an existing one.
                         .then(Commands.argument("id", StringArgumentType.word())
                                 .executes(c -> claimRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
                 .then(Commands.literal("redefine")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.redefine"))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .executes(c -> redefineRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
                 .then(Commands.literal("wand")
                         // Hand out the built-in selection wand (configurable item). Obtainable once.
@@ -116,7 +158,7 @@ public final class WGCommands {
                 .then(Commands.literal("remove")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.delete")
                                     || mod.perms().has(s, "worldguardneo.region.delete.others"))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .executes(c -> removeRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
                 .then(Commands.literal("undo")
                         // Restore the most recently removed region in this world (session trash).
@@ -124,21 +166,21 @@ public final class WGCommands {
                         .executes(c -> undoRemove(c.getSource(), mod)))
                 .then(Commands.literal("info")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.info"))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .executes(c -> infoRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod)))
                         .executes(c -> infoRegionAtPlayer(c.getSource(), mod)))
                 .then(Commands.literal("select")
                         // Load an existing region's geometry into your selection (for redefine /
                         // expand). OP 2 + its own node.
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.select"))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .executes(c -> selectRegion(c.getSource(),
                                         StringArgumentType.getString(c, "id"), mod))))
                 .then(Commands.literal("transfer")
                         // Transfer sole ownership of a region to another player. OP 3 + its own node.
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.transfer"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                         .executes(c -> transferRegion(c, mod)))))
                 .then(Commands.literal("list")
                         // Базовый /rg list (без аргумента) — свои регионы, доступно всем
@@ -147,7 +189,7 @@ public final class WGCommands {
                         .executes(c -> listOwnRegions(c.getSource(), mod))
                         // /rg list <player> — регионы указанного игрока. Принимает имя
                         // или строковый UUID. Требует region.list.others (default OP 2).
-                        .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                 .requires(s -> mod.perms().has(s, "worldguardneo.region.list.others"))
                                 .executes(c -> listPlayerRegions(c.getSource(),
                                         StringArgumentType.getString(c, "player"), mod))))
@@ -161,7 +203,7 @@ public final class WGCommands {
                                         IntegerArgumentType.getInteger(c, "radius"), mod))))
                 .then(Commands.literal("teleport")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.teleport"))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .executes(c -> teleportToRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
                 .then(Commands.literal("flag")
                         // Hide the whole `flag` subcommand unless the player can set at least one
@@ -170,8 +212,8 @@ public final class WGCommands {
                         // from showing to players who can't use any flag at all. We treat op-2 OR
                         // any flag-related node as "may see flags".
                         .requires(s -> canUseFlags(s, mod))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("flag", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("flag", StringArgumentType.word()).suggests(FLAGN)
                                         .then(Commands.literal("-g")
                                                 // The `-g <group>` syntax is privileged: only show
                                                 // it to players who actually hold the group node
@@ -180,9 +222,9 @@ public final class WGCommands {
                                                 // setFlag() would reject it.
                                                 .requires(s -> canUseFlagGroup(s, mod))
                                                 .then(Commands.argument("group", StringArgumentType.word())
-                                                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                                        .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FLAGV)
                                                                 .executes(c -> setFlagGrouped(c, mod)))))
-                                        .then(Commands.argument("value", StringArgumentType.greedyString())
+                                        .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FLAGV)
                                                 .executes(c -> setFlag(c.getSource(),
                                                         StringArgumentType.getString(c, "id"),
                                                         StringArgumentType.getString(c, "flag"),
@@ -192,15 +234,15 @@ public final class WGCommands {
                                                 StringArgumentType.getString(c, "flag"), "", null, mod)))))
                 .then(Commands.literal("priority")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flag.priority"))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .then(Commands.argument("value", IntegerArgumentType.integer())
                                         .executes(c -> setPriority(c.getSource(),
                                                 StringArgumentType.getString(c, "id"),
                                                 IntegerArgumentType.getInteger(c, "value"), mod)))))
                 .then(Commands.literal("setparent")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flag.parent"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("parent", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("parent", StringArgumentType.word()).suggests(RID)
                                         .executes(c -> setParent(c.getSource(),
                                                 StringArgumentType.getString(c, "id"),
                                                 StringArgumentType.getString(c, "parent"), mod)))
@@ -208,23 +250,23 @@ public final class WGCommands {
                                         StringArgumentType.getString(c, "id"), null, mod))))
                 .then(Commands.literal("addowner")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.addowner"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                         .executes(c -> changeMembership(c, "id", "player", mod, true,  true)))))
                 .then(Commands.literal("removeowner")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.removeowner"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                         .executes(c -> changeMembership(c, "id", "player", mod, true,  false)))))
                 .then(Commands.literal("addmember")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.addmember"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                         .executes(c -> changeMembership(c, "id", "player", mod, false, true)))))
                 .then(Commands.literal("removemember")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.removemember"))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                         .executes(c -> changeMembership(c, "id", "player", mod, false, false)))))
                 .then(Commands.literal("reload")
                         .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
