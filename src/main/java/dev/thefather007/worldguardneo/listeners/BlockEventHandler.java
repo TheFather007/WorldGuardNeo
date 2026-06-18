@@ -152,32 +152,34 @@ public final class BlockEventHandler {
         UUID id = p.getUUID();
         // Dedicated right-click toggles (all default ALLOW): each is an explicit state flag that,
         // when set to deny, blocks that specific action even for members — independent of the
-        // generic interact/use gate below. Bypass holders skip them. Checked here so an admin can,
-        // e.g., allow interact but forbid sign editing, or forbid emptying buckets in a region.
-        if (!canBypass(p)) {
-            StateFlag ded = null;
-            String dmsg = null;
-            if (heldItem instanceof net.minecraft.world.item.MinecartItem) {
-                ded = Flags.VEHICLE_PLACE; dmsg = "msg.vehicle.place-denied";
-            } else if (heldItem instanceof net.minecraft.world.item.BucketItem) {
-                boolean empty = heldItem == net.minecraft.world.item.Items.BUCKET;
-                ded  = empty ? Flags.BUCKET_FILL : Flags.BUCKET_EMPTY;
-                dmsg = empty ? "msg.bucket.fill-denied" : "msg.bucket.empty-denied";
-            } else {
-                BlockState st = sl.getBlockState(bp);
-                if (st.getBlock() instanceof net.minecraft.world.level.block.LecternBlock
-                        && st.getValue(net.minecraft.world.level.block.LecternBlock.HAS_BOOK)) {
-                    ded = Flags.LECTERN_TAKE; dmsg = "msg.lectern.take-denied";
-                } else if (st.getBlock() instanceof net.minecraft.world.level.block.SignBlock) {
-                    ded = Flags.SIGN_EDIT; dmsg = "msg.sign.edit-denied";
-                }
+        // generic interact/use gate below. So an admin can, e.g., allow interact but forbid sign
+        // editing, or forbid emptying buckets in a region.
+        //
+        // We resolve which toggle (if any) applies and test it FIRST, and only consult the
+        // permission backend for region.bypass when the toggle actually denies — mirroring the
+        // lazy-bypass pattern elsewhere so a normal allowed right-click never hits LuckPerms.
+        StateFlag ded = null;
+        String dmsg = null;
+        if (heldItem instanceof net.minecraft.world.item.MinecartItem) {
+            ded = Flags.VEHICLE_PLACE; dmsg = "msg.vehicle.place-denied";
+        } else if (heldItem instanceof net.minecraft.world.item.BucketItem) {
+            boolean empty = heldItem == net.minecraft.world.item.Items.BUCKET;
+            ded  = empty ? Flags.BUCKET_FILL : Flags.BUCKET_EMPTY;
+            dmsg = empty ? "msg.bucket.fill-denied" : "msg.bucket.empty-denied";
+        } else {
+            BlockState st = sl.getBlockState(bp);
+            if (st.getBlock() instanceof net.minecraft.world.level.block.LecternBlock
+                    && st.getValue(net.minecraft.world.level.block.LecternBlock.HAS_BOOK)) {
+                ded = Flags.LECTERN_TAKE; dmsg = "msg.lectern.take-denied";
+            } else if (st.getBlock() instanceof net.minecraft.world.level.block.SignBlock) {
+                ded = Flags.SIGN_EDIT; dmsg = "msg.sign.edit-denied";
             }
-            if (ded != null && !mgr.testState(ded, id, x, y, z)) {
-                e.setCanceled(true);
-                syncInventory(p);
-                p.displayClientMessage(Component.literal(mod.i18n().raw(dmsg)), true);
-                return;
-            }
+        }
+        if (ded != null && !mgr.testState(ded, id, x, y, z) && !canBypass(p)) {
+            e.setCanceled(true);
+            syncInventory(p);
+            p.displayClientMessage(Component.literal(mod.i18n().raw(dmsg)), true);
+            return;
         }
         // INTERACT/USE use build-access semantics (members interact freely, strangers are
         // blocked unless a flag explicitly opens it). Containers additionally require chest-access.
@@ -248,9 +250,9 @@ public final class BlockEventHandler {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         if (!(e.getItemStack().getItem() instanceof net.minecraft.world.item.BoatItem)) return;
         if (!mod.isProtectionActive(p.serverLevel())) return;
-        if (canBypass(p)) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
-        if (!mgr.testState(Flags.VEHICLE_PLACE, p.getUUID(), p.getX(), p.getY(), p.getZ())) {
+        // Resolve the flag first; only consult region.bypass if it denies (lazy-bypass pattern).
+        if (!mgr.testState(Flags.VEHICLE_PLACE, p.getUUID(), p.getX(), p.getY(), p.getZ()) && !canBypass(p)) {
             e.setCanceled(true);
             syncInventory(p);
             p.displayClientMessage(Component.literal(mod.i18n().raw("msg.vehicle.place-denied")), true);
