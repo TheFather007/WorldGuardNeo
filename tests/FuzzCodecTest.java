@@ -21,7 +21,7 @@ public final class FuzzCodecTest {
     static void check(String n, boolean c) { if (c) passed++; else { failed++; if (failed <= 30) System.out.println("FAIL: " + n); } }
 
     static final Gson GSON = new Gson();
-    static final int N = 500;
+    static final int N = 1000;          // doubled (was 500)
     static final UUID[] POOL = new UUID[6];
     static { for (int i = 0; i < POOL.length; i++) POOL[i] = new UUID(0x1000 + i, 0x2000 + i); }
     static final String[] GROUPS = {"admins", "vip", "trusted", "builders"};

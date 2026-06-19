@@ -22,7 +22,7 @@ public final class ResolutionFuzzTest {
     static int passed = 0, failed = 0;
     static void check(String n, boolean c) { if (c) passed++; else { failed++; if (failed <= 40) System.out.println("FAIL: " + n); } }
 
-    static final int M = 8000;
+    static final int M = 16000;        // doubled (was 8000)
     static final UUID[] POOL = new UUID[4];
     static { for (int i = 0; i < POOL.length; i++) POOL[i] = new UUID(7, i + 1); }
     static final UUID[] ACTORS = {POOL[0], POOL[1], POOL[2], POOL[3], null};
@@ -74,7 +74,7 @@ public final class ResolutionFuzzTest {
 
     /* (2) controlled outcomes: dominance of the strictly-highest tier + all-unset default. */
     static void controlled(Random rng) {
-        for (int s = 0; s < 3000; s++) {
+        for (int s = 0; s < 6000; s++) {   // doubled (was 3000)
             RegionManager m = new RegionManager("w");
             int k = 1 + rng.nextInt(4);
             int maxPrio = Integer.MIN_VALUE;
@@ -98,7 +98,7 @@ public final class ResolutionFuzzTest {
             check("top-tier ALL dominance", m.testState(Flags.PVP, actor, 10, 10, 10) == allow);
         }
         // all-unset → flag default
-        for (int s = 0; s < 1000; s++) {
+        for (int s = 0; s < 2000; s++) {   // doubled (was 1000)
             RegionManager m = new RegionManager("w");
             int k = 1 + rng.nextInt(4);
             for (int i = 0; i < k; i++) {

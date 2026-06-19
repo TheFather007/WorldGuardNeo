@@ -43,7 +43,12 @@ bash tests/run.sh           # compile + run every suite; non-zero exit on any fa
 | `ResolutionFuzzTest` | **Property-based, ~85k assertions:** over thousands of random region stacks — list-overload vs point-overload equivalence (testState + resolveValue), and controlled-outcome dominance (strictly-highest-tier value wins; all-unset → flag default). |
 | `JsonStorageTest` | The REAL JSON disk backend (not just the codec): multi-world round-trip, empty world, world-key filename sanitization, atomic rewrite (no leftover `.tmp`), and the corrupt-file → `.corrupt-` quarantine. |
 | `ConfigTest` | The REAL config layer (night-config TOML): `loadOrCreate` writes a default `config.toml`; custom values (incl. the v1.3 `[selection]`/`[claim-expiry]` keys) read back; wrong-typed values fall back to field defaults. |
+| `NewFlagsTest` | The v1.3 protection flags (vehicle-place/enter, item-frame-rotate, sign-edit, lectern-take, armor-stand-use, glide, bucket-fill/empty, spawn-limit) across every engine direction: registration + type, default state, `parse()`, per-region codec round-trip, and live resolution (deny / priority / parent inheritance / region-group). |
 | `PerFlagReport` | Per-flag battery; writes a detailed human-readable report to `tests/FLAG_REPORT.txt`. |
+
+The fuzz suites (`SpatialIndexFuzzTest`, `ResolutionFuzzTest`, `GeometryCrossCheckTest`,
+`FuzzCodecTest`) run doubled iteration counts (~525k assertions total). A GitHub Actions workflow
+(`.github/workflows/ci.yml`) runs this JVM suite **and** the in-game GameTests on every push/PR.
 | `coverage.sh` | Static guard: every registered flag is referenced in an enforcement/command file (catches a flag that silently lost its handler). |
 
 Total: **~261,000 assertions** across 25 suites + the static coverage guard.

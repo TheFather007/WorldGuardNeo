@@ -476,4 +476,161 @@ public final class WGNGameTests {
                 "member allowed build");
         h.succeed();
     }
+
+    /* ---------------- ADDED: break / place / interact variants & controls ---------------- */
+
+    @GameTest(template = TPL)
+    public static void breakAllowedForMember(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_break_member");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.STONE);
+        p.gameMode.destroyBlock(h.absolutePos(rel));
+        h.assertBlockNotPresent(Blocks.STONE, rel); // member may break
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void placeAllowFlagOpensToStranger(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_place_allow");
+        r.setFlag(Flags.BLOCK_PLACE, StateFlag.State.ALLOW);
+        r.setFlag(Flags.BUILD, StateFlag.State.ALLOW);
+        BlockPos floorRel = new BlockPos(4, 0, 4);
+        placeBlockOnTop(h, stranger(h), floorRel, Items.STONE);
+        h.assertBlockPresent(Blocks.STONE, floorRel.above());
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void placeExplicitDenyBlocksOwner(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_place_owner_deny");
+        ServerPlayer p = stranger(h);
+        r.owners().add(p.getUUID());
+        r.setFlag(Flags.BLOCK_PLACE, StateFlag.State.DENY); // explicit deny beats membership
+        BlockPos floorRel = new BlockPos(4, 0, 4);
+        placeBlockOnTop(h, p, floorRel, Items.STONE);
+        h.assertBlockNotPresent(Blocks.STONE, floorRel.above());
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void placeWildernessAllowed(GameTestHelper h) {
+        mgr(h);
+        BlockPos floorRel = new BlockPos(4, 0, 4);
+        placeBlockOnTop(h, stranger(h), floorRel, Items.STONE);
+        h.assertBlockPresent(Blocks.STONE, floorRel.above());
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void interactExplicitDenyBlocksMember(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_use_member_deny");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        r.setFlag(Flags.INTERACT, StateFlag.State.DENY); // explicit deny beats membership
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.OAK_TRAPDOOR);
+        h.useBlock(h.absolutePos(rel), p);
+        h.assertBlockProperty(rel, BlockStateProperties.OPEN, false);
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void interactWildernessAllowed(GameTestHelper h) {
+        mgr(h);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.OAK_TRAPDOOR);
+        h.useBlock(h.absolutePos(rel), stranger(h));
+        h.assertBlockProperty(rel, BlockStateProperties.OPEN, true);
+        h.succeed();
+    }
+
+    /* ---------------- ADDED: chest-access variants ---------------- */
+
+    @GameTest(template = TPL)
+    public static void chestAccessAllowFlagOpensToStranger(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_chest_allow");
+        r.setFlag(Flags.INTERACT, StateFlag.State.ALLOW);
+        r.setFlag(Flags.USE, StateFlag.State.ALLOW);
+        r.setFlag(Flags.CHEST_ACCESS, StateFlag.State.ALLOW);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.CHEST);
+        ServerPlayer p = stranger(h);
+        h.useBlock(h.absolutePos(rel), p);
+        h.assertTrue(p.containerMenu != p.inventoryMenu, "chest-access allow → chest opened");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void chestAccessExplicitDenyBlocksMember(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_chest_member_deny");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        r.setFlag(Flags.CHEST_ACCESS, StateFlag.State.DENY);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.CHEST);
+        h.useBlock(h.absolutePos(rel), p);
+        h.assertTrue(p.containerMenu == p.inventoryMenu, "chest-access deny → chest stayed closed for member");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void chestAccessWildernessOpens(GameTestHelper h) {
+        mgr(h);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.CHEST);
+        ServerPlayer p = stranger(h);
+        h.useBlock(h.absolutePos(rel), p);
+        h.assertTrue(p.containerMenu != p.inventoryMenu, "wilderness → chest opens");
+        h.succeed();
+    }
+
+    /* ---------------- ADDED: pvp / mob-damage controls ---------------- */
+
+    @GameTest(template = TPL)
+    public static void pvpAllowFlagLetsDamage(GameTestHelper h) {
+        region(h, "gt_pvp_allow").setFlag(Flags.PVP, StateFlag.State.ALLOW);
+        ServerPlayer attacker = stranger(h), victim = stranger(h);
+        float before = victim.getHealth();
+        attacker.attack(victim);
+        h.assertTrue(victim.getHealth() < before, "pvp allow → victim took damage");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void mobDamageAllowFlagLetsDamage(GameTestHelper h) {
+        region(h, "gt_mobdmg_allow").setFlag(Flags.MOB_DAMAGE, StateFlag.State.ALLOW);
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        float before = cow.getHealth();
+        stranger(h).attack(cow);
+        h.assertTrue(cow.getHealth() < before, "mob-damage allow → cow took damage");
+        h.succeed();
+    }
+
+    /* ---------------- ADDED: random-tick mixin variants ---------------- */
+
+    @GameTest(template = TPL)
+    public static void frostedIceMeltDenyKeepsIce(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_frosted_deny");
+        r.setFlag(Flags.FROSTED_ICE_MELT, StateFlag.State.DENY);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.FROSTED_ICE);
+        forceRandomTicks(h, h.absolutePos(rel), 300);
+        h.assertBlockPresent(Blocks.FROSTED_ICE, rel); // mixin cancels frosted-ice melt
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void leafDecayUnsetStillDecays(GameTestHelper h) {
+        // Region present but no leaf-decay flag → leaves still decay (unset = default allow).
+        region(h, "gt_leaf_unset");
+        BlockPos rel = new BlockPos(4, 2, 4);
+        h.setBlock(rel, Blocks.OAK_LEAVES.defaultBlockState()
+                .setValue(BlockStateProperties.PERSISTENT, false)
+                .setValue(BlockStateProperties.DISTANCE, 7));
+        forceRandomTicks(h, h.absolutePos(rel), 400);
+        h.assertBlockNotPresent(Blocks.OAK_LEAVES, rel);
+        h.succeed();
+    }
 }

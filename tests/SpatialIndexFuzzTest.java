@@ -16,7 +16,7 @@ public final class SpatialIndexFuzzTest {
     static int passed = 0, failed = 0;
     static void check(String n, boolean c) { if (c) passed++; else { failed++; if (failed <= 40) System.out.println("FAIL: " + n); } }
 
-    static final int CONFIGS = 50;
+    static final int CONFIGS = 100;   // doubled (was 50)
     static final int QUERIES = 600;
     static final int RANGE   = 240; // coords in [-120, 120)
 

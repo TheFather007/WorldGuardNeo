@@ -23,7 +23,7 @@ public final class GeometryCrossCheckTest {
     public static void main(String[] args) {
         Random rng = new Random(0xBEEF);
         int shapes = 0;
-        for (int i = 0; i < 120; i++) {
+        for (int i = 0; i < 240; i++) {     // doubled (was 120)
             List<Point2> poly = (i % 2 == 0) ? randomRect(rng) : randomL(rng);
             crossCheck("shape" + i, poly);
             shapes++;

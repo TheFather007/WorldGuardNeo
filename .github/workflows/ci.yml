@@ -1,0 +1,52 @@
+name: CI
+
+# Runs the test layers on every push and pull request.
+# This workflow lives on the region-tests branch, which carries the mod source plus both test
+# layers: the pure-JVM engine suite (tests/) and the in-game GameTest battery
+# (src/main/java/.../gametest/WGNGameTests.java).
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, deterministic engine tests — the primary gate. ~500k assertions, no Minecraft runtime.
+  jvm-tests:
+    name: JVM engine tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build (compile main classes, skip gradle test task)
+        run: ./gradlew build -x test --no-daemon --stacktrace
+      - name: Run pure-JVM engine suite
+        run: bash tests/run.sh
+
+  # In-game GameTests — exercise the real event/mixin enforcement path in a live ServerLevel.
+  # Heavier (downloads NeoForge/Minecraft and boots a dedicated gametest server), so it's a
+  # separate job. runGameTestServer exits non-zero if any @GameTest fails.
+  gametest:
+    name: In-game GameTests
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Run GameTest server
+        run: ./gradlew runGameTestServer --no-daemon --stacktrace
