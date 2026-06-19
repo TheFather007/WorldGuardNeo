@@ -74,6 +74,26 @@ worldguardneo/
 3. Запустите сервер один раз — будет создан `config/worldguardneo/config.toml`.
 4. При необходимости отредактируйте конфиг и выполните `/rg reload`.
 
+## Тестирование
+
+Два дополняющих слоя:
+
+- **Чистые JVM-тесты движка** (`tests/`, в ветке `region-tests`) — запуск:
+  `./gradlew build -x test && bash tests/run.sh`. ~260k проверок (геометрия, разрешение флагов,
+  хранилище, конфиг) без рантайма Minecraft.
+- **Внутриигровые GameTest** (`src/main/java/.../gametest/WGNGameTests.java`) — проверяют РЕАЛЬНЫЙ
+  путь событий/миксинов (ломание/установка/взаимодействие, доступ к сундукам, random-tick миксины,
+  PvP/урон мобам, транспорт, декорации, взрывы и флаги v1.3 vehicle-enter / item-frame-rotate /
+  bucket) в живом `ServerLevel`. Запуск на настоящем NeoForge:
+
+  ```
+  ./gradlew runGameTestServer
+  ```
+
+  Каждый тест строит регион над платформой 9×6×9, выполняет реальное действие mock-игроком и
+  проверяет результат защиты. (GameTest требует рантайм Minecraft, поэтому в headless-сборке не
+  выполняется — запускайте локально или в CI, поднимающем NeoForge-ран.)
+
 ## Решение проблем
 
 **`Could not find com.sk89q.worldedit:worldedit-neoforge:...`** — этой ошибки в текущей версии быть не должно: WorldEdit убран из зависимостей сборки. Если она появилась, убедитесь, что используете актуальный `build.gradle.kts` (без строки `compileOnly("com.sk89q.worldedit...")`).

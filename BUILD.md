@@ -74,6 +74,28 @@ So `./gradlew build` works out of the box with nothing to install manually.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust the config if needed and run `/rg reload`.
 
+## Testing
+
+Two complementary layers:
+
+- **Pure-JVM engine tests** (`tests/`, on the `region-tests` branch) — run with
+  `./gradlew build -x test && bash tests/run.sh`. ~260k assertions covering geometry, flag
+  resolution, storage and config — no Minecraft runtime needed.
+- **In-game GameTests** (`src/main/java/.../gametest/WGNGameTests.java`) — exercise the REAL
+  event/mixin enforcement path (block break/place/interact, chest access, random-tick mixins,
+  PvP/mob-damage, vehicles, decorations, explosions, and the v1.3 vehicle-enter / item-frame-rotate
+  / bucket flags) inside a live `ServerLevel`. Run them on a real NeoForge setup with:
+
+  ```
+  ./gradlew runGameTestServer
+  ```
+
+  The run enables the `worldguardneo` gametest namespace; each test builds a region over a 9×6×9
+  stone platform, performs a real action via a mock player, and asserts the protection outcome.
+  (GameTests require a Minecraft runtime, so they don't run in CI-less/headless builds — use this
+  task locally or in a CI job that provisions the NeoForge run.)
+
+
 ## Troubleshooting
 
 **`Could not find com.sk89q.worldedit:worldedit-neoforge:...`** — this shouldn't happen in the current version: WorldEdit was removed from build dependencies. If you hit it, make sure you're using the current `build.gradle.kts` (no `compileOnly("com.sk89q.worldedit...")` line).

@@ -44,6 +44,14 @@ neoForge {
             server()
             programArgument("--nogui")
         }
+        // Dedicated GameTest server: runs the in-game @GameTest battery
+        // (dev.thefather007.worldguardneo.gametest.WGNGameTests) against a real ServerLevel.
+        // Launch with `./gradlew runGameTestServer`. No extra mods are required — WorldGuardNeo
+        // has no hard dependencies, and the tests create regions programmatically.
+        create("gameTestServer") {
+            type = "gameTestServer"
+            systemProperty("neoforge.enabledGameTestNamespaces", modId)
+        }
     }
 
     mods {
