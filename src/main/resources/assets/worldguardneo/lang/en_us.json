@@ -31,6 +31,7 @@
   "msg.region.global-select": "§8[§3WGN§8] §e⚠ §7Region §6%id% §7is the §fglobal §7region — it has no geometry.",
   "msg.region.global-remove": "§8[§3WGN§8] §c✘ §7The global region cannot be deleted §8(§7holds world-wide defaults§8)§7.",
   "msg.region.exists": "§8[§3WGN§8] §c✘ §7Region §6%id% §7already exists.",
+  "msg.region.bad-id": "§8[§3WGN§8] §c✘ §7Invalid region id §6%id%§7 — use 1–40 of §fA–Z a–z 0–9 _ -§7.",
   "msg.region.toolarge": "§8[§3WGN§8] §c✘ §7Region is too §clarge §8(§b%volume% §7> §b%limit%§8)§7.",
   "msg.region.toosmall": "§8[§3WGN§8] §e⚠ §7Region is too §esmall §8(§b%volume% §7< §b%limit% §7blocks§8)§7.",
   "msg.region.defined": "§8[§3WGN§8] §a✔ §7Region §6%id% §aclaimed §8(§7volume §b%volume%§8)§7.",

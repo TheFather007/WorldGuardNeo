@@ -205,10 +205,19 @@ public final class BackupManager implements AutoCloseable {
         rotate(retain);
     }
 
-    /** Embedded-database files living at the data root (sqlite / h2), present ones only. */
+    /**
+     * Embedded-database files living at the data root (sqlite / h2), present ones only.
+     *
+     * <p>The SQLite {@code -wal} and {@code -shm} sidecars are included: although the backup
+     * checkpoints with {@code wal_checkpoint(TRUNCATE)} on the server thread before the copy, the
+     * copy itself runs asynchronously, so a server tick between the checkpoint and the copy can
+     * commit fresh frames into a new {@code -wal}. Copying the sidecars alongside the main file
+     * makes the snapshot a complete, recoverable WAL set rather than one missing the latest commits.
+     */
     private List<Path> collectDbFiles() {
-        List<Path> out = new ArrayList<>(2);
-        for (String name : new String[]{"regions.sqlite", "regions_h2.mv.db"}) {
+        List<Path> out = new ArrayList<>(4);
+        for (String name : new String[]{
+                "regions.sqlite", "regions.sqlite-wal", "regions.sqlite-shm", "regions_h2.mv.db"}) {
             Path p = dataDir.resolve(name);
             if (Files.isRegularFile(p)) out.add(p);
         }

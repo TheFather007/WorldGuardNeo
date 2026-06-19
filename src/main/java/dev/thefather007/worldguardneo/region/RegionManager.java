@@ -117,13 +117,15 @@ public final class RegionManager {
     }
 
     /**
-     * Allocation-free "would propagation from the source point to the target point cross a region
-     * boundary?" probe. Returns true if any region that contains the TARGET does NOT also contain
-     * the SOURCE — i.e. fire/fluid/etc. spreading from source into target would enter (or leave) a
-     * region the source isn't part of. Equivalent to comparing {@code getApplicable(target)} ids
-     * against {@code getApplicable(source)} ids, but walks the spatial-index candidates directly
-     * with no list allocation or sort — important on the NeighborNotifyEvent path, the hottest
-     * event in the mod (every ocean/river/lava flow tick).
+     * Allocation-free "would propagation from the source point to the target point cross INTO a
+     * region boundary?" probe. Returns true if any region that contains the TARGET does NOT also
+     * contain the SOURCE — i.e. fire/fluid/etc. spreading from source into target would ENTER a
+     * region the source isn't part of (wilderness→claim, or claimA→claimB). This is exactly the
+     * grief vector the adjacency guard protects against; propagation LEAVING a region into
+     * wilderness is intentionally not flagged (no claim there to protect), so only the target side
+     * is examined. Equivalent to comparing the target's applicable ids against the source's, but
+     * walks the spatial-index candidates directly with no list allocation or sort — important on
+     * the NeighborNotifyEvent path, the hottest event in the mod (every ocean/river/lava flow tick).
      */
     public boolean crossesBoundary(double sx, double sy, double sz,
                                    double tx, double ty, double tz) {

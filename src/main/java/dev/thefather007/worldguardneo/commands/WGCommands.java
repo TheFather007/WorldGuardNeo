@@ -550,6 +550,14 @@ public final class WGCommands {
                 err(src, mod, "msg.claim.autogen-failed");
                 return 0;
             }
+        } else if (!isValidRegionId(id)) {
+            // User-supplied id: restrict to a safe charset. Brigadier's word() also allows '.', '+'
+            // etc., which would let an id collide with the storage quarantine marker ('.corrupt-')
+            // — such a region loads back invisible and can't be pruned — or with the reserved
+            // global-region id. Auto-generated ids are already sanitized, so this only gates the
+            // explicit-id path.
+            err(src, mod, "msg.region.bad-id", "id", id);
+            return 0;
         }
 
         if (mgr.get(id).isPresent()) { err(src, mod, "msg.region.exists", "id", id); return 0; }
@@ -1553,6 +1561,24 @@ public final class WGCommands {
         // sendFailure already styles in italic red by default for chat-source senders;
         // we let lang §-codes override that for player-source chats.
         s.sendFailure(Component.literal(m.i18n().format(key, a)));
+    }
+
+    /**
+     * Validates a user-supplied region id: 1–40 chars of {@code [A-Za-z0-9_-]}, and not the
+     * reserved global-region id. This keeps ids safe for every storage backend (no '.' that could
+     * collide with the {@code .corrupt-} quarantine marker, no chars that break JSON filenames or
+     * SQL), matching WorldGuard's id conventions.
+     */
+    private static boolean isValidRegionId(String id) {
+        if (id == null || id.isEmpty() || id.length() > 40) return false;
+        if (id.equalsIgnoreCase(dev.thefather007.worldguardneo.region.GlobalRegion.ID)) return false;
+        for (int i = 0, n = id.length(); i < n; i++) {
+            char c = id.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                      || (c >= '0' && c <= '9') || c == '_' || c == '-';
+            if (!ok) return false;
+        }
+        return true;
     }
 
     /**
