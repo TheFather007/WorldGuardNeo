@@ -454,8 +454,12 @@ public final class PlayerEventHandler {
 
         // glide (elytra): when denied, force-stop fall-flying so a player can't soar across the
         // region. stopFallFlying clears the gliding flag; the player simply falls/walks. Only
-        // touched while actually gliding, so it costs nothing for grounded players.
-        if (p.isFallFlying() && !mgr.testState(Flags.GLIDE, applicable, id)) {
+        // touched while actually gliding, so it costs nothing for grounded players. Bypass holders
+        // are exempt — dropping an admin out of the air mid-flight (possible fall death) would be a
+        // nasty surprise, and bypass means "ignore region protection". Bypass is resolved lazily
+        // (only when glide actually denies), reusing the per-tick cache.
+        if (p.isFallFlying() && !mgr.testState(Flags.GLIDE, applicable, id)
+                && !resolveBypassCached(p, bypassState)) {
             p.stopFallFlying();
         }
 

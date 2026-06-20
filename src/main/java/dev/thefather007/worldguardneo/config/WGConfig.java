@@ -143,9 +143,12 @@ public final class WGConfig {
             g.defaults.verticalExpandUp   = intOf(toml, "defaults.vertical-expand-up", g.defaults.verticalExpandUp);
         } catch (Exception ex) {
             WorldGuardNeo.LOGGER.error(
-                    "config.toml is malformed — falling back to defaults. " +
+                    "config.toml is malformed — keeping values parsed so far, defaults for the rest. " +
                     "Fix the file or delete it to regenerate.", ex);
-            return GlobalSection.defaults();
+            // Return the partially-populated section (g started as defaults and was overwritten
+            // field-by-field up to the failure), NOT a fresh defaults() — otherwise one bad key
+            // deep in the file silently discards every admin setting parsed before it.
+            return g;
         }
         return g;
     }
@@ -177,7 +180,9 @@ public final class WGConfig {
     /* ---- typed readers tolerant of missing keys / wrong types ---- */
     private static String str(Config c, String path, String def) {
         Object v = c.get(path);
-        return v != null ? String.valueOf(v) : def;
+        // Type-guard like bool()/intOf(): a non-string value (e.g. storage-format = true) falls
+        // back to the default instead of being coerced to garbage ("true") via String.valueOf.
+        return v instanceof String s ? s : def;
     }
     private static boolean bool(Config c, String path, boolean def) {
         Object v = c.get(path);

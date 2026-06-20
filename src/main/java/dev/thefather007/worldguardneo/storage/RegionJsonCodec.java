@@ -175,11 +175,18 @@ public final class RegionJsonCodec {
                 JsonArray pa = obj.getAsJsonArray("points");
                 List<PolygonalRegion.Point2> pts = new ArrayList<>(pa.size());
                 for (JsonElement pe : pa) {
-                    JsonObject po = pe.getAsJsonObject();
-                    pts.add(new PolygonalRegion.Point2(po.get("x").getAsInt(), po.get("z").getAsInt()));
+                    // Skip a malformed point (missing/non-numeric x or z) rather than dropping the
+                    // whole region — matches how flags/UUIDs are handled. The <3 guard below still
+                    // protects against a degenerate polygon.
+                    try {
+                        JsonObject po = pe.getAsJsonObject();
+                        pts.add(new PolygonalRegion.Point2(po.get("x").getAsInt(), po.get("z").getAsInt()));
+                    } catch (Exception ex) {
+                        WorldGuardNeo.LOGGER.warn("Polygonal '{}' has a malformed point — skipping that point", id);
+                    }
                 }
                 if (pts.size() < 3) {
-                    WorldGuardNeo.LOGGER.warn("Polygonal '{}' has fewer than 3 points — skipping", id);
+                    WorldGuardNeo.LOGGER.warn("Polygonal '{}' has fewer than 3 valid points — skipping", id);
                     yield null;
                 }
                 int minY = obj.get("min-y").getAsInt();
