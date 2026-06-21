@@ -26,6 +26,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
@@ -118,6 +120,45 @@ public final class WGNGameTests {
         p.setPos(abs.getX() + 0.5, abs.getY() + 1.0, abs.getZ() + 0.5); // stand on the block (reach)
         BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(abs), Direction.UP, abs, false);
         p.gameMode.useItemOn(p, h.getLevel(), ItemStack.EMPTY, InteractionHand.MAIN_HAND, hit);
+    }
+
+    /**
+     * A mock player positioned at the given relative position INSIDE the test region, with the
+     * forced-creative invulnerability cleared so it can actually be damaged. pvp/mob-damage flags
+     * are resolved at the victim's position, and a freshly mocked player sits at the level spawn
+     * (wilderness), so without this it would never see the region's flag.
+     */
+    private static ServerPlayer combatantAt(GameTestHelper h, BlockPos rel) {
+        ServerPlayer p = stranger(h);
+        BlockPos abs = h.absolutePos(rel);
+        p.setPos(abs.getX() + 0.5, abs.getY(), abs.getZ() + 0.5);
+        p.getAbilities().invulnerable = false;
+        return p;
+    }
+
+    /**
+     * Empty a water bucket onto the top of {@code targetRel}. The mod's {@code bucket-empty} gate is
+     * on {@code RightClickBlock}, so we post that event first (exactly what vanilla fires when a
+     * bucket right-clicks a block) and only perform the real empty — {@link
+     * net.minecraft.world.item.BucketItem#use} raycasts from the eyes, hence the look-straight-down —
+     * when the gate did not cancel. This mirrors the real client→server handshake (a cancelled
+     * RightClickBlock means the client never sends the follow-up use-item).
+     */
+    private static void emptyWaterBucket(GameTestHelper h, ServerPlayer p, BlockPos targetRel) {
+        ItemStack bucket = new ItemStack(Items.WATER_BUCKET);
+        p.setItemInHand(InteractionHand.MAIN_HAND, bucket);
+        BlockPos abs = h.absolutePos(targetRel);
+        p.setPos(abs.getX() + 0.5, abs.getY() + 2.0, abs.getZ() + 0.5);
+        p.setXRot(90f);  // look straight down so BucketItem#use raycasts onto the target's top face
+        p.setYRot(0f);
+        BlockHitResult hit = new BlockHitResult(
+                new Vec3(abs.getX() + 0.5, abs.getY() + 1.0, abs.getZ() + 0.5), Direction.UP, abs, false);
+        PlayerInteractEvent.RightClickBlock evt =
+                new PlayerInteractEvent.RightClickBlock(p, InteractionHand.MAIN_HAND, abs, hit);
+        NeoForge.EVENT_BUS.post(evt);
+        if (!evt.isCanceled()) {
+            p.gameMode.useItem(p, h.getLevel(), bucket, InteractionHand.MAIN_HAND);
+        }
     }
 
     /* ---------------- BLOCK-BREAK / BUILD ---------------- */
@@ -296,14 +337,13 @@ public final class WGNGameTests {
     public static void pvpDenyNoDamage(GameTestHelper h) {
         CuboidRegion r = region(h, "gt_pvp_deny");
         r.setFlag(Flags.PVP, StateFlag.State.DENY);
-        ServerPlayer attacker = stranger(h);
-        ServerPlayer victim = stranger(h);
-        // The mock player is forced isCreative()==true, whose abilities.invulnerable short-circuits
-        // hurt() BEFORE the pvp gate ever fires. Clear it so the attack actually reaches the
-        // LivingIncomingDamageEvent the mod cancels — otherwise this would pass vacuously.
-        victim.getAbilities().invulnerable = false;
+        BlockPos rel = new BlockPos(4, 1, 4);
+        ServerPlayer attacker = combatantAt(h, rel);
+        ServerPlayer victim = combatantAt(h, rel);
         float before = victim.getHealth();
-        attacker.attack(victim); // routes through hurt() → LivingIncomingDamageEvent → pvp gate
+        // Direct hurt() with a fixed amount → LivingIncomingDamageEvent → pvp gate (avoids
+        // attack-strength scaling). The victim sits inside the region so PVP=DENY applies.
+        victim.hurt(attacker.damageSources().playerAttack(attacker), 4.0f);
         h.assertTrue(victim.getHealth() == before, "pvp deny → victim took no damage");
         h.succeed();
     }
@@ -313,7 +353,8 @@ public final class WGNGameTests {
     @GameTest(template = TPL)
     public static void placeDeniedForStranger(GameTestHelper h) {
         region(h, "gt_place_deny");
-        BlockPos floorRel = new BlockPos(4, 0, 4); // place ON TOP of this → (4,1,4)
+        BlockPos floorRel = new BlockPos(4, 1, 4); // pedestal inside the region; place lands on (4,2,4)
+        h.setBlock(floorRel, Blocks.STONE);
         ServerPlayer p = stranger(h);
         placeBlockOnTop(h, p, floorRel, Items.STONE);
         h.assertBlockNotPresent(Blocks.STONE, floorRel.above()); // stranger can't place
@@ -325,7 +366,8 @@ public final class WGNGameTests {
         CuboidRegion r = region(h, "gt_place_owner");
         ServerPlayer p = stranger(h);
         r.owners().add(p.getUUID());
-        BlockPos floorRel = new BlockPos(4, 0, 4);
+        BlockPos floorRel = new BlockPos(4, 1, 4); // pedestal inside the region; place lands on (4,2,4)
+        h.setBlock(floorRel, Blocks.STONE);
         placeBlockOnTop(h, p, floorRel, Items.STONE);
         h.assertBlockPresent(Blocks.STONE, floorRel.above());
         h.succeed();
@@ -462,7 +504,7 @@ public final class WGNGameTests {
         r.members().add(p.getUUID()); // member: interact passes, so we isolate bucket-empty
         BlockPos floorRel = new BlockPos(4, 1, 4); // emptying onto the top face places at (4,2,4)
         h.setBlock(floorRel, Blocks.STONE);
-        placeBlockOnTop(h, p, floorRel, Items.WATER_BUCKET);
+        emptyWaterBucket(h, p, floorRel);
         h.assertBlockNotPresent(Blocks.WATER, floorRel.above()); // bucket-empty deny → no water
         h.succeed();
     }
@@ -474,7 +516,7 @@ public final class WGNGameTests {
         r.members().add(p.getUUID());
         BlockPos floorRel = new BlockPos(4, 1, 4);
         h.setBlock(floorRel, Blocks.STONE);
-        placeBlockOnTop(h, p, floorRel, Items.WATER_BUCKET);
+        emptyWaterBucket(h, p, floorRel);
         h.assertBlockPresent(Blocks.WATER, floorRel.above()); // default allow → water placed
         h.succeed();
     }
@@ -523,9 +565,14 @@ public final class WGNGameTests {
     @GameTest(template = TPL)
     public static void placeAllowFlagOpensToStranger(GameTestHelper h) {
         CuboidRegion r = region(h, "gt_place_allow");
+        // Placing a block goes through BOTH the interact gate (RightClickBlock) and the build gate
+        // (EntityPlaceEvent), so a stranger needs interact/use opened as well as block-place/build.
+        r.setFlag(Flags.INTERACT, StateFlag.State.ALLOW);
+        r.setFlag(Flags.USE, StateFlag.State.ALLOW);
         r.setFlag(Flags.BLOCK_PLACE, StateFlag.State.ALLOW);
         r.setFlag(Flags.BUILD, StateFlag.State.ALLOW);
-        BlockPos floorRel = new BlockPos(4, 0, 4);
+        BlockPos floorRel = new BlockPos(4, 1, 4); // pedestal inside the region; place lands on (4,2,4)
+        h.setBlock(floorRel, Blocks.STONE);
         placeBlockOnTop(h, stranger(h), floorRel, Items.STONE);
         h.assertBlockPresent(Blocks.STONE, floorRel.above());
         h.succeed();
@@ -537,7 +584,8 @@ public final class WGNGameTests {
         ServerPlayer p = stranger(h);
         r.owners().add(p.getUUID());
         r.setFlag(Flags.BLOCK_PLACE, StateFlag.State.DENY); // explicit deny beats membership
-        BlockPos floorRel = new BlockPos(4, 0, 4);
+        BlockPos floorRel = new BlockPos(4, 1, 4); // pedestal inside the region; place lands on (4,2,4)
+        h.setBlock(floorRel, Blocks.STONE);
         placeBlockOnTop(h, p, floorRel, Items.STONE);
         h.assertBlockNotPresent(Blocks.STONE, floorRel.above());
         h.succeed();
@@ -546,7 +594,8 @@ public final class WGNGameTests {
     @GameTest(template = TPL)
     public static void placeWildernessAllowed(GameTestHelper h) {
         mgr(h);
-        BlockPos floorRel = new BlockPos(4, 0, 4);
+        BlockPos floorRel = new BlockPos(4, 1, 4); // pedestal (wilderness — no region); lands on (4,2,4)
+        h.setBlock(floorRel, Blocks.STONE);
         placeBlockOnTop(h, stranger(h), floorRel, Items.STONE);
         h.assertBlockPresent(Blocks.STONE, floorRel.above());
         h.succeed();
@@ -620,12 +669,13 @@ public final class WGNGameTests {
     @GameTest(template = TPL)
     public static void pvpAllowFlagLetsDamage(GameTestHelper h) {
         region(h, "gt_pvp_allow").setFlag(Flags.PVP, StateFlag.State.ALLOW);
-        ServerPlayer attacker = stranger(h), victim = stranger(h);
-        // Clear the mock player's forced creative invulnerability so the attack can land (see
-        // pvpDenyNoDamage). With pvp ALLOW the mod must NOT cancel, so the victim takes damage.
-        victim.getAbilities().invulnerable = false;
+        BlockPos rel = new BlockPos(4, 1, 4);
+        ServerPlayer attacker = combatantAt(h, rel);
+        ServerPlayer victim = combatantAt(h, rel);
         float before = victim.getHealth();
-        attacker.attack(victim);
+        // Victim sits inside the region (PVP=ALLOW) with creative invulnerability cleared, so the
+        // mod must NOT cancel and the damage lands.
+        victim.hurt(attacker.damageSources().playerAttack(attacker), 4.0f);
         h.assertTrue(victim.getHealth() < before, "pvp allow → victim took damage");
         h.succeed();
     }
