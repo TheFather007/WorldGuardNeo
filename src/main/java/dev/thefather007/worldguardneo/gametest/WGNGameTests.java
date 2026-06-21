@@ -1534,4 +1534,356 @@ public final class WGNGameTests {
         h.assertBlockPresent(Blocks.STONE, rel); // creeper source → creeper-explosion deny → survives
         h.succeed();
     }
+
+    /* ============================================================================
+     *  ENGINE / API / GEOMETRY / MEMBERSHIP / CODEC — verifying the mod's functions
+     *  beyond flag enforcement: the region store, spatial queries, cuboid geometry,
+     *  ownership, flag (de)serialization, and the public WorldGuardNeoAPI facade.
+     *  Pure logic against the live RegionManager — deterministic in the test server.
+     * ========================================================================== */
+
+    private static dev.thefather007.worldguardneo.util.Vec3 v(BlockPos p) {
+        return new dev.thefather007.worldguardneo.util.Vec3(p.getX(), p.getY(), p.getZ());
+    }
+
+    // ---- region store ----
+
+    @GameTest(template = TPL)
+    public static void engineAddGetRemove(GameTestHelper h) {
+        RegionManager m = mgr(h);
+        m.remove("eng_agr");
+        int before = m.size();
+        CuboidRegion r = makeRegion(h, "eng_agr", new BlockPos(0, 0, 0), new BlockPos(2, 2, 2));
+        h.assertTrue(m.get("eng_agr").isPresent(), "get returns the added region");
+        h.assertTrue(m.size() == before + 1, "size grew by one");
+        h.assertTrue(m.remove("eng_agr"), "remove returns true");
+        h.assertTrue(m.get("eng_agr").isEmpty(), "get empty after remove");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineDuplicateAddRejected(GameTestHelper h) {
+        makeRegion(h, "eng_dup", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        CuboidRegion dup = new CuboidRegion("eng_dup", v(h.absolutePos(new BlockPos(0, 0, 0))),
+                v(h.absolutePos(new BlockPos(1, 1, 1))));
+        h.assertTrue(!mgr(h).add(dup), "adding a duplicate id returns false");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineRemoveUnlinksChild(GameTestHelper h) {
+        CuboidRegion parent = makeRegion(h, "eng_p", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        CuboidRegion child = region(h, "eng_c");
+        child.setParent(parent);
+        mgr(h).remove("eng_p");
+        h.assertTrue(child.parent() == null, "removing a parent unlinks the child");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineGetApplicableSortedByPriority(GameTestHelper h) {
+        CuboidRegion lo = region(h, "eng_lo"); lo.setPriority(1);
+        CuboidRegion hi = region(h, "eng_hi"); hi.setPriority(9);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        List<ProtectedRegion> app = mgr(h).getApplicable(a.getX(), a.getY(), a.getZ());
+        h.assertTrue(app.size() >= 2 && app.get(0) == hi, "highest priority sorts first");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineWildernessEmptyAndHasAnyAt(GameTestHelper h) {
+        region(h, "eng_w");
+        BlockPos in = h.absolutePos(new BlockPos(4, 2, 4));
+        BlockPos out = in.offset(0, 200, 0);
+        h.assertTrue(mgr(h).hasAnyAt(in.getX(), in.getY(), in.getZ()), "hasAnyAt true inside");
+        h.assertTrue(!mgr(h).hasAnyAt(out.getX(), out.getY(), out.getZ()), "hasAnyAt false in wilderness");
+        h.assertTrue(mgr(h).getApplicable(out.getX(), out.getY(), out.getZ()).isEmpty(), "wilderness applicable empty");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineOverlappingQuery(GameTestHelper h) {
+        region(h, "eng_ov");
+        List<ProtectedRegion> hit = mgr(h).overlapping(
+                v(h.absolutePos(new BlockPos(3, 1, 3))), v(h.absolutePos(new BlockPos(5, 3, 5))));
+        h.assertTrue(hit.stream().anyMatch(r -> r.id().equals("eng_ov")), "overlapping finds the region");
+        List<ProtectedRegion> miss = mgr(h).overlapping(
+                v(h.absolutePos(new BlockPos(4, 2, 4)).offset(0, 200, 0)),
+                v(h.absolutePos(new BlockPos(4, 2, 4)).offset(2, 202, 2)));
+        h.assertTrue(miss.stream().noneMatch(r -> r.id().equals("eng_ov")), "overlapping misses far box");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineCrossesBoundary(GameTestHelper h) {
+        region(h, "eng_cb");
+        BlockPos in = h.absolutePos(new BlockPos(4, 2, 4));
+        BlockPos out = in.offset(0, 200, 0);
+        h.assertTrue(mgr(h).crossesBoundary(out.getX(), out.getY(), out.getZ(), in.getX(), in.getY(), in.getZ()),
+                "wilderness → region crosses a boundary");
+        h.assertTrue(!mgr(h).crossesBoundary(in.getX(), in.getY(), in.getZ(),
+                in.getX() + 1, in.getY(), in.getZ()), "inside → inside does not cross");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineOwnershipQueries(GameTestHelper h) {
+        CuboidRegion r = region(h, "eng_own");
+        UUID owner = UUID.randomUUID();
+        r.owners().add(owner);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        h.assertTrue(mgr(h).isOwnerAt(owner, a.getX(), a.getY(), a.getZ()), "isOwnerAt true for owner");
+        h.assertTrue(mgr(h).isMemberAt(owner, a.getX(), a.getY(), a.getZ()), "owner counts as member");
+        h.assertTrue(mgr(h).countOwned(owner) >= 1, "countOwned >= 1");
+        h.assertTrue(mgr(h).getOwnedBy(owner).stream().anyMatch(x -> x.id().equals("eng_own")), "getOwnedBy lists it");
+        h.assertTrue(!mgr(h).isOwnerAt(UUID.randomUUID(), a.getX(), a.getY(), a.getZ()), "stranger not owner");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void engineGlobalRegionNotApplicable(GameTestHelper h) {
+        region(h, "eng_gl");
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        h.assertTrue(mgr(h).getApplicable(a.getX(), a.getY(), a.getZ()).stream()
+                .noneMatch(r -> r == mgr(h).globalRegion()), "global region is never in getApplicable");
+        h.succeed();
+    }
+
+    // ---- cuboid geometry ----
+
+    @GameTest(template = TPL)
+    public static void cuboidContainsBounds(GameTestHelper h) {
+        CuboidRegion r = makeRegion(h, "geo_c", new BlockPos(0, 0, 0), new BlockPos(2, 2, 2));
+        BlockPos min = h.absolutePos(new BlockPos(0, 0, 0));
+        BlockPos max = h.absolutePos(new BlockPos(2, 2, 2));
+        h.assertTrue(r.contains(min.getX(), min.getY(), min.getZ()), "contains min corner");
+        h.assertTrue(r.contains(max.getX(), max.getY(), max.getZ()), "contains max corner");
+        h.assertTrue(!r.contains(max.getX() + 2, max.getY(), max.getZ()), "excludes far point");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void cuboidNormalizesSwappedCorners(GameTestHelper h) {
+        // pass corners in reversed order — region must still normalize and contain the middle
+        CuboidRegion r = makeRegion(h, "geo_sw", new BlockPos(4, 3, 4), new BlockPos(0, 0, 0));
+        BlockPos mid = h.absolutePos(new BlockPos(2, 1, 2));
+        h.assertTrue(r.contains(mid.getX(), mid.getY(), mid.getZ()), "swapped corners normalize");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void cuboidVolumeBoundsType(GameTestHelper h) {
+        CuboidRegion r = makeRegion(h, "geo_v", new BlockPos(0, 0, 0), new BlockPos(2, 2, 2));
+        h.assertTrue(r.volume() == 27L, "3x3x3 volume = 27 (got " + r.volume() + ")");
+        h.assertTrue(r.type().equals("cuboid"), "type is cuboid");
+        h.assertTrue(r.minimumBound() != null && r.maximumBound() != null, "bounds present");
+        h.succeed();
+    }
+
+    // ---- membership / flags on a region ----
+
+    @GameTest(template = TPL)
+    public static void membershipOwnersAndMembers(GameTestHelper h) {
+        CuboidRegion r = region(h, "mem_om");
+        UUID o = UUID.randomUUID(), m = UUID.randomUUID(), s = UUID.randomUUID();
+        r.owners().add(o);
+        r.members().add(m);
+        h.assertTrue(r.isOwner(o) && r.isMember(o), "owner is owner + member");
+        h.assertTrue(!r.isOwner(m) && r.isMember(m), "member is member, not owner");
+        h.assertTrue(!r.isOwner(s) && !r.isMember(s), "stranger is neither");
+        h.assertTrue(r.ownersView().contains(o) && r.membersView().contains(m), "views reflect contents");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void membershipGroups(GameTestHelper h) {
+        CuboidRegion r = region(h, "mem_grp");
+        r.ownerGroups().add("admins");
+        r.memberGroups().add("trusted");
+        h.assertTrue(r.ownerGroupsView().contains("admins"), "owner group recorded");
+        h.assertTrue(r.memberGroupsView().contains("trusted"), "member group recorded");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void flagSetGetUnset(GameTestHelper h) {
+        CuboidRegion r = region(h, "flag_sgu");
+        h.assertTrue(!r.hasFlags(), "fresh region has no flags");
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        h.assertTrue(r.getFlag(Flags.PVP) == StateFlag.State.DENY, "getFlag returns set value");
+        h.assertTrue(r.hasFlags(), "hasFlags true after set");
+        r.setFlag(Flags.PVP, null);
+        h.assertTrue(r.getFlag(Flags.PVP) == null, "setting null unsets");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void flagGroupSetGet(GameTestHelper h) {
+        CuboidRegion r = region(h, "flag_grp");
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        r.setFlagGroup(Flags.PVP, RegionGroup.MEMBERS);
+        h.assertTrue(r.getFlagGroup(Flags.PVP) == RegionGroup.MEMBERS, "flag group stored");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void flagEpochBumpsOnChange(GameTestHelper h) {
+        CuboidRegion r = region(h, "flag_epoch");
+        long before = ProtectedRegion.flagEpoch();
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        h.assertTrue(ProtectedRegion.flagEpoch() > before, "flag epoch advances on mutation");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void flagCopyFlagsFrom(GameTestHelper h) {
+        CuboidRegion src = region(h, "flag_src");
+        src.setFlag(Flags.PVP, StateFlag.State.DENY);
+        src.setFlag(Flags.GREETING, "hello");
+        CuboidRegion dst = makeRegion(h, "flag_dst", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        dst.copyFlagsFrom(src);
+        h.assertTrue(dst.getFlag(Flags.PVP) == StateFlag.State.DENY, "copied state flag");
+        h.assertTrue("hello".equals(dst.getFlag(Flags.GREETING)), "copied value flag");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void parentCycleIsRejected(GameTestHelper h) {
+        CuboidRegion a = region(h, "cyc_a");
+        CuboidRegion b = makeRegion(h, "cyc_b", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        a.setParent(b);
+        boolean threw = false;
+        try { b.setParent(a); } catch (Exception e) { threw = true; } // cycle must be detected
+        h.assertTrue(threw, "setParent rejects a parent cycle");
+        h.assertTrue(b.parent() == null, "rejected cycle leaves the parent unset");
+        h.succeed();
+    }
+
+    // ---- WorldGuardNeoAPI facade ----
+
+    @GameTest(template = TPL)
+    public static void apiRegionLookups(GameTestHelper h) {
+        CuboidRegion r = region(h, "api_look");
+        r.setPriority(3);
+        BlockPos rel = new BlockPos(4, 2, 4);
+        BlockPos abs = h.absolutePos(rel);
+        var at = dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.getRegionAt(h.getLevel(), abs);
+        h.assertTrue(at.isPresent() && at.get().id().equals("api_look"), "getRegionAt finds region");
+        h.assertTrue(dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.getRegionsAt(h.getLevel(), abs).size() >= 1,
+                "getRegionsAt non-empty");
+        h.assertTrue(dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.getRegion(h.getLevel(), "api_look").isPresent(),
+                "getRegion by id");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void apiBuildPermissionChecks(GameTestHelper h) {
+        CuboidRegion r = region(h, "api_build");
+        ServerPlayer member = combatantAt(h, new BlockPos(4, 1, 4));
+        r.members().add(member.getUUID());
+        ServerPlayer stranger = combatantAt(h, new BlockPos(4, 1, 4));
+        BlockPos abs = h.absolutePos(new BlockPos(4, 1, 4));
+        h.assertTrue(dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.canBuild(member, abs),
+                "member can build via API");
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.canBuild(stranger, abs),
+                "stranger cannot build via API");
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.canInteract(stranger, abs),
+                "stranger cannot interact via API");
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.canAccessChests(stranger, abs),
+                "stranger cannot open chests via API");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void apiQueryFlags(GameTestHelper h) {
+        CuboidRegion r = region(h, "api_query");
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        r.setFlag(Flags.GREETING, "hi");
+        BlockPos abs = h.absolutePos(new BlockPos(4, 2, 4));
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.queryFlag(
+                h.getLevel(), Flags.PVP, null, abs), "queryFlag(PVP)=deny");
+        var val = dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.queryValue(
+                h.getLevel(), Flags.GREETING, null, abs);
+        h.assertTrue(val.isPresent() && val.get().equals("hi"), "queryValue(GREETING)");
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.queryFlag(
+                h.getLevel(), "pvp", null, abs.getX(), abs.getY(), abs.getZ()), "queryFlag by name");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void apiOwnershipAndBypass(GameTestHelper h) {
+        CuboidRegion r = region(h, "api_own");
+        UUID o = UUID.randomUUID();
+        r.owners().add(o);
+        h.assertTrue(dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.isOwner(r, o), "API isOwner");
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.isMember(r, UUID.randomUUID()),
+                "API isMember false for stranger");
+        h.assertTrue(!dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.hasBypass(combatantAt(h, new BlockPos(4, 1, 4))),
+                "mock player has no bypass");
+        h.assertTrue(dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.isAvailable(), "API available");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void apiRegisterCustomFlag(GameTestHelper h) {
+        StateFlag custom = new StateFlag("gametest-marker", true);
+        dev.thefather007.worldguardneo.api.WorldGuardNeoAPI.registerFlag(custom); // idempotent
+        h.assertTrue(Flags.isRegistered("gametest-marker"), "custom flag registered");
+        h.assertTrue(Flags.get("gametest-marker") != null, "custom flag resolvable by name");
+        h.succeed();
+    }
+
+    // ---- flag (de)serialization / parsing ----
+
+    @GameTest(template = TPL)
+    public static void codecStateFlag(GameTestHelper h) {
+        try {
+            h.assertTrue(Flags.PVP.parse("allow") == StateFlag.State.ALLOW, "parse allow");
+            h.assertTrue(Flags.PVP.parse("deny") == StateFlag.State.DENY, "parse deny");
+        } catch (Exception e) {
+            h.fail("valid state parse threw: " + e);
+        }
+        var json = Flags.PVP.toJson(StateFlag.State.DENY);
+        h.assertTrue(Flags.PVP.fromJson(json) == StateFlag.State.DENY, "state flag json round-trip");
+        boolean threw = false;
+        try { Flags.PVP.parse("not-a-state"); } catch (Exception e) { threw = true; }
+        h.assertTrue(threw, "invalid state value throws");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void codecIntegerFlag(GameTestHelper h) {
+        try {
+            h.assertTrue(Flags.HEAL_DELAY.parse("42").equals(42), "parse integer");
+        } catch (Exception e) {
+            h.fail("valid integer parse threw: " + e);
+        }
+        boolean threw = false;
+        try { Flags.HEAL_DELAY.parse("xyz"); } catch (Exception e) { threw = true; }
+        h.assertTrue(threw, "invalid integer throws");
+        var json = Flags.HEAL_DELAY.toJson(7);
+        h.assertTrue(Flags.HEAL_DELAY.fromJson(json).equals(7), "integer json round-trip");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void codecStringAndSetFlags(GameTestHelper h) {
+        h.assertTrue("hello".equals(Flags.GREETING.parse("hello")), "string parse");
+        var sj = Flags.GREETING.toJson("hi");
+        h.assertTrue("hi".equals(Flags.GREETING.fromJson(sj)), "string json round-trip");
+        Set<String> parsed = Flags.BLOCKED_CMDS.parse("tp,gamemode,give");
+        h.assertTrue(parsed != null && parsed.contains("tp") && parsed.contains("give"), "set parse splits on comma");
+        var setJson = Flags.BLOCKED_CMDS.toJson(Set.of("a", "b"));
+        h.assertTrue(Flags.BLOCKED_CMDS.fromJson(setJson).equals(Set.of("a", "b")), "set json round-trip");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void codecDoubleAndBooleanFlags(GameTestHelper h) {
+        var dj = Flags.MAX_SPEED.toJson(0.25);
+        h.assertTrue(Flags.MAX_SPEED.fromJson(dj).equals(0.25), "double json round-trip");
+        var bj = Flags.NOTIFY_ENTER.toJson(true);
+        h.assertTrue(Flags.NOTIFY_ENTER.fromJson(bj).equals(true), "boolean json round-trip");
+        h.succeed();
+    }
 }
