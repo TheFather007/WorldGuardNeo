@@ -53,8 +53,10 @@ public final class WGNGameTests {
 
     // Bare path only: @GameTestHolder supplies the "worldguardneo" namespace and the framework
     // builds ResourceLocation(namespace, TPL). A namespaced value here would double the namespace
-    // ("worldguardneo:worldguardneo:platform" → invalid path). The structure SNBT lives at
-    // data/worldguardneo/gameteststructures/platform.snbt (the gametest test-structures dir).
+    // ("worldguardneo:worldguardneo:platform" → invalid path). The template (a 9x6x9 stone floor)
+    // is shipped as a binary structure NBT at data/worldguardneo/structures/platform.nbt — the
+    // datapack path StructureTemplateManager.loadFromResource reads (loadFromTestStructures only
+    // reads the run-dir filesystem, so it can't be shipped in the jar).
     private static final String TPL = "platform";
 
     /* ---------------- helpers ---------------- */
