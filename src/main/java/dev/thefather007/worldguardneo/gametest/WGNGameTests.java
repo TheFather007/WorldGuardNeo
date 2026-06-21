@@ -98,9 +98,26 @@ public final class WGNGameTests {
         ItemStack stack = new ItemStack(item, 64);
         p.setItemInHand(InteractionHand.MAIN_HAND, stack);
         BlockPos floorAbs = h.absolutePos(floorRel);
+        p.setPos(floorAbs.getX() + 0.5, floorAbs.getY() + 2.0, floorAbs.getZ() + 0.5); // stand above (reach)
         Vec3 hitVec = new Vec3(floorAbs.getX() + 0.5, floorAbs.getY() + 1.0, floorAbs.getZ() + 0.5);
         BlockHitResult hit = new BlockHitResult(hitVec, Direction.UP, floorAbs, false);
         p.gameMode.useItemOn(p, h.getLevel(), stack, InteractionHand.MAIN_HAND, hit);
+    }
+
+    /**
+     * Right-click (empty hand) the block at {@code rel} as {@code p}, driving the action through the
+     * real {@link net.minecraft.server.level.ServerPlayerGameMode#useItemOn} path — which fires the
+     * {@code PlayerInteractEvent.RightClickBlock} the mod enforces. NOTE: {@link GameTestHelper#useBlock}
+     * must NOT be used to test interact/chest protection: it calls the block's interaction methods
+     * directly, bypassing the event entirely (a denied region would still "open" the block), and it
+     * re-applies {@code absolutePos} internally (so passing an already-absolute pos double-offsets).
+     */
+    private static void useBlockAsPlayer(GameTestHelper h, ServerPlayer p, BlockPos rel) {
+        p.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+        BlockPos abs = h.absolutePos(rel);
+        p.setPos(abs.getX() + 0.5, abs.getY() + 1.0, abs.getZ() + 0.5); // stand on the block (reach)
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(abs), Direction.UP, abs, false);
+        p.gameMode.useItemOn(p, h.getLevel(), ItemStack.EMPTY, InteractionHand.MAIN_HAND, hit);
     }
 
     /* ---------------- BLOCK-BREAK / BUILD ---------------- */
@@ -174,7 +191,7 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.OAK_TRAPDOOR);
         ServerPlayer p = stranger(h);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertBlockProperty(rel, BlockStateProperties.OPEN, false); // didn't open
         h.succeed();
     }
@@ -186,7 +203,7 @@ public final class WGNGameTests {
         r.members().add(p.getUUID());
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.OAK_TRAPDOOR);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertBlockProperty(rel, BlockStateProperties.OPEN, true); // member toggled it open
         h.succeed();
     }
@@ -199,7 +216,7 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.OAK_TRAPDOOR);
         ServerPlayer p = stranger(h);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertBlockProperty(rel, BlockStateProperties.OPEN, true);
         h.succeed();
     }
@@ -281,6 +298,10 @@ public final class WGNGameTests {
         r.setFlag(Flags.PVP, StateFlag.State.DENY);
         ServerPlayer attacker = stranger(h);
         ServerPlayer victim = stranger(h);
+        // The mock player is forced isCreative()==true, whose abilities.invulnerable short-circuits
+        // hurt() BEFORE the pvp gate ever fires. Clear it so the attack actually reaches the
+        // LivingIncomingDamageEvent the mod cancels — otherwise this would pass vacuously.
+        victim.getAbilities().invulnerable = false;
         float before = victim.getHealth();
         attacker.attack(victim); // routes through hurt() → LivingIncomingDamageEvent → pvp gate
         h.assertTrue(victim.getHealth() == before, "pvp deny → victim took no damage");
@@ -318,7 +339,7 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.CHEST);
         ServerPlayer p = stranger(h);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertTrue(p.containerMenu == p.inventoryMenu, "stranger: chest menu did not open");
         h.succeed();
     }
@@ -330,7 +351,7 @@ public final class WGNGameTests {
         r.members().add(p.getUUID());
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.CHEST);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertTrue(p.containerMenu != p.inventoryMenu, "member: chest menu opened");
         h.succeed();
     }
@@ -539,7 +560,7 @@ public final class WGNGameTests {
         r.setFlag(Flags.INTERACT, StateFlag.State.DENY); // explicit deny beats membership
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.OAK_TRAPDOOR);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertBlockProperty(rel, BlockStateProperties.OPEN, false);
         h.succeed();
     }
@@ -549,7 +570,7 @@ public final class WGNGameTests {
         mgr(h);
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.OAK_TRAPDOOR);
-        h.useBlock(h.absolutePos(rel), stranger(h));
+        useBlockAsPlayer(h, stranger(h), rel);
         h.assertBlockProperty(rel, BlockStateProperties.OPEN, true);
         h.succeed();
     }
@@ -565,7 +586,7 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.CHEST);
         ServerPlayer p = stranger(h);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertTrue(p.containerMenu != p.inventoryMenu, "chest-access allow → chest opened");
         h.succeed();
     }
@@ -578,7 +599,7 @@ public final class WGNGameTests {
         r.setFlag(Flags.CHEST_ACCESS, StateFlag.State.DENY);
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.CHEST);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertTrue(p.containerMenu == p.inventoryMenu, "chest-access deny → chest stayed closed for member");
         h.succeed();
     }
@@ -589,7 +610,7 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         h.setBlock(rel, Blocks.CHEST);
         ServerPlayer p = stranger(h);
-        h.useBlock(h.absolutePos(rel), p);
+        useBlockAsPlayer(h, p, rel);
         h.assertTrue(p.containerMenu != p.inventoryMenu, "wilderness → chest opens");
         h.succeed();
     }
@@ -600,6 +621,9 @@ public final class WGNGameTests {
     public static void pvpAllowFlagLetsDamage(GameTestHelper h) {
         region(h, "gt_pvp_allow").setFlag(Flags.PVP, StateFlag.State.ALLOW);
         ServerPlayer attacker = stranger(h), victim = stranger(h);
+        // Clear the mock player's forced creative invulnerability so the attack can land (see
+        // pvpDenyNoDamage). With pvp ALLOW the mod must NOT cancel, so the victim takes damage.
+        victim.getAbilities().invulnerable = false;
         float before = victim.getHealth();
         attacker.attack(victim);
         h.assertTrue(victim.getHealth() < before, "pvp allow → victim took damage");
