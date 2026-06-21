@@ -1,5 +1,5 @@
 plugins {
-    id("net.neoforged.moddev") version "1.0.21"
+    id("net.neoforged.moddev") version "2.0.141"
     `java-library`
 }
 
@@ -28,12 +28,12 @@ repositories {
 }
 
 neoForge {
-    version.set(neoVersion)
+    version = neoVersion
 
     parchment {
         // Parameter mappings for nicer names in the IDE. Dev-only — does not affect the jar.
-        mappingsVersion.set("2024.07.28")
-        minecraftVersion.set("1.21")
+        mappingsVersion = "2024.07.28"
+        minecraftVersion = "1.21"
     }
 
     runs {
