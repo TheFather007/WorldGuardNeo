@@ -1,9 +1,14 @@
 package dev.thefather007.worldguardneo.gametest;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
+import dev.thefather007.worldguardneo.flags.BooleanFlag;
+import dev.thefather007.worldguardneo.flags.DoubleFlag;
 import dev.thefather007.worldguardneo.flags.Flag;
 import dev.thefather007.worldguardneo.flags.Flags;
+import dev.thefather007.worldguardneo.flags.IntegerFlag;
+import dev.thefather007.worldguardneo.flags.SetFlag;
 import dev.thefather007.worldguardneo.flags.StateFlag;
+import dev.thefather007.worldguardneo.flags.StringFlag;
 import dev.thefather007.worldguardneo.mixinsupport.MixinFlagBridge;
 import dev.thefather007.worldguardneo.region.CuboidRegion;
 import dev.thefather007.worldguardneo.region.RegionGroup;
@@ -12,7 +17,9 @@ import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTestGenerator;
 import net.minecraft.gametest.framework.GameTestHelper;
+import net.minecraft.gametest.framework.TestFunction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -20,6 +27,8 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.animal.Cow;
 import net.minecraft.world.entity.decoration.ItemFrame;
+import net.minecraft.world.entity.item.PrimedTnt;
+import net.minecraft.world.entity.monster.Creeper;
 import net.minecraft.world.entity.vehicle.Boat;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
@@ -34,10 +43,13 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * In-game GameTest battery for WorldGuardNeo, exercising the REAL event/mixin enforcement path
@@ -1309,6 +1321,217 @@ public final class WGNGameTests {
                 "stranger cannot build in an unflagged region");
         h.assertTrue(!mgr(h).testBuildAccess(Flags.BUILD, a.getX(), a.getY(), a.getZ(), null),
                 "null actor cannot build in an unflagged region");
+        h.succeed();
+    }
+
+    /* ============================================================================
+     *  GENERATED MATRIX — every registered flag exercised under every resolution
+     *  scenario. @GameTestGenerator emits one TestFunction per (flag × scenario),
+     *  scaling the battery into the hundreds so the entire flag surface of the mod
+     *  is verified: deny / allow / wilderness-default / priority / equal-priority
+     *  deny-beats-allow / parent inheritance / four region-group filters for state
+     *  flags, and set / parent / wilderness / group for value flags.
+     * ========================================================================== */
+
+    private static BlockPos P(GameTestHelper h)    { return h.absolutePos(new BlockPos(4, 2, 4)); }
+    private static BlockPos WILD(GameTestHelper h) { return h.absolutePos(new BlockPos(4, 2, 4)).offset(0, 200, 0); }
+
+    private static TestFunction raw(String name, Consumer<GameTestHelper> fn) {
+        // batchName is reassigned in chunks by generated(); structureName MUST be namespaced
+        // "worldguardneo:" — the runner filters generated tests by the structure's namespace.
+        return new TestFunction("wgn_tmp", "worldguardneo:" + name, "worldguardneo:platform",
+                200, 0L, true, fn);
+    }
+
+    @GameTestGenerator
+    public static Collection<TestFunction> generated() {
+        List<TestFunction> tmp = new ArrayList<>();
+        for (Flag<?> flag : Flags.all()) {
+            if (flag instanceof StateFlag sf) addStateScenarios(tmp, sf);
+            else                              addValueScenarios(tmp, flag);
+        }
+        // Chunk into small batches so the framework never places hundreds of test arenas at once
+        // (one big batch would balloon memory / chunk-gen time on the headless server).
+        List<TestFunction> out = new ArrayList<>(tmp.size());
+        for (int i = 0; i < tmp.size(); i++) {
+            TestFunction t = tmp.get(i);
+            out.add(new TestFunction("wgn_gen_" + (i / 48), t.testName(), t.structureName(),
+                    t.maxTicks(), t.setupTicks(), t.required(), t.function()));
+        }
+        return out;
+    }
+
+    private static void addStateScenarios(List<TestFunction> out, StateFlag f) {
+        String n = f.name().replace(':', '_');
+        boolean def = f.defaultAllow();
+
+        out.add(raw("state_deny__" + n, h -> {
+            region(h, "gd_" + n).setFlag(f, StateFlag.State.DENY);
+            denied(h, P(h), f, n); h.succeed();
+        }));
+        out.add(raw("state_allow__" + n, h -> {
+            region(h, "ga_" + n).setFlag(f, StateFlag.State.ALLOW);
+            allowed(h, P(h), f, n); h.succeed();
+        }));
+        out.add(raw("state_wilderness__" + n, h -> {
+            mgr(h); BlockPos w = WILD(h);
+            h.assertTrue(mgr(h).testState(f, U, w.getX(), w.getY(), w.getZ()) == def,
+                    n + " wilderness → flag default (" + def + ")");
+            h.succeed();
+        }));
+        out.add(raw("state_priority__" + n, h -> {
+            CuboidRegion lo = region(h, "gpl_" + n); lo.setPriority(0);  lo.setFlag(f, StateFlag.State.ALLOW);
+            CuboidRegion hi = region(h, "gph_" + n); hi.setPriority(10); hi.setFlag(f, StateFlag.State.DENY);
+            denied(h, P(h), f, n + " higher-priority deny");
+            h.succeed();
+        }));
+        out.add(raw("state_eqprio__" + n, h -> {
+            CuboidRegion a = region(h, "gea_" + n); a.setPriority(5); a.setFlag(f, StateFlag.State.ALLOW);
+            CuboidRegion b = region(h, "geb_" + n); b.setPriority(5); b.setFlag(f, StateFlag.State.DENY);
+            denied(h, P(h), f, n + " deny-beats-allow");
+            h.succeed();
+        }));
+        out.add(raw("state_parent__" + n, h -> {
+            CuboidRegion parent = makeRegion(h, "gpp_" + n, new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+            parent.setFlag(f, StateFlag.State.DENY);
+            region(h, "gpc_" + n).setParent(parent);
+            denied(h, P(h), f, n + " inherits parent deny"); // P=(4,2,4) outside parent, inside child
+            h.succeed();
+        }));
+        out.add(raw("state_group_members__" + n, h -> {
+            CuboidRegion r = region(h, "ggm_" + n);
+            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.MEMBERS);
+            UUID m = UUID.randomUUID(); r.members().add(m); UUID s = UUID.randomUUID();
+            BlockPos a = P(h);
+            h.assertTrue(!mgr(h).testState(f, m, a.getX(), a.getY(), a.getZ()), n + " members-deny hits member");
+            h.assertTrue(mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()) == def, n + " members-deny spares stranger");
+            h.succeed();
+        }));
+        out.add(raw("state_group_nonmembers__" + n, h -> {
+            CuboidRegion r = region(h, "ggn_" + n);
+            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.NON_MEMBERS);
+            UUID m = UUID.randomUUID(); r.members().add(m); UUID s = UUID.randomUUID();
+            BlockPos a = P(h);
+            h.assertTrue(!mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()), n + " non-members-deny hits stranger");
+            h.assertTrue(mgr(h).testState(f, m, a.getX(), a.getY(), a.getZ()) == def, n + " non-members-deny spares member");
+            h.succeed();
+        }));
+        out.add(raw("state_group_owners__" + n, h -> {
+            CuboidRegion r = region(h, "ggo_" + n);
+            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.OWNERS);
+            UUID o = UUID.randomUUID(); r.owners().add(o); UUID s = UUID.randomUUID();
+            BlockPos a = P(h);
+            h.assertTrue(!mgr(h).testState(f, o, a.getX(), a.getY(), a.getZ()), n + " owners-deny hits owner");
+            h.assertTrue(mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()) == def, n + " owners-deny spares stranger");
+            h.succeed();
+        }));
+        out.add(raw("state_group_nonowners__" + n, h -> {
+            CuboidRegion r = region(h, "ggno_" + n);
+            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.NON_OWNERS);
+            UUID o = UUID.randomUUID(); r.owners().add(o); UUID s = UUID.randomUUID();
+            BlockPos a = P(h);
+            h.assertTrue(!mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()), n + " non-owners-deny hits stranger");
+            h.assertTrue(mgr(h).testState(f, o, a.getX(), a.getY(), a.getZ()) == def, n + " non-owners-deny spares owner");
+            h.succeed();
+        }));
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static void setFlagRaw(ProtectedRegion r, Flag<?> f, Object v) { r.setFlag((Flag) f, v); }
+
+    private static Object sampleValue(Flag<?> f) {
+        if (f instanceof StringFlag)  return "wgn_test";
+        if (f instanceof IntegerFlag) return 7;
+        if (f instanceof DoubleFlag)  return 1.5;
+        if (f instanceof BooleanFlag) return Boolean.TRUE;
+        if (f instanceof SetFlag)     return Set.of("alpha", "beta");
+        return null;
+    }
+
+    private static void addValueScenarios(List<TestFunction> out, Flag<?> f) {
+        Object v = sampleValue(f);
+        if (v == null) return; // unknown value type — nothing to assert generically
+        String n = f.name().replace(':', '_');
+
+        out.add(raw("value_set__" + n, h -> {
+            CuboidRegion r = region(h, "vs_" + n); setFlagRaw(r, f, v);
+            BlockPos a = P(h);
+            Object got = mgr(h).resolveValue(f, a.getX(), a.getY(), a.getZ(), null);
+            h.assertTrue(Objects.equals(v, got), n + " value resolves (got " + got + ")");
+            h.succeed();
+        }));
+        out.add(raw("value_parent__" + n, h -> {
+            CuboidRegion parent = makeRegion(h, "vpp_" + n, new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+            setFlagRaw(parent, f, v);
+            region(h, "vpc_" + n).setParent(parent);
+            BlockPos a = P(h);
+            Object got = mgr(h).resolveValue(f, a.getX(), a.getY(), a.getZ(), null);
+            h.assertTrue(Objects.equals(v, got), n + " value inherited from parent (got " + got + ")");
+            h.succeed();
+        }));
+        out.add(raw("value_wilderness__" + n, h -> {
+            mgr(h); BlockPos w = WILD(h);
+            Object got = mgr(h).resolveValue(f, w.getX(), w.getY(), w.getZ(), null);
+            h.assertTrue(got == null, n + " unset in wilderness → null (got " + got + ")");
+            h.succeed();
+        }));
+    }
+
+    /* ============================================================================
+     *  PHYSICAL GRIEF — real explosions through the live ExplosionEvent path.
+     *  level.explode() computes the affected blocks, fires ExplosionEvent.Detonate
+     *  (where the mod removes protected blocks), then destroys what remains — so a
+     *  protected region's blocks must physically survive the blast.
+     * ========================================================================== */
+
+    @GameTest(template = TPL)
+    public static void explosionWildernessDestroysStone(GameTestHelper h) {
+        mgr(h); // no region → vanilla blast destroys the block (control proving the test works)
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.STONE);
+        BlockPos c = h.absolutePos(rel);
+        h.getLevel().explode(null, c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5, 3.0f,
+                Level.ExplosionInteraction.TNT);
+        h.assertBlockNotPresent(Blocks.STONE, rel);
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void explosionOtherGriefDenied(GameTestHelper h) {
+        region(h, "gt_expl_other").setFlag(Flags.OTHER_EXPLOSION, StateFlag.State.DENY);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.STONE);
+        BlockPos c = h.absolutePos(rel);
+        // null source → OTHER_EXPLOSION; deny → the mod drops the block from the blast.
+        h.getLevel().explode(null, c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5, 3.0f,
+                Level.ExplosionInteraction.TNT);
+        h.assertBlockPresent(Blocks.STONE, rel);
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void explosionTntGriefDenied(GameTestHelper h) {
+        region(h, "gt_expl_tnt").setFlag(Flags.TNT, StateFlag.State.DENY);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.STONE);
+        BlockPos c = h.absolutePos(rel);
+        PrimedTnt tnt = new PrimedTnt(h.getLevel(), c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5, null);
+        h.getLevel().explode(tnt, c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5, 3.0f,
+                Level.ExplosionInteraction.TNT);
+        h.assertBlockPresent(Blocks.STONE, rel); // TNT source → tnt flag deny → survives
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void explosionCreeperGriefDenied(GameTestHelper h) {
+        region(h, "gt_expl_creeper").setFlag(Flags.CREEPER_EXPLOSION, StateFlag.State.DENY);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.STONE);
+        Creeper creeper = h.spawn(EntityType.CREEPER, new BlockPos(1, 1, 1));
+        BlockPos c = h.absolutePos(rel);
+        h.getLevel().explode(creeper, c.getX() + 0.5, c.getY() + 0.5, c.getZ() + 0.5, 3.0f,
+                Level.ExplosionInteraction.MOB);
+        h.assertBlockPresent(Blocks.STONE, rel); // creeper source → creeper-explosion deny → survives
         h.succeed();
     }
 }
