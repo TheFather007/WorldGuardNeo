@@ -137,6 +137,22 @@ public final class WGNGameTests {
     }
 
     /**
+     * Fire the mod's pvp/mob-damage gate ({@code LivingIncomingDamageEvent}) for {@code attacker}
+     * hitting {@code victim} and report whether the mod cancelled it. Posting the event directly is
+     * deterministic — unlike trying to land real damage on a mock player, whose forced creative
+     * invulnerability and lack of a client connection make {@code hurt()} unreliable in the headless
+     * GameTestServer. The verdict (cancel/allow) is exactly what the mod computes from the PVP flag.
+     */
+    private static boolean attackGateCancels(ServerPlayer attacker,
+                                             net.minecraft.world.entity.LivingEntity victim, float amount) {
+        var container = new net.neoforged.neoforge.common.damagesource.DamageContainer(
+                attacker.damageSources().playerAttack(attacker), amount);
+        var evt = new net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent(victim, container);
+        NeoForge.EVENT_BUS.post(evt);
+        return evt.isCanceled();
+    }
+
+    /**
      * Empty a water bucket onto the top of {@code targetRel}. The mod's {@code bucket-empty} gate is
      * on {@code RightClickBlock}, so we post that event first (exactly what vanilla fires when a
      * bucket right-clicks a block) and only perform the real empty — {@link
@@ -340,11 +356,8 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         ServerPlayer attacker = combatantAt(h, rel);
         ServerPlayer victim = combatantAt(h, rel);
-        float before = victim.getHealth();
-        // Direct hurt() with a fixed amount → LivingIncomingDamageEvent → pvp gate (avoids
-        // attack-strength scaling). The victim sits inside the region so PVP=DENY applies.
-        victim.hurt(attacker.damageSources().playerAttack(attacker), 4.0f);
-        h.assertTrue(victim.getHealth() == before, "pvp deny → victim took no damage");
+        // Victim sits inside the region so PVP=DENY applies; the mod must cancel the damage gate.
+        h.assertTrue(attackGateCancels(attacker, victim, 4.0f), "pvp deny → damage gate cancels");
         h.succeed();
     }
 
@@ -672,11 +685,8 @@ public final class WGNGameTests {
         BlockPos rel = new BlockPos(4, 1, 4);
         ServerPlayer attacker = combatantAt(h, rel);
         ServerPlayer victim = combatantAt(h, rel);
-        float before = victim.getHealth();
-        // Victim sits inside the region (PVP=ALLOW) with creative invulnerability cleared, so the
-        // mod must NOT cancel and the damage lands.
-        victim.hurt(attacker.damageSources().playerAttack(attacker), 4.0f);
-        h.assertTrue(victim.getHealth() < before, "pvp allow → victim took damage");
+        // Victim sits inside the region (PVP=ALLOW), so the mod must NOT cancel the damage gate.
+        h.assertTrue(!attackGateCancels(attacker, victim, 4.0f), "pvp allow → damage gate does not cancel");
         h.succeed();
     }
 
