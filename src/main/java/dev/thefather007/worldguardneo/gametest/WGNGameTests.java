@@ -51,7 +51,11 @@ import java.util.UUID;
 @PrefixGameTestTemplate(false)
 public final class WGNGameTests {
 
-    private static final String TPL = "worldguardneo:platform";
+    // Bare path only: @GameTestHolder supplies the "worldguardneo" namespace and the framework
+    // builds ResourceLocation(namespace, TPL). A namespaced value here would double the namespace
+    // ("worldguardneo:worldguardneo:platform" → invalid path). The structure SNBT lives at
+    // data/worldguardneo/gameteststructures/platform.snbt (the gametest test-structures dir).
+    private static final String TPL = "platform";
 
     /* ---------------- helpers ---------------- */
 
