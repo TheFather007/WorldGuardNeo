@@ -1,9 +1,12 @@
 package dev.thefather007.worldguardneo.gametest;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
+import dev.thefather007.worldguardneo.flags.Flag;
 import dev.thefather007.worldguardneo.flags.Flags;
 import dev.thefather007.worldguardneo.flags.StateFlag;
+import dev.thefather007.worldguardneo.mixinsupport.MixinFlagBridge;
 import dev.thefather007.worldguardneo.region.CuboidRegion;
+import dev.thefather007.worldguardneo.region.RegionGroup;
 import dev.thefather007.worldguardneo.region.ProtectedRegion;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
@@ -32,6 +35,8 @@ import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -723,6 +728,587 @@ public final class WGNGameTests {
                 .setValue(BlockStateProperties.DISTANCE, 7));
         forceRandomTicks(h, h.absolutePos(rel), 400);
         h.assertBlockNotPresent(Blocks.OAK_LEAVES, rel);
+        h.succeed();
+    }
+
+    /* ============================================================================
+     *  EXTENDED COVERAGE — every remaining flag and the resolution engine.
+     *  Techniques (all proven deterministic in the headless GameTestServer):
+     *   - post the exact NeoForge event the mod listens on and assert cancel
+     *     (damage gate, right-click gate);
+     *   - call MixinFlagBridge#check, the gate the random-tick mixins delegate to;
+     *   - resolve value/state flags through the live RegionManager engine.
+     * ========================================================================== */
+
+    /* ---------------- extended helpers ---------------- */
+
+    /** A region with custom RELATIVE bounds (everything stays in this test's own arena). */
+    private static CuboidRegion makeRegion(GameTestHelper h, String id, BlockPos relA, BlockPos relB) {
+        RegionManager m = mgr(h);
+        m.remove(id);
+        BlockPos a = h.absolutePos(relA), b = h.absolutePos(relB);
+        CuboidRegion r = new CuboidRegion(id,
+                new dev.thefather007.worldguardneo.util.Vec3(a.getX(), a.getY(), a.getZ()),
+                new dev.thefather007.worldguardneo.util.Vec3(b.getX(), b.getY(), b.getZ()));
+        m.add(r);
+        return r;
+    }
+
+    /** Add a fresh stranger to {@code r}'s members and return it. */
+    private static ServerPlayer memberOf(GameTestHelper h, CuboidRegion r) {
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        return p;
+    }
+
+    /** Post the mod's damage gate for a player victim standing at {@code rel}; report cancel. */
+    private static boolean damageGateCancels(GameTestHelper h, BlockPos rel,
+                                             net.minecraft.world.damagesource.DamageSource src) {
+        ServerPlayer victim = combatantAt(h, rel);
+        var c = new net.neoforged.neoforge.common.damagesource.DamageContainer(src, 4.0f);
+        var evt = new net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent(victim, c);
+        NeoForge.EVENT_BUS.post(evt);
+        return evt.isCanceled();
+    }
+
+    /** Post a RightClickBlock for {@code p} clicking {@code rel} holding {@code held}; report cancel. */
+    private static boolean rightClickGateCancels(GameTestHelper h, ServerPlayer p, BlockPos rel, ItemStack held) {
+        p.setItemInHand(InteractionHand.MAIN_HAND, held);
+        BlockPos abs = h.absolutePos(rel);
+        p.setPos(abs.getX() + 0.5, abs.getY() + 1.0, abs.getZ() + 0.5);
+        BlockHitResult hit = new BlockHitResult(Vec3.atCenterOf(abs), Direction.UP, abs, false);
+        var evt = new PlayerInteractEvent.RightClickBlock(p, InteractionHand.MAIN_HAND, abs, hit);
+        NeoForge.EVENT_BUS.post(evt);
+        return evt.isCanceled();
+    }
+
+    private static UUID U = UUID.randomUUID();
+
+    private static void denied(GameTestHelper h, BlockPos a, StateFlag f, String name) {
+        h.assertTrue(!mgr(h).testState(f, U, a.getX(), a.getY(), a.getZ()), name + " deny → testState false");
+    }
+    private static void allowed(GameTestHelper h, BlockPos a, StateFlag f, String name) {
+        h.assertTrue(mgr(h).testState(f, U, a.getX(), a.getY(), a.getZ()), name + " allow → testState true");
+    }
+    private static <T> void value(GameTestHelper h, BlockPos a, Flag<T> f, T expected, String name) {
+        T v = mgr(h).resolveValue(f, a.getX(), a.getY(), a.getZ(), null);
+        h.assertTrue(Objects.equals(expected, v), name + " resolves (got " + v + ")");
+    }
+
+    /* ---------------- ENVIRONMENTAL DAMAGE (LivingIncomingDamageEvent) ---------------- */
+
+    @GameTest(template = TPL)
+    public static void fallDamageDenyCancels(GameTestHelper h) {
+        region(h, "gt_fall").setFlag(Flags.FALL_DAMAGE, StateFlag.State.DENY);
+        h.assertTrue(damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().fall()),
+                "fall-damage deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void fallDamageDefaultAllows(GameTestHelper h) {
+        region(h, "gt_fall_def"); // no flag → vanilla fall damage proceeds
+        h.assertTrue(!damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().fall()),
+                "fall-damage unset → gate does not cancel");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void fireDamageDenyCancels(GameTestHelper h) {
+        region(h, "gt_fire_dmg").setFlag(Flags.FIRE_DAMAGE, StateFlag.State.DENY);
+        h.assertTrue(damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().inFire()),
+                "fire-damage deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void drownDamageDenyCancels(GameTestHelper h) {
+        region(h, "gt_drown").setFlag(Flags.DROWN_DAMAGE, StateFlag.State.DENY);
+        h.assertTrue(damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().drown()),
+                "drown-damage deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void suffocationDamageDenyCancels(GameTestHelper h) {
+        region(h, "gt_suffocate").setFlag(Flags.SUFFOCATION_DAMAGE, StateFlag.State.DENY);
+        h.assertTrue(damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().inWall()),
+                "suffocation-damage deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void playerDamageDenyCancels(GameTestHelper h) {
+        region(h, "gt_pdmg").setFlag(Flags.PLAYER_DAMAGE, StateFlag.State.DENY);
+        h.assertTrue(damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().generic()),
+                "player-damage deny → gate cancels generic damage");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void invincibleAllowCancelsAllDamage(GameTestHelper h) {
+        region(h, "gt_invinc").setFlag(Flags.INVINCIBLE, StateFlag.State.ALLOW);
+        h.assertTrue(damageGateCancels(h, new BlockPos(4, 1, 4), h.getLevel().damageSources().generic()),
+                "invincible → all damage cancelled");
+        h.succeed();
+    }
+
+    /* ---------------- ENVIRONMENT MIXIN GATES (MixinFlagBridge#check) ---------------- */
+
+    @GameTest(template = TPL)
+    public static void grassSpreadDenyGate(GameTestHelper h) {
+        region(h, "gt_grass").setFlag(Flags.GRASS_SPREAD, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 1, 4));
+        h.assertTrue(!MixinFlagBridge.check(h.getLevel(), a, Flags.GRASS_SPREAD), "grass-spread deny → gate blocks");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void grassSpreadWildernessAllows(GameTestHelper h) {
+        mgr(h);
+        BlockPos far = h.absolutePos(new BlockPos(4, 1, 4)).offset(0, 200, 0);
+        h.assertTrue(MixinFlagBridge.check(h.getLevel(), far, Flags.GRASS_SPREAD), "wilderness → grass-spread allowed");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void myceliumSpreadDenyGate(GameTestHelper h) {
+        region(h, "gt_myc").setFlag(Flags.MYCELIUM_SPREAD, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 1, 4));
+        h.assertTrue(!MixinFlagBridge.check(h.getLevel(), a, Flags.MYCELIUM_SPREAD), "mycelium-spread deny → gate blocks");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void vineGrowthDenyGate(GameTestHelper h) {
+        region(h, "gt_vine").setFlag(Flags.VINE_GROWTH, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 1, 4));
+        h.assertTrue(!MixinFlagBridge.check(h.getLevel(), a, Flags.VINE_GROWTH), "vine-growth deny → gate blocks");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void iceFormDenyGate(GameTestHelper h) {
+        region(h, "gt_iceform").setFlag(Flags.ICE_FORM, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 1, 4));
+        h.assertTrue(!MixinFlagBridge.check(h.getLevel(), a, Flags.ICE_FORM), "ice-form deny → gate blocks");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void snowFallDenyGate(GameTestHelper h) {
+        region(h, "gt_snowfall").setFlag(Flags.SNOW_FALL, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 1, 4));
+        h.assertTrue(!MixinFlagBridge.check(h.getLevel(), a, Flags.SNOW_FALL), "snow-fall deny → gate blocks");
+        h.succeed();
+    }
+
+    /* ---------------- DEDICATED RIGHT-CLICK FLAGS (RightClickBlock gate) ---------------- */
+
+    @GameTest(template = TPL)
+    public static void signEditDenyCancels(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_sign");
+        r.setFlag(Flags.SIGN_EDIT, StateFlag.State.DENY);
+        ServerPlayer p = memberOf(h, r); // member → isolates the dedicated sign-edit toggle
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.OAK_SIGN);
+        h.assertTrue(rightClickGateCancels(h, p, rel, ItemStack.EMPTY), "sign-edit deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void lecternTakeDenyCancels(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_lectern");
+        r.setFlag(Flags.LECTERN_TAKE, StateFlag.State.DENY);
+        ServerPlayer p = memberOf(h, r);
+        BlockPos rel = new BlockPos(4, 1, 4);
+        h.setBlock(rel, Blocks.LECTERN.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.LecternBlock.HAS_BOOK, true));
+        h.assertTrue(rightClickGateCancels(h, p, rel, ItemStack.EMPTY), "lectern-take deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void bucketFillDenyCancels(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_bfill");
+        r.setFlag(Flags.BUCKET_FILL, StateFlag.State.DENY);
+        ServerPlayer p = memberOf(h, r);
+        // An EMPTY bucket → bucket-fill; the dedicated toggle is keyed off the held item.
+        h.assertTrue(rightClickGateCancels(h, p, new BlockPos(4, 1, 4), new ItemStack(Items.BUCKET)),
+                "bucket-fill deny → gate cancels");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void bucketFillAllowForMember(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_bfill_ok");
+        r.setFlag(Flags.BUCKET_FILL, StateFlag.State.ALLOW);
+        ServerPlayer p = memberOf(h, r);
+        h.assertTrue(!rightClickGateCancels(h, p, new BlockPos(4, 1, 4), new ItemStack(Items.BUCKET)),
+                "bucket-fill allow → gate does not cancel");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void vehiclePlaceDenyCancels(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_vplace");
+        r.setFlag(Flags.VEHICLE_PLACE, StateFlag.State.DENY);
+        ServerPlayer p = memberOf(h, r);
+        h.assertTrue(rightClickGateCancels(h, p, new BlockPos(4, 1, 4), new ItemStack(Items.MINECART)),
+                "vehicle-place deny → gate cancels");
+        h.succeed();
+    }
+
+    /* ---------------- VALUE / SESSION FLAGS (resolveValue) ---------------- */
+
+    @GameTest(template = TPL)
+    public static void greetingFarewellResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_greet");
+        r.setFlag(Flags.GREETING, "Welcome!");
+        r.setFlag(Flags.FAREWELL, "Bye!");
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.GREETING, "Welcome!", "greeting");
+        value(h, a, Flags.FAREWELL, "Bye!", "farewell");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void titleFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_titles");
+        r.setFlag(Flags.GREETING_TITLE, "Hi");
+        r.setFlag(Flags.FAREWELL_TITLE, "Cya");
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.GREETING_TITLE, "Hi", "greeting-title");
+        value(h, a, Flags.FAREWELL_TITLE, "Cya", "farewell-title");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void denyMessageFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_denymsg");
+        r.setFlag(Flags.DENY_MESSAGE, "No.");
+        r.setFlag(Flags.ENTRY_DENY_MESSAGE, "No entry.");
+        r.setFlag(Flags.EXIT_DENY_MESSAGE, "No exit.");
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.DENY_MESSAGE, "No.", "deny-message");
+        value(h, a, Flags.ENTRY_DENY_MESSAGE, "No entry.", "entry-deny-message");
+        value(h, a, Flags.EXIT_DENY_MESSAGE, "No exit.", "exit-deny-message");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void healFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_heal");
+        r.setFlag(Flags.HEAL_DELAY, 40);
+        r.setFlag(Flags.HEAL_AMOUNT, 2);
+        r.setFlag(Flags.MAX_HEAL, 20);
+        r.setFlag(Flags.MIN_HEAL, 1);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.HEAL_DELAY, 40, "heal-delay");
+        value(h, a, Flags.HEAL_AMOUNT, 2, "heal-amount");
+        value(h, a, Flags.MAX_HEAL, 20, "heal-max");
+        value(h, a, Flags.MIN_HEAL, 1, "heal-min");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void feedFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_feed");
+        r.setFlag(Flags.FEED_DELAY, 60);
+        r.setFlag(Flags.FEED_AMOUNT, 3);
+        r.setFlag(Flags.FEED_MAX, 20);
+        r.setFlag(Flags.FEED_MIN, 4);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.FEED_DELAY, 60, "feed-delay");
+        value(h, a, Flags.FEED_AMOUNT, 3, "feed-amount");
+        value(h, a, Flags.FEED_MAX, 20, "feed-max");
+        value(h, a, Flags.FEED_MIN, 4, "feed-min");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void gameModeAndLocksResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_locks");
+        r.setFlag(Flags.GAME_MODE, "adventure");
+        r.setFlag(Flags.TIME_LOCK, "night");
+        r.setFlag(Flags.WEATHER_LOCK, "clear");
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.GAME_MODE, "adventure", "game-mode");
+        value(h, a, Flags.TIME_LOCK, "night", "time-lock");
+        value(h, a, Flags.WEATHER_LOCK, "clear", "weather-lock");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void maxSpeedAndNotifyResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_speed");
+        r.setFlag(Flags.MAX_SPEED, 0.35);
+        r.setFlag(Flags.NOTIFY_ENTER, true);
+        r.setFlag(Flags.NOTIFY_LEAVE, false);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.MAX_SPEED, 0.35, "max-speed");
+        value(h, a, Flags.NOTIFY_ENTER, true, "notify-enter");
+        value(h, a, Flags.NOTIFY_LEAVE, false, "notify-leave");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void commandAndLocationFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_cmdloc");
+        r.setFlag(Flags.ON_ENTRY, "say hi");
+        r.setFlag(Flags.ON_EXIT, "say bye");
+        r.setFlag(Flags.SPAWN_LOC, "0 64 0");
+        r.setFlag(Flags.TELE_LOC, "10 64 10");
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.ON_ENTRY, "say hi", "on-entry");
+        value(h, a, Flags.ON_EXIT, "say bye", "on-exit");
+        value(h, a, Flags.SPAWN_LOC, "0 64 0", "spawn");
+        value(h, a, Flags.TELE_LOC, "10 64 10", "teleport");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void setFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_sets");
+        r.setFlag(Flags.BLOCKED_CMDS, Set.of("tp", "gamemode"));
+        r.setFlag(Flags.ALLOWED_CMDS, Set.of("help"));
+        r.setFlag(Flags.DENY_SPAWN, Set.of("minecraft:zombie"));
+        r.setFlag(Flags.SPAWN_LIMIT, Set.of("minecraft:cow:5"));
+        r.setFlag(Flags.BLOCKED_EFFECTS, Set.of("minecraft:poison"));
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.BLOCKED_CMDS, Set.of("tp", "gamemode"), "blocked-cmds");
+        value(h, a, Flags.ALLOWED_CMDS, Set.of("help"), "allowed-cmds");
+        value(h, a, Flags.DENY_SPAWN, Set.of("minecraft:zombie"), "deny-spawn");
+        value(h, a, Flags.SPAWN_LIMIT, Set.of("minecraft:cow:5"), "spawn-limit");
+        value(h, a, Flags.BLOCKED_EFFECTS, Set.of("minecraft:poison"), "blocked-effects");
+        h.succeed();
+    }
+
+    /* ---------------- REMAINING STATE FLAGS (testState) ---------------- */
+
+    @GameTest(template = TPL)
+    public static void movementStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_move");
+        r.setFlag(Flags.ENTRY, StateFlag.State.DENY);
+        r.setFlag(Flags.EXIT, StateFlag.State.DENY);
+        r.setFlag(Flags.ENTRY_VEHICLE, StateFlag.State.DENY);
+        r.setFlag(Flags.EXIT_VEHICLE, StateFlag.State.DENY);
+        r.setFlag(Flags.SLEEP, StateFlag.State.DENY);
+        r.setFlag(Flags.GLIDE, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.ENTRY, "entry");
+        denied(h, a, Flags.EXIT, "exit");
+        denied(h, a, Flags.ENTRY_VEHICLE, "entry-vehicle");
+        denied(h, a, Flags.EXIT_VEHICLE, "exit-vehicle");
+        denied(h, a, Flags.SLEEP, "sleep");
+        denied(h, a, Flags.GLIDE, "glide");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void itemChatStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_itemchat");
+        r.setFlag(Flags.ITEM_PICKUP, StateFlag.State.DENY);
+        r.setFlag(Flags.ITEM_DROP, StateFlag.State.DENY);
+        r.setFlag(Flags.SEND_CHAT, StateFlag.State.DENY);
+        r.setFlag(Flags.RECEIVE_CHAT, StateFlag.State.DENY);
+        r.setFlag(Flags.HUNGER_DRAIN, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.ITEM_PICKUP, "item-pickup");
+        denied(h, a, Flags.ITEM_DROP, "item-drop");
+        denied(h, a, Flags.SEND_CHAT, "send-chat");
+        denied(h, a, Flags.RECEIVE_CHAT, "receive-chat");
+        denied(h, a, Flags.HUNGER_DRAIN, "hunger-drain");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void deathStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_death");
+        r.setFlag(Flags.KEEP_INVENTORY, StateFlag.State.ALLOW);
+        r.setFlag(Flags.KEEP_XP, StateFlag.State.ALLOW);
+        r.setFlag(Flags.EXP_DROPS, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        allowed(h, a, Flags.KEEP_INVENTORY, "keep-inventory");
+        allowed(h, a, Flags.KEEP_XP, "keep-xp");
+        denied(h, a, Flags.EXP_DROPS, "exp-drops");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void physicsStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_physics");
+        r.setFlag(Flags.REDSTONE, StateFlag.State.DENY);
+        r.setFlag(Flags.PISTONS, StateFlag.State.DENY);
+        r.setFlag(Flags.DISPENSER_OUTPUT, StateFlag.State.DENY);
+        r.setFlag(Flags.WATER_FLOW, StateFlag.State.DENY);
+        r.setFlag(Flags.LAVA_FLOW, StateFlag.State.DENY);
+        r.setFlag(Flags.FIRE_SPREAD, StateFlag.State.DENY);
+        r.setFlag(Flags.LAVA_FIRE, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.REDSTONE, "redstone");
+        denied(h, a, Flags.PISTONS, "pistons");
+        denied(h, a, Flags.DISPENSER_OUTPUT, "dispenser-output");
+        denied(h, a, Flags.WATER_FLOW, "water-flow");
+        denied(h, a, Flags.LAVA_FLOW, "lava-flow");
+        denied(h, a, Flags.FIRE_SPREAD, "fire-spread");
+        denied(h, a, Flags.LAVA_FIRE, "lava-fire");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void mobStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_mobstate");
+        r.setFlag(Flags.MOB_SPAWNING, StateFlag.State.DENY);
+        r.setFlag(Flags.MOB_GRIEF, StateFlag.State.DENY);
+        r.setFlag(Flags.MOB_TELEPORT, StateFlag.State.DENY);
+        r.setFlag(Flags.ENDER_BUILD, StateFlag.State.DENY);
+        r.setFlag(Flags.CHORUS_FRUIT, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.MOB_SPAWNING, "mob-spawning");
+        denied(h, a, Flags.MOB_GRIEF, "mob-grief");
+        denied(h, a, Flags.MOB_TELEPORT, "mob-teleport");
+        denied(h, a, Flags.ENDER_BUILD, "enderpearl");
+        denied(h, a, Flags.CHORUS_FRUIT, "chorus-teleport");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void explosionStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_expl");
+        r.setFlag(Flags.TNT, StateFlag.State.DENY);
+        r.setFlag(Flags.CREEPER_EXPLOSION, StateFlag.State.DENY);
+        r.setFlag(Flags.GHAST_FIREBALL, StateFlag.State.DENY);
+        r.setFlag(Flags.ENDERDRAGON, StateFlag.State.DENY);
+        r.setFlag(Flags.OTHER_EXPLOSION, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.TNT, "tnt");
+        denied(h, a, Flags.CREEPER_EXPLOSION, "creeper-explosion");
+        denied(h, a, Flags.GHAST_FIREBALL, "ghast-fireball");
+        denied(h, a, Flags.ENDERDRAGON, "enderdragon");
+        denied(h, a, Flags.OTHER_EXPLOSION, "other-explosion");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void decorationStateFlagsResolve(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_decostate");
+        r.setFlag(Flags.ARMOR_STAND_USE, StateFlag.State.DENY);
+        r.setFlag(Flags.ITEM_FRAME_ROTATE, StateFlag.State.DENY);
+        r.setFlag(Flags.SIGN_EDIT, StateFlag.State.DENY);
+        r.setFlag(Flags.LECTERN_TAKE, StateFlag.State.DENY);
+        r.setFlag(Flags.BUCKET_FILL, StateFlag.State.DENY);
+        r.setFlag(Flags.VEHICLE_PLACE, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.ARMOR_STAND_USE, "armor-stand-use");
+        denied(h, a, Flags.ITEM_FRAME_ROTATE, "item-frame-rotate");
+        denied(h, a, Flags.SIGN_EDIT, "sign-edit");
+        denied(h, a, Flags.LECTERN_TAKE, "lectern-take");
+        denied(h, a, Flags.BUCKET_FILL, "bucket-fill");
+        denied(h, a, Flags.VEHICLE_PLACE, "vehicle-place");
+        h.succeed();
+    }
+
+    /* ---------------- ENGINE SEMANTICS ---------------- */
+
+    @GameTest(template = TPL)
+    public static void priorityHigherWins(GameTestHelper h) {
+        CuboidRegion lo = region(h, "gt_prio_lo"); lo.setPriority(0);  lo.setFlag(Flags.PVP, StateFlag.State.ALLOW);
+        CuboidRegion hi = region(h, "gt_prio_hi"); hi.setPriority(10); hi.setFlag(Flags.PVP, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.PVP, "higher-priority DENY overrides lower ALLOW");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void denyBeatsAllowEqualPriority(GameTestHelper h) {
+        CuboidRegion x = region(h, "gt_eq_a"); x.setPriority(5); x.setFlag(Flags.PVP, StateFlag.State.ALLOW);
+        CuboidRegion y = region(h, "gt_eq_b"); y.setPriority(5); y.setFlag(Flags.PVP, StateFlag.State.DENY);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        denied(h, a, Flags.PVP, "DENY beats ALLOW at equal priority");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void parentInheritanceState(GameTestHelper h) {
+        // Parent does NOT contain the query point; the child inherits via the parent pointer.
+        CuboidRegion parent = makeRegion(h, "gt_pinh_parent", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        parent.setFlag(Flags.PVP, StateFlag.State.DENY);
+        CuboidRegion child = region(h, "gt_pinh_child");
+        child.setParent(parent);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4)); // inside child, outside parent
+        denied(h, a, Flags.PVP, "child inherits parent's PVP DENY");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void parentInheritanceValue(GameTestHelper h) {
+        CuboidRegion parent = makeRegion(h, "gt_pival_parent", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        parent.setFlag(Flags.GREETING, "FromParent");
+        CuboidRegion child = region(h, "gt_pival_child");
+        child.setParent(parent);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        value(h, a, Flags.GREETING, "FromParent", "child inherits parent greeting");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void groupFilterMembersOnly(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_grp_mem");
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        r.setFlagGroup(Flags.PVP, RegionGroup.MEMBERS);
+        UUID member = UUID.randomUUID();
+        r.members().add(member);
+        UUID stranger = UUID.randomUUID();
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        h.assertTrue(!mgr(h).testState(Flags.PVP, member, a.getX(), a.getY(), a.getZ()),
+                "MEMBERS-group DENY applies to a member");
+        h.assertTrue(mgr(h).testState(Flags.PVP, stranger, a.getX(), a.getY(), a.getZ()),
+                "MEMBERS-group DENY does NOT apply to a stranger (defaults allow)");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void groupFilterNonMembersOnly(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_grp_non");
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        r.setFlagGroup(Flags.PVP, RegionGroup.NON_MEMBERS);
+        UUID member = UUID.randomUUID();
+        r.members().add(member);
+        UUID stranger = UUID.randomUUID();
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        h.assertTrue(mgr(h).testState(Flags.PVP, member, a.getX(), a.getY(), a.getZ()),
+                "NON_MEMBERS-group DENY does NOT apply to a member");
+        h.assertTrue(!mgr(h).testState(Flags.PVP, stranger, a.getX(), a.getY(), a.getZ()),
+                "NON_MEMBERS-group DENY applies to a stranger");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void wildernessUsesFlagDefaults(GameTestHelper h) {
+        mgr(h); // ensure manager; query a point far outside any region
+        BlockPos far = h.absolutePos(new BlockPos(4, 2, 4)).offset(0, 200, 0);
+        h.assertTrue(mgr(h).testState(Flags.PVP, U, far.getX(), far.getY(), far.getZ()),
+                "wilderness PVP → default allow");
+        h.assertTrue(!mgr(h).testState(Flags.KEEP_INVENTORY, U, far.getX(), far.getY(), far.getZ()),
+                "wilderness keep-inventory → default deny");
+        h.assertTrue(mgr(h).resolveValue(Flags.GREETING, far.getX(), far.getY(), far.getZ(), null) == null,
+                "wilderness unset value flag → null");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void testBuildAccessImplicitMembership(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_implicit"); // no build flags set
+        UUID member = UUID.randomUUID();
+        r.members().add(member);
+        BlockPos a = h.absolutePos(new BlockPos(4, 2, 4));
+        h.assertTrue(mgr(h).testBuildAccess(Flags.BUILD, a.getX(), a.getY(), a.getZ(), member),
+                "member builds in an unflagged region");
+        h.assertTrue(!mgr(h).testBuildAccess(Flags.BUILD, a.getX(), a.getY(), a.getZ(), UUID.randomUUID()),
+                "stranger cannot build in an unflagged region");
+        h.assertTrue(!mgr(h).testBuildAccess(Flags.BUILD, a.getX(), a.getY(), a.getZ(), null),
+                "null actor cannot build in an unflagged region");
         h.succeed();
     }
 }
