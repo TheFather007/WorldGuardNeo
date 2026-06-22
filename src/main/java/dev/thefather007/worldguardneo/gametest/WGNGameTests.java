@@ -1921,4 +1921,34 @@ public final class WGNGameTests {
                 "non-member excluded by the MEMBERS group");
         h.succeed();
     }
+
+    // ---- robustness-fix regressions ----
+
+    @GameTest(template = TPL)
+    public static void doubleFlagRejectsNonFinite(GameTestHelper h) {
+        try {
+            h.assertTrue(Flags.MAX_SPEED.parse("0.5").equals(0.5), "a finite double still parses");
+        } catch (Exception e) {
+            h.fail("finite double parse threw: " + e);
+        }
+        for (String bad : new String[]{"NaN", "Infinity", "-Infinity"}) {
+            boolean threw = false;
+            try { Flags.MAX_SPEED.parse(bad); } catch (Exception e) { threw = true; }
+            h.assertTrue(threw, "non-finite '" + bad + "' is rejected");
+        }
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void uuidNameOfNullServerSafe(GameTestHelper h) {
+        UUID u = UUID.randomUUID();
+        // Must not NPE when the server is null (web-map popup during shutdown) — falls back to UUID.
+        h.assertTrue(u.toString().equals(
+                dev.thefather007.worldguardneo.util.UuidResolver.nameOf(null, u)),
+                "nameOf(null server) falls back to the raw UUID");
+        h.assertTrue("(none)".equals(
+                dev.thefather007.worldguardneo.util.UuidResolver.nameOf(null, null)),
+                "nameOf(null, null) → (none)");
+        h.succeed();
+    }
 }
