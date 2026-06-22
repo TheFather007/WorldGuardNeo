@@ -116,16 +116,25 @@ public final class BackupManager implements AutoCloseable {
         } catch (Throwable t) {
             WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] prepareForBackup failed", t);
         }
-        executor.submit(() -> {
-            try {
-                doBackup(label);
-            } catch (Throwable t) {
-                // Catch Throwable so a single bad backup doesn't take down the executor.
-                WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Backup failed", t);
-            } finally {
-                inFlight.set(false);
-            }
-        });
+        try {
+            executor.submit(() -> {
+                try {
+                    doBackup(label);
+                } catch (Throwable t) {
+                    // Catch Throwable so a single bad backup doesn't take down the executor.
+                    WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Backup failed", t);
+                } finally {
+                    inFlight.set(false);
+                }
+            });
+        } catch (RuntimeException ex) {
+            // submit() can throw (e.g. RejectedExecutionException if the executor is shutting down).
+            // Without resetting the flag here, inFlight would stay true forever and block every
+            // future backup with a misleading "already in progress".
+            inFlight.set(false);
+            WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Could not schedule backup task", ex);
+            return false;
+        }
         return true;
     }
 
