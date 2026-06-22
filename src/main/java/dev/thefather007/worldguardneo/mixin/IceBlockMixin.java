@@ -12,13 +12,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Cancels ice-melt random ticks inside regions where {@code ice-melt} is DENY.
- *
- * {@code IceBlock} handles regular (frosty) ice melting into water via its
- * {@link IceBlock#randomTick} override. Packed ice and blue ice are separate blocks that do
- * not melt at all, so they aren't affected here — only normal ice is gated.
- * We inject at HEAD with {@code cancellable = true} so the vanilla melt logic
- * is skipped entirely — no observers, no neighbor updates, no item drops.
+ * Cancels ice-melt random ticks where {@code ice-melt} is DENY. Only normal {@link IceBlock} melts
+ * (packed/blue ice are separate non-melting blocks). Cancelling at HEAD skips the melt entirely —
+ * no observers, neighbor updates, or item drops.
  */
 @Mixin(IceBlock.class)
 public abstract class IceBlockMixin {

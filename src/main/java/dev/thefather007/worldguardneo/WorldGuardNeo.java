@@ -65,14 +65,11 @@ public final class WorldGuardNeo {
         INSTANCE = this;
         LOGGER.info("[WorldGuardNeo] Bootstrapping v1.3 for NeoForge 1.21.1");
 
-        // Pre-register all built-in flags FIRST so that storage and config can resolve them
-        // by name without races. None of the subsequent constructors take a flag identity,
-        // but moving this up keeps the invariant cheap to verify.
+        // Register built-in flags first so storage and config can resolve them by name.
         Flags.bootstrap();
 
         Path configDir = FMLPaths.CONFIGDIR.get().resolve(MOD_ID);
-        // Regions now live under config/worldguardneo/regions (was gameDir/worldguardneo/regions)
-        // so all of the mod's persistent data sits in one place next to config.toml.
+        // All persistent data lives under config/worldguardneo, next to config.toml.
         Path dataDir   = configDir;
 
         this.config           = WGConfig.loadOrCreate(configDir);
@@ -80,19 +77,16 @@ public final class WorldGuardNeo {
         this.permissions      = PermissionService.detect(this.config.global().useLuckPerms);
         RegionStorage storage = createStorage(this.config.global(), dataDir);
         this.regionContainer  = new RegionContainer(storage);
-        // Built-in region selection (replaces WorldEdit). Per-player cuboid/polygon state, rendered
-        // to the client over the WorldEdit-CUI plugin channel.
+        // Built-in selection (replaces WorldEdit): per-player state rendered over the WE-CUI channel.
         this.selectionStore   = new SelectionStore();
-        // Backups also go under config/worldguardneo (passing dataDir, the mod's data root).
         this.backupManager    = new dev.thefather007.worldguardneo.backup.BackupManager(dataDir);
-        // Violations go to logs/worldguardneo-violations.log, separate from the main console,
-        // so routine "player tried to grief a claim" events don't bury real errors.
+        // Violations log separately so routine grief attempts don't bury real errors.
         this.violationLog     = new dev.thefather007.worldguardneo.util.ViolationLog(
                 FMLPaths.GAMEDIR.get().resolve("logs"));
         // Admin audit trail (region create/delete/redefine/transfer, flag/member edits).
         this.auditLog         = new dev.thefather007.worldguardneo.util.AuditLog(
                 FMLPaths.GAMEDIR.get().resolve("logs"));
-        // Claim-expiry activity tracker (loads activity.json; cleanup only runs if enabled in config).
+        // Claim-expiry tracker; cleanup only runs if enabled in config.
         this.claimExpiry      = new dev.thefather007.worldguardneo.expiry.ClaimExpiry(dataDir);
 
         // Lifecycle.

@@ -1,6 +1,5 @@
 package dev.thefather007.worldguardneo.integrations;
 
-import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flag;
 import dev.thefather007.worldguardneo.region.ProtectedRegion;
 import net.minecraft.server.MinecraftServer;

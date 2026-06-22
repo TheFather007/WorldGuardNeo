@@ -19,11 +19,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(FrostedIceBlock.class)
 public abstract class FrostedIceBlockMixin {
 
-    // Target "tick", NOT "randomTick": frosted ice melts/ages via its SCHEDULED tick (which calls
-    // slightlyMelt), scheduled from onPlace/neighborChanged. FrostedIceBlock does not declare
-    // randomTick (it would only inherit IceBlock's light-based melt, the wrong path), so injecting
-    // into "randomTick" silently found no method and — with the global require=0 — did nothing,
-    // leaving frosted-ice-melt=DENY unenforced. tick has the same descriptor.
+    // Target "tick", NOT "randomTick": frosted ice ages via its SCHEDULED tick (slightlyMelt).
+    // FrostedIceBlock doesn't declare randomTick, so injecting there silently did nothing (with
+    // require=0), leaving frosted-ice-melt unenforced. tick has the same descriptor.
     @Inject(method = "tick", at = @At("HEAD"), cancellable = true)
     private void worldguardneo$gateFrostedMelt(
             BlockState state, ServerLevel level, BlockPos pos, RandomSource rng,

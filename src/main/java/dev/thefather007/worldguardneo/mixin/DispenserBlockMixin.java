@@ -16,35 +16,20 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Enforces the {@code dispenser-output} flag and blocks cross-border dispenser grief.
+ * Enforces {@code dispenser-output} and blocks cross-border dispenser grief (a dispenser aimed
+ * across a border can shoot lava/water/fire/potions/items into a neighbouring claim). Vanilla has
+ * no cancellable dispense event, so we intercept {@link DispenserBlock#dispenseFrom} at HEAD.
  *
- * <p>A dispenser/dropper is a classic adjacency-grief tool: place one just outside (or in your
- * own region) aimed across the border and it can shoot lava/water buckets, fire charges, splash
- * potions, or eject items into a neighbouring claim. Vanilla offers no cancellable event for
- * dispensing, so we intercept {@link DispenserBlock#dispenseFrom} at HEAD.
- *
- * <p>Two independent checks, either of which cancels the dispense:
- * <ol>
- *   <li><b>{@code dispenser-output} flag</b> at the dispenser's own cell — lets an owner turn a
- *       region's dispensers off entirely (resolved with parents; default ALLOW).</li>
- *   <li><b>Cross-border containment</b> — the cell the dispenser fires INTO (its facing
- *       direction) must not belong to a region the dispenser's own cell isn't part of. This is
- *       the same boundary rule the piston/fluid handlers use, so a dispenser outside a claim
- *       can't fire into it, and one in region A can't fire across into adjacent region B.</li>
- * </ol>
- *
- * <p>Performance: a single {@code hasAnyAt} probe short-circuits the whole check when neither the
- * dispenser nor its target cell is inside any region (the overwhelmingly common case), so normal
- * world dispensers pay almost nothing. Fails open (allows) on any unexpected error so a dispenser
- * can never crash the tick.
+ * <p>Two independent checks, either of which cancels: (1) {@code dispenser-output} at the
+ * dispenser's own cell; (2) cross-border containment — the target cell must not belong to a region
+ * the dispenser's cell isn't part of (same boundary rule as the piston/fluid handlers). A
+ * {@code hasAnyAt} probe short-circuits when neither cell is in a region. Fails open on error.
  */
 @Mixin(DispenserBlock.class)
 public abstract class DispenserBlockMixin {
 
-    // require = 0: this is a defensive safety net. dispenseFrom's exact descriptor is stable in
-    // 1.21.1 Mojmap (ServerLevel, BlockState, BlockPos), but if a future remap changes it, the
-    // injector will simply not apply rather than crash the server at load. The protection just
-    // silently turns off for dispensers in that case — never a hard failure.
+    // require = 0: if a future remap changes dispenseFrom's descriptor, the injector silently
+    // skips rather than crashing at load — protection just turns off for dispensers.
     @Inject(method = "dispenseFrom", at = @At("HEAD"), cancellable = true, require = 0)
     private void worldguardneo$gateDispense(ServerLevel level, BlockState state, BlockPos pos,
                                             CallbackInfo ci) {
@@ -54,19 +39,17 @@ public abstract class DispenserBlockMixin {
             if (!mod.isProtectionActive(level)) return;
             RegionManager mgr = mod.regions().get(level);
 
-            // Target cell = the block directly in the dispenser's facing direction (where items/
-            // fluids/projectiles are emitted). DispenserBlock exposes the FACING property.
+            // Target cell = the block the dispenser fires into (its FACING direction).
             BlockPos target = pos;
             try {
                 Direction facing = state.getValue(DispenserBlock.FACING);
                 target = pos.relative(facing);
             } catch (Throwable ignored) {
-                // If FACING can't be read for some reason, fall back to the dispenser's own cell.
+                // FACING unreadable → fall back to the dispenser's own cell.
             }
 
-            // Fast path: nothing region-related at either the dispenser or its target AND the
-            // global region has no opinion → vanilla. (The global check keeps a world-wide
-            // "dispenser-output deny" effective in wilderness, matching MixinFlagBridge.)
+            // Fast path: nothing region-related at either cell AND no global opinion → vanilla.
+            // The global check keeps a world-wide "dispenser-output deny" effective in wilderness.
             boolean nearDispenser = mgr.hasAnyAt(pos.getX(), pos.getY(), pos.getZ());
             boolean nearTarget    = mgr.hasAnyAt(target.getX(), target.getY(), target.getZ());
             if (!nearDispenser && !nearTarget) {
@@ -76,21 +59,19 @@ public abstract class DispenserBlockMixin {
                 return;
             }
 
-            // Check 1: dispenser-output flag at the dispenser's own position. No nearDispenser
-            // guard: when only the TARGET is in a region, testState falls back to the global
-            // value, which must still be able to deny.
+            // Check 1: dispenser-output at the dispenser's own cell. No nearDispenser guard — when
+            // only the TARGET is in a region, testState falls back to the global value, which must
+            // still be able to deny.
             if (!mgr.testState(Flags.DISPENSER_OUTPUT, null, pos.getX(), pos.getY(), pos.getZ())) {
                 ci.cancel();
                 return;
             }
 
-            // Check 2: cross-border containment. If the target cell belongs to a region the
-            // dispenser's cell is not part of, the dispense crosses a protection boundary.
+            // Check 2: cross-border containment.
             var dispenserRegions = mgr.getApplicable(pos.getX(), pos.getY(), pos.getZ());
             for (ProtectedRegion r : mgr.getApplicable(target.getX(), target.getY(), target.getZ())) {
                 if (!containsId(dispenserRegions, r.id())) {
-                    // Foreign region in the line of fire. Allow only if that region's
-                    // dispenser-output is explicitly ALLOW (an owner opting in); otherwise block.
+                    // Foreign region in the line of fire: allow only on explicit ALLOW (owner opt-in).
                     if (resolveDispenserAllow(r)) continue;
                     ci.cancel();
                     return;
@@ -107,11 +88,9 @@ public abstract class DispenserBlockMixin {
     }
 
     /**
-     * Resolve a region's dispenser-output (walking parents) for a CROSS-BORDER dispense coming
-     * from outside that region. Only an EXPLICIT ALLOW opts the region in; unset means protected.
-     * (Previously "unset → allowed", which let a dispenser outside a claim fire lava/fire/items
-     * across the border into any region whose owner hadn't manually set dispenser-output=deny —
-     * the same gutted-boundary bug the piston handler had.)
+     * Resolve a region's dispenser-output (walking parents) for a CROSS-BORDER dispense. Only an
+     * EXPLICIT ALLOW opts in; unset means protected. (Treating unset as allowed was a boundary
+     * bug that let outside dispensers fire across the border into unconfigured regions.)
      */
     private static boolean resolveDispenserAllow(ProtectedRegion r) {
         StateFlag.State s = null;

@@ -10,16 +10,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 /**
- * Force {@link Biome#shouldFreeze} and {@link Biome#shouldSnow} to return false at
- * positions inside regions where the corresponding WGN flag is DENY.
- *
- * <p>Biome has two overloads of {@code shouldFreeze}: a 2-arg form and a 3-arg form
- * that takes an extra {@code mustBeAtEdge} boolean. Vanilla calls both depending on
- * the path (chunk precipitation tick vs. waterloggable-block checks), so we inject
- * into both via two separate {@code @Inject} targets sharing the same gate logic.
- *
- * <p>The {@code LevelReader} passed in is the {@code ServerLevel}; we narrow with an
- * {@code instanceof} check inside {@link MixinFlagBridge#iceForm}.
+ * Forces {@link Biome#shouldFreeze} and {@link Biome#shouldSnow} to return false where the
+ * corresponding WGN flag is DENY. {@code shouldFreeze} has two overloads (2-arg and 3-arg
+ * {@code mustBeAtEdge}) that vanilla calls from different paths, so both are injected.
  */
 @Mixin(Biome.class)
 public abstract class BiomeMixin {
