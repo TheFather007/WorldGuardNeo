@@ -65,6 +65,10 @@ public final class UuidResolver {
     /** Best-effort name for display. Returns the UUID string when no name is known. */
     public static String nameOf(MinecraftServer server, UUID uuid) {
         if (uuid == null) return "(none)";
+        // Server can be null when ServerLifecycleHooks.getCurrentServer() is consulted off the main
+        // path — e.g. a web-map (BlueMap/squaremap) marker popup rendered during shutdown. Fall back
+        // to the raw UUID rather than NPE on server.getPlayerList().
+        if (server == null) return uuid.toString();
         // Online?
         ServerPlayer online = server.getPlayerList().getPlayer(uuid);
         if (online != null) return online.getGameProfile().getName();
