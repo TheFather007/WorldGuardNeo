@@ -261,18 +261,19 @@ public final class PlayerEventHandler {
                 if (current.contains(oldId)) continue;
                 var or = mgr.get(oldId).orElse(null);
                 if (or == null) continue;
-                StateFlag.State resolved = resolveStateWithParents(or, Flags.EXIT);
-                if (resolved == StateFlag.State.DENY
-                        && RegionManager.groupMatches(or.getFlagGroup(Flags.EXIT), or, id)) {
+                // resolveStateForRegion walks the leaving region's parents AND applies the SOURCE
+                // region's group filter — so an inherited group-scoped EXIT deny is honoured
+                // correctly (the old code read the child's group for an inherited flag).
+                StateFlag.State resolved = mgr.resolveStateForRegion(Flags.EXIT, or, id);
+                if (resolved == StateFlag.State.DENY) {
                     denyExit = true;
                     String m = or.getFlag(Flags.EXIT_DENY_MESSAGE);
                     if (m != null) { denyMsg = m; break; }
                 }
                 // Stricter exit-vehicle: only triggers if the player is mounted.
                 if (passenger) {
-                    StateFlag.State rv = resolveStateWithParents(or, Flags.EXIT_VEHICLE);
-                    if (rv == StateFlag.State.DENY
-                            && RegionManager.groupMatches(or.getFlagGroup(Flags.EXIT_VEHICLE), or, id)) {
+                    StateFlag.State rv = mgr.resolveStateForRegion(Flags.EXIT_VEHICLE, or, id);
+                    if (rv == StateFlag.State.DENY) {
                         denyExit = true;
                         if (denyMsg == null) {
                             String m = or.getFlag(Flags.EXIT_DENY_MESSAGE);

@@ -1886,4 +1886,39 @@ public final class WGNGameTests {
         h.assertTrue(Flags.NOTIFY_ENTER.fromJson(bj).equals(true), "boolean json round-trip");
         h.succeed();
     }
+
+    // ---- EXIT group-from-source regression (resolveStateForRegion) ----
+
+    @GameTest(template = TPL)
+    public static void exitGroupInheritedFromParent(GameTestHelper h) {
+        // Parent owns an OWNERS-scoped EXIT deny; the child inherits the flag. The resolver must
+        // apply the PARENT's group, not the child's — the bug this guards against denied/allowed
+        // the wrong players for inherited exit flags.
+        CuboidRegion parent = makeRegion(h, "exitg_p", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        parent.setFlag(Flags.EXIT, StateFlag.State.DENY);
+        parent.setFlagGroup(Flags.EXIT, RegionGroup.OWNERS);
+        UUID owner = UUID.randomUUID(); parent.owners().add(owner);
+        UUID stranger = UUID.randomUUID();
+        CuboidRegion child = region(h, "exitg_c");
+        child.setParent(parent);
+        h.assertTrue(mgr(h).resolveStateForRegion(Flags.EXIT, child, owner) == StateFlag.State.DENY,
+                "owner (parent's OWNERS group) gets the inherited EXIT deny");
+        h.assertTrue(mgr(h).resolveStateForRegion(Flags.EXIT, child, stranger) == null,
+                "stranger excluded by the parent's OWNERS group → no deny");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void exitGroupDirectMembers(GameTestHelper h) {
+        CuboidRegion r = region(h, "exitg_d");
+        r.setFlag(Flags.EXIT_VEHICLE, StateFlag.State.DENY);
+        r.setFlagGroup(Flags.EXIT_VEHICLE, RegionGroup.MEMBERS);
+        UUID m = UUID.randomUUID(); r.members().add(m);
+        UUID s = UUID.randomUUID();
+        h.assertTrue(mgr(h).resolveStateForRegion(Flags.EXIT_VEHICLE, r, m) == StateFlag.State.DENY,
+                "member gets the direct exit-vehicle deny");
+        h.assertTrue(mgr(h).resolveStateForRegion(Flags.EXIT_VEHICLE, r, s) == null,
+                "non-member excluded by the MEMBERS group");
+        h.succeed();
+    }
 }
