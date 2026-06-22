@@ -101,7 +101,9 @@ public final class ViolationLog {
                     return;
                 }
             }
-            // 999 archives for one day is absurd — just delete-and-restart rather than grow forever.
+            // 999 archives for one day is absurd — delete-and-restart rather than grow forever.
+            // (Without this the loop fell through and the old file kept being appended to.)
+            Files.delete(file);
         } catch (IOException ex) {
             // Couldn't rotate (file locked, permissions). The writer will append to the existing
             // file instead — no data lost, just not split per-session.
