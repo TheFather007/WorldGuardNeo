@@ -309,6 +309,24 @@ public final class RegionManager {
     /* --------------- internal helpers --------------- */
 
     /**
+     * Resolve a state flag for ONE specific region by walking its parent chain, applying the
+     * SOURCE region's group filter (not the starting region's). Returns the resolved state, or
+     * {@code null} if no region in the chain sets the flag or the source's group excludes the actor.
+     *
+     * <p>Used by movement handlers for the EXIT case: the player's current position is already
+     * OUTSIDE the region they are leaving, so a position-based {@link #testState} would never see
+     * it. This walks the leaving region directly. It mirrors {@link #testState}'s "group filter
+     * belongs to the source, not the child" semantics — previously the EXIT path read the child
+     * region's group for an inherited flag, which mis-applied group-scoped exit denials.
+     */
+    public StateFlag.State resolveStateForRegion(StateFlag flag, ProtectedRegion region, UUID actor) {
+        ProtectedRegion source = resolveSourceWithParents(region, flag);
+        if (source == null) return null;
+        if (!groupMatches(source.getFlagGroup(flag), source, actor)) return null;
+        return source.getFlag(flag);
+    }
+
+    /**
      * Walks the parent chain looking for the first region that has the flag set. Returns
      * the source region (not the starting one) so callers can apply the source's group
      * filter — important for inherited flags from a parent that may have a different
