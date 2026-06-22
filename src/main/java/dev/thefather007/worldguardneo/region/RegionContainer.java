@@ -12,13 +12,9 @@ import java.util.IdentityHashMap;
 import java.util.Map;
 
 /**
- * Maps world key (e.g. {@code "minecraft:overworld"}) → its RegionManager.
- *
- * Two indexes are kept:
- *   - {@link #managers} keyed by stringified dimension id, for save/load and command paths.
- *   - {@link #byLevel} keyed by the Level instance, for the hot lookup path. Levels are
- *     stable objects for the lifetime of the server, so identity hashing is correct and
- *     avoids allocating a fresh {@code "namespace:path"} string per event.
+ * Maps world key → its RegionManager. Two indexes: {@link #managers} keyed by dimension-id string
+ * (save/load, commands), and {@link #byLevel} keyed by Level instance for the hot lookup path —
+ * Levels are stable, so identity hashing avoids allocating a "namespace:path" string per event.
  */
 public final class RegionContainer {
 
@@ -27,10 +23,8 @@ public final class RegionContainer {
     private final IdentityHashMap<Level, RegionManager> byLevel = new IdentityHashMap<>();
 
     /**
-     * Per-world "save needed" flag. The save() method just marks the world dirty;
-     * {@link #flushDirty} actually performs the disk write. Called from the server-tick
-     * hook every few seconds, this coalesces dozens of rapid edits (e.g. an admin running
-     * a batch of /rg flag commands) into a single I/O operation.
+     * Per-world "save needed" flag. {@link #save} only marks dirty; {@link #flushDirty} does the
+     * disk write from the tick hook, coalescing rapid edits into a single I/O operation.
      */
     private final java.util.Set<String> dirty = new java.util.HashSet<>();
     /** Tick of last flush, in overworld ticks. */
@@ -48,11 +42,9 @@ public final class RegionContainer {
     }
 
     /**
-     * Total number of regions OWNED by a player across ALL dimensions. Region limits must be
-     * global, not per-world — otherwise a player could claim the full quota in the Overworld,
-     * then again in the Nether, the End, and every modded dimension, multiplying their real
-     * limit by the dimension count. {@code RegionManager.countOwned} only sees one world, so
-     * the claim path must use THIS method for the limit check.
+     * Regions OWNED by a player across ALL dimensions. Limits must be global, not per-world —
+     * otherwise a player could re-claim the full quota in every dimension. The claim path must use
+     * THIS method (not the single-world {@code RegionManager.countOwned}) for the limit check.
      */
     public int countOwnedGlobal(java.util.UUID player) {
         int n = 0;
@@ -90,32 +82,26 @@ public final class RegionContainer {
     }
 
     public void saveAll() {
-        // Immediate, synchronous full save — used by /rg save and on server stop.
-        // Drains the dirty set since nothing more can be pending.
+        // Immediate synchronous full save (/rg save, server stop). Drains all dirty/incremental sets
+        // since every world is now fully synced.
         for (RegionManager m : managers.values()) {
             try { storage.save(m.world(), m); }
             catch (Exception ex) { WorldGuardNeo.LOGGER.error("Failed to save regions for {}", m.world(), ex); }
         }
         dirty.clear();
-        // saveAll() fully synced every world, so any pending incremental work is subsumed.
         regionDirty.clear();
         regionDeleted.clear();
     }
 
     /**
-     * Per-region incremental dirty/deleted sets, keyed by world. Used so a single-region edit
-     * (e.g. {@code /rg flag}) persists only that region instead of rewriting the whole world.
-     * Cascade-heavy operations (remove, redefine, global-flag edits) use the full-world {@link #dirty}
-     * path instead. A full-dirty world subsumes (and is processed instead of) its per-region sets.
+     * Per-region incremental dirty/deleted sets, keyed by world, so a single-region edit persists
+     * only that region. Cascade-heavy ops use the full-world {@link #dirty} path, which subsumes
+     * a world's per-region sets.
      */
     private final Map<String, java.util.Set<String>> regionDirty   = new HashMap<>();
     private final Map<String, java.util.Set<String>> regionDeleted = new HashMap<>();
 
-    /**
-     * Mark a world as dirty so the next {@link #flushDirty} writes it.
-     * Returns immediately — no I/O on the hot path. This is the API every
-     * /rg command should call after mutating a region.
-     */
+    /** Mark a world dirty for the next {@link #flushDirty}. No I/O on the hot path. */
     public void save(String worldKey) {
         if (managers.containsKey(worldKey)) dirty.add(worldKey);
     }
@@ -152,18 +138,15 @@ public final class RegionContainer {
     }
 
     /**
-     * Called from the server tick. Writes pending dirty worlds to disk if enough ticks
-     * have elapsed since the last flush. The 5-second interval is a good trade-off:
-     * frequent enough that crashes only lose a few seconds of edits; rare enough that
-     * batch operations don't hammer the disk.
+     * Writes pending dirty worlds to disk once enough ticks have elapsed. The 5s interval trades off
+     * crash exposure (a few seconds of edits) against not hammering the disk during batch operations.
      */
     public void flushDirty(long currentTick) {
         if (dirty.isEmpty() && regionDirty.isEmpty() && regionDeleted.isEmpty()) return;
         if (currentTick - lastFlushTick < FLUSH_INTERVAL_TICKS) return;
         lastFlushTick = currentTick;
 
-        // Full-world saves first. A full save fully syncs the world, so drop any pending
-        // per-region work for the same world (it's subsumed).
+        // Full-world saves first; they subsume any pending per-region work for the same world.
         var fullSnapshot = new java.util.ArrayList<>(dirty);
         dirty.clear();
         for (String key : fullSnapshot) {
@@ -175,9 +158,8 @@ public final class RegionContainer {
                 storage.save(key, m);
             } catch (Exception ex) {
                 WorldGuardNeo.LOGGER.error("Failed to save regions for {}", key, ex);
-                // CRITICAL: re-mark dirty so a transient failure (disk full, locked file)
-                // gets retried on the next flush instead of silently dropping the world's
-                // unsaved edits until someone happens to modify it again.
+                // Re-mark dirty so a transient failure (disk full, locked file) is retried next flush
+                // instead of silently dropping the world's unsaved edits.
                 dirty.add(key);
             }
         }

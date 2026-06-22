@@ -13,19 +13,11 @@ import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 
 /**
- * Turns the built-in wand ({@link WandItem}) into a selection tool, replacing WorldEdit's wand:
- * <ul>
- *   <li>left-click a block → set position 1 (cuboid) or add a polygon vertex;</li>
- *   <li>right-click a block → set position 2 (cuboid) or add a polygon vertex.</li>
- * </ul>
- * Every wand interaction is cancelled so the item can <em>only</em> select — it never breaks a
- * block, places, eats or attacks. Listeners run at {@link EventPriority#HIGHEST} so the cancel
- * lands before {@link BlockEventHandler}'s protection checks (which already defer to us — see the
- * "honor higher-priority cancellations (e.g. wand)" note there).
- *
- * <p>Selecting requires {@code worldguardneo.selection.use} (op 0 by default, i.e. everyone). A
- * player who lacks it still can't grief with the wand: the interaction is cancelled, it just
- * doesn't record a position.
+ * Turns the built-in wand ({@link WandItem}) into a selection tool: left-click sets pos1 / adds a
+ * polygon vertex, right-click sets pos2 / adds a vertex. Every wand interaction is cancelled so the
+ * item can only select. Runs at {@link EventPriority#HIGHEST} so the cancel lands before
+ * {@link BlockEventHandler}'s protection checks (which defer to us). Selecting requires
+ * {@code worldguardneo.selection.use}; lacking it still cancels, it just records nothing.
  */
 public final class SelectionWandHandler {
 

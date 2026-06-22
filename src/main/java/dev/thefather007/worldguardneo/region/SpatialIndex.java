@@ -11,22 +11,15 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Chunk-bucketed spatial index for region lookup.
+ * Chunk-bucketed spatial index for region lookup. Each region is registered in every 16×16 (XZ)
+ * chunk-column its AABB overlaps; a point lookup is one chunk-key probe + linear filter over the
+ * (tiny) bucket. Y is not bucketed (extents are usually large; a Y axis would just bloat memory).
  *
- * Each region is registered in every 16×16 (XZ) chunk-column its bounding box overlaps.
- * Lookup at a point reduces to a single chunk-key map probe, then a linear filter over the
- * (typically tiny) bucket. Y is not bucketed because vertical extents are usually large
- * and a 16-bucket Y axis would multiply memory cost without much benefit.
+ * <p>Regions whose footprint exceeds {@link #MAX_BUCKETS_PER_REGION} buckets (e.g. world-spanning
+ * admin regions) go in {@link #oversized} and are consulted via fallback scan, keeping memory bounded.
  *
- * Regions whose XZ footprint would create more than {@link #MAX_BUCKETS_PER_REGION} buckets
- * (e.g. world-spanning admin regions) are placed in {@link #oversized} instead and consulted
- * as a fallback linear scan. This keeps memory bounded even for pathological inputs.
- *
- * Performance: uses {@link Long2ObjectOpenHashMap} to avoid Long autoboxing on every
- * lookup — region position checks fire thousands of times per tick on a busy server.
- *
- * Thread-safety: read-only after build, mutating methods must be called from the
- * server thread (same as RegionManager).
+ * <p>Uses {@link Long2ObjectOpenHashMap} to avoid Long autoboxing — lookups fire thousands of times
+ * per tick. Read-only after build; mutators must run on the server thread.
  */
 public final class SpatialIndex {
 
@@ -36,17 +29,13 @@ public final class SpatialIndex {
     /** Key = ((long) chunkX << 32) | (chunkZ & 0xffff_ffffL). Primitive map → no Long boxing. */
     private final Long2ObjectOpenHashMap<ArrayList<ProtectedRegion>> buckets = new Long2ObjectOpenHashMap<>();
 
-    /**
-     * Regions too large to bucket. IdentityHashMap<Object,Boolean> as a poor-man's identity set
-     * (we never have duplicates here; identity equality is what we want for region instances).
-     */
+    /** Regions too large to bucket. IdentityHashMap as a poor-man's identity set (region instances). */
     private final IdentityHashMap<ProtectedRegion, Boolean> oversized = new IdentityHashMap<>();
 
     /**
-     * Immutable snapshot of {@link #oversized}'s keys, rebuilt only when the oversized set
-     * mutates. Lets {@link #candidates} return it directly (zero allocation) for the very
-     * common "point is in a world-spanning region but no bucketed region" lookup — on a server
-     * with even one oversized region that path previously allocated an ArrayList on EVERY probe.
+     * Immutable snapshot of {@link #oversized}'s keys, rebuilt only on mutation. Lets
+     * {@link #candidates} return it with zero allocation for the common "point is in a world-spanning
+     * region but no bucketed region" lookup.
      */
     private List<ProtectedRegion> oversizedSnapshot = List.of();
 
@@ -84,8 +73,7 @@ public final class SpatialIndex {
         for (int cx = cx0; cx <= cx1; cx++) {
             for (int cz = cz0; cz <= cz1; cz++) {
                 long k = key(cx, cz);
-                // get+put avoids overload ambiguity between Long2ObjectOpenHashMap's
-                // computeIfAbsent(long,Long2ObjectFunction) and Map.computeIfAbsent(K,Function).
+                // get+put avoids computeIfAbsent overload ambiguity (primitive vs Map variant).
                 ArrayList<ProtectedRegion> list = buckets.get(k);
                 if (list == null) {
                     list = new ArrayList<>(2);

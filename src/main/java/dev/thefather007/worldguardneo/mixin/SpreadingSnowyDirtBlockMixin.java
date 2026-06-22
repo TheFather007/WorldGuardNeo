@@ -14,17 +14,9 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Gates the random-tick spread logic shared by {@link GrassBlock} and {@link MyceliumBlock}
- * (and any other modded block that subclasses {@link SpreadingSnowyDirtBlock}, since both
- * vanilla grass and mycelium use the same parent for their spread implementation).
- *
- * <p>We dispatch on the concrete class:
- * <ul>
- *   <li>Grass-block tick → {@code GRASS_SPREAD} flag</li>
- *   <li>Mycelium-block tick → {@code MYCELIUM_SPREAD} flag</li>
- *   <li>Modded subclasses → treated as grass-spread by default; admins can swap to
- *       mycelium-spread per region if their block is mycelium-like.</li>
- * </ul>
+ * Gates the random-tick spread shared by {@link GrassBlock}, {@link MyceliumBlock}, and any
+ * modded {@link SpreadingSnowyDirtBlock} subclass (all share the parent's spread impl). Dispatches
+ * on concrete class: mycelium → {@code MYCELIUM_SPREAD}, everything else → {@code GRASS_SPREAD}.
  */
 @Mixin(SpreadingSnowyDirtBlock.class)
 public abstract class SpreadingSnowyDirtBlockMixin {
@@ -33,13 +25,10 @@ public abstract class SpreadingSnowyDirtBlockMixin {
     private void worldguardneo$gateSpread(
             BlockState state, ServerLevel level, BlockPos pos, RandomSource rng,
             CallbackInfo ci) {
-        // Concrete-class dispatch — Mycelium gets its own flag, everything else falls under
-        // grass-spread. This keeps the public flag set semantically clean.
         Object self = this;
         if (self instanceof MyceliumBlock) {
             if (!MixinFlagBridge.myceliumSpread(level, pos)) ci.cancel();
         } else {
-            // GrassBlock + any modded SpreadingSnowyDirtBlock subclass that isn't mycelium.
             if (!MixinFlagBridge.grassSpread(level, pos)) ci.cancel();
         }
     }

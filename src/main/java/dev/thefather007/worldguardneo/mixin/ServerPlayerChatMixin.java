@@ -10,15 +10,10 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Enforces the {@code receive-chat} flag: a player standing in a region where {@code receive-chat}
- * is DENY does not receive other players' chat messages. This is the RECEIVER side — the
- * complement of {@code send-chat} (which gates the sender via {@code ServerChatEvent}). There is no
- * per-recipient NeoForge event, so we intercept the per-player delivery method directly.
- *
- * <p>{@link ServerPlayer#sendChatMessage} is vanilla's per-recipient chat delivery (system messages
- * use a different method, so those still get through). Cancelling at HEAD simply suppresses the
- * message for this receiver. {@code require = 0} (mixin-config default): a future remap just skips
- * the injection rather than crashing — protection turns off, never a hard failure.
+ * Enforces the receiver side of {@code receive-chat}: a player in a region where it's DENY doesn't
+ * receive others' chat. Complement of {@code send-chat}; there's no per-recipient NeoForge event,
+ * so we cancel vanilla's per-recipient {@link ServerPlayer#sendChatMessage} at HEAD (system
+ * messages use a different method and still get through).
  */
 @Mixin(ServerPlayer.class)
 public abstract class ServerPlayerChatMixin {

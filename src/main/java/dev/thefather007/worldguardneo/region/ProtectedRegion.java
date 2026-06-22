@@ -6,27 +6,19 @@ import dev.thefather007.worldguardneo.util.Vec3;
 import java.util.*;
 
 /**
- * A region of space in a single world that holds flags, owners and members.
+ * A region of space in a single world that holds flags, owners and members. Subclasses implement
+ * geometry (contains/minimumBound/maximumBound).
  *
- * Subclasses must implement geometry: {@link #contains(double, double, double)},
- * {@link #minimumBound()} and {@link #maximumBound()}.
- *
- * <p><b>Memory layout</b>: the six collections (owners, members, owner-groups,
- * member-groups, flag values, flag groups) are lazily allocated on first write.
- * On a large server with thousands of mostly-quiet regions this saves significant
- * heap — a region with no flags, no owners, no members costs no collection objects.
- * Read methods tolerate null collections and return safe empty results.
+ * <p>Memory layout: the six collections are lazily allocated on first write so a quiet region costs
+ * no collection objects — significant heap saving across thousands of regions. Reads tolerate null.
  */
 public abstract class ProtectedRegion {
 
     /**
-     * Global mutation epoch, bumped on every flag/group/parent/priority change on ANY region.
-     * Consumers (e.g. the per-player tick cache in PlayerEventHandler) compare a stored epoch
-     * against this to know whether previously computed flag-derived state is still valid —
-     * a single volatile read instead of re-resolving a dozen flags every tick.
-     *
-     * <p>Single-writer: all mutations happen on the server thread, so the unguarded volatile
-     * increment is race-free; same-thread readers always observe the latest value.
+     * Global mutation epoch, bumped on every flag/group/parent/priority change on ANY region. Lets
+     * consumers (e.g. the per-player tick cache) invalidate cached flag-derived state with one
+     * volatile read instead of re-resolving flags every tick. Single-writer (server thread), so the
+     * unguarded volatile increment is race-free.
      */
     private static volatile long flagEpoch;
     public  static long flagEpoch()     { return flagEpoch; }
@@ -48,9 +40,8 @@ public abstract class ProtectedRegion {
     private Map<Flag<?>, RegionGroup> flagGroups;
 
     protected ProtectedRegion(String id) {
-        // Validate id manually instead of regex.matches — runs on every region load,
-        // and on a server with thousands of regions this compiles thousands of Patterns
-        // at boot. Spec: one or more [a-zA-Z0-9_\-:.]
+        // Manual validation, not regex.matches — avoids compiling a Pattern per region at boot.
+        // Spec: one or more [a-zA-Z0-9_\-:.]
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("Invalid region id: empty");
         }
@@ -85,11 +76,7 @@ public abstract class ProtectedRegion {
     /** Allocation-free "does this region set any flag values?" probe for cache relevance. */
     public final boolean hasFlags() { return flagValues != null && !flagValues.isEmpty(); }
 
-    /**
-     * Mutable owners set. Lazy-allocated — the first call to this method materializes the
-     * underlying collection. Use {@link #ownersView()} for read-only access without allocation,
-     * or {@link #isOwner} to test single membership.
-     */
+    /** Mutable owners set; lazy-allocated on first call. Use {@link #ownersView()}/{@link #isOwner} for allocation-free reads. */
     public final Set<UUID>   owners()        {
         if (owners == null) owners = new LinkedHashSet<>(2);
         return owners;
@@ -161,12 +148,9 @@ public abstract class ProtectedRegion {
     }
 
     /**
-     * Copy every flag value AND its group filter from {@code other} into this region. Used by
-     * {@code /rg redefine}, which builds a fresh region object at the new geometry and must
-     * carry over all existing flags. Done here (rather than element-by-element in the command
-     * layer with a raw {@code Flag}) so the unchecked storage copy stays encapsulated: the
-     * values already came out of a region's own typed {@link #setFlag} calls, so re-storing
-     * them verbatim preserves the flag→value type pairing without any cast.
+     * Copy every flag value AND group filter from {@code other} into this region. Used by
+     * {@code /rg redefine}. Done here so the unchecked storage copy stays encapsulated — the values
+     * came from typed {@link #setFlag} calls, so re-storing verbatim preserves flag→value types.
      */
     public final void copyFlagsFrom(ProtectedRegion other) {
         if (other.flagValues != null && !other.flagValues.isEmpty()) {
