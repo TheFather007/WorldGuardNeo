@@ -6,7 +6,7 @@
 
 [English](API.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · **⚙️ API** · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · **⚙️ API** · [🧩 KubeJS](KUBEJS.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -79,6 +79,7 @@ List<ProtectedRegion> mine = WorldGuardNeoAPI.getOwnedRegions(level, player.getU
 boolean canBuild = WorldGuardNeoAPI.canBuild(player, pos);
 
 // Аналогично для других защит
+boolean canPlace        = WorldGuardNeoAPI.canPlace(player, pos);
 boolean canInteract     = WorldGuardNeoAPI.canInteract(player, pos);
 boolean canAccessChests = WorldGuardNeoAPI.canAccessChests(player, pos);
 boolean canPvP          = WorldGuardNeoAPI.canPvP(player, pos);
@@ -252,7 +253,7 @@ public class MyMagicMod {
 }
 ```
 
-Теперь админ может запретить магию в регионе через `/rg flag spawn mymagicmod.no-magic deny`.
+Теперь админ может запретить магию в регионе через `/rg flag spawn mymagicmod-no-magic deny`.
 
 ### Пример 2: мод респаун-логирования
 

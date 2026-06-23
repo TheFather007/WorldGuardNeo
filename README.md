@@ -2,7 +2,7 @@
 
 # WorldGuardNeo
 
-**Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created with a built-in selection wand and protected by 80+ per-region flags. No WorldEdit required.**
+**Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created with a built-in selection wand and protected by 90+ per-region flags. No WorldEdit required.**
 
 ![Version](https://img.shields.io/badge/Version-1.3-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
@@ -24,7 +24,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 ## Features
 
 - **Built-in selection wand** — `/rg wand` hands out a selection item (a stick by default, configurable). Left/right-click two corners for a cuboid, or build a polygon point-by-point. No WorldEdit dependency. The outline renders client-side for players who have [WorldEditCUI](https://www.curseforge.com/minecraft/mc-mods/worldedit-cui).
-- **80+ flags** — build, block-break/place, interact, use, chest-access, pvp, mob-spawning, mob-damage, tnt/creeper/other explosions, fire-spread, lava-fire, lightning, redstone, pistons, dispenser-output, fluids, growth, entry/exit, greetings, game-mode/time/weather locks, keep-inventory/xp, and more.
+- **90+ flags** — build, block-break/place, interact, use, chest-access, pvp, mob-spawning, mob-damage, tnt/creeper/other explosions, fire-spread, lava-fire, lightning, redstone, pistons, dispenser-output, fluids, growth, entry/exit, greetings, game-mode/time/weather locks, keep-inventory/xp, and more.
 - **Per-region & per-world** — flags per region; world-wide toggles per dimension via override files.
 - **Membership model** — owners and members; build-type flags respect them (WorldGuard "private by default").
 - **Parents & priority** — regions inherit flags from a parent; overlapping regions resolve by priority (DENY beats ALLOW).
@@ -222,7 +222,7 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 
 ## Flags
 
-WorldGuardNeo ships 80+ flags. Build-type flags (build, block-break, block-place, interact, use, chest-access) follow the membership model; the rest are environmental state flags (allow/deny) or value flags (greetings, locks, limits). Run `/rg flags` in-game to list every flag with its value hint and description.
+WorldGuardNeo ships 90+ flags. Build-type flags (build, block-break, block-place, interact, use, chest-access) follow the membership model; the rest are environmental state flags (allow/deny) or value flags (greetings, locks, limits). Run `/rg flags` in-game to list every flag with its value hint and description.
 
 **See [FLAGS.md](FLAGS.md) for the complete table** — every flag with its type, default, permission node, and description.
 

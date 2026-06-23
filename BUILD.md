@@ -6,7 +6,7 @@
 
 **English** · [Русский](BUILD_RU.md)
 
-[🏠 Home](README.md) · **🔨 Building** · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · **🔨 Building** · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [🧩 KubeJS](KUBEJS.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -42,7 +42,7 @@ worldguardneo/
 ├── settings.gradle.kts
 ├── gradlew / gradlew.bat     # Gradle wrapper
 └── src/main/
-    ├── java/                 # source (60 files)
+    ├── java/                 # source (69 files)
     └── resources/
         ├── META-INF/neoforge.mods.toml
         ├── assets/worldguardneo/lang/   # en_us, ru_ru
