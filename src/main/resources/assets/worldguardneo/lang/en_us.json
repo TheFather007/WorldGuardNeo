@@ -37,6 +37,7 @@
   "msg.region.defined": "§8[§3WGN§8] §a✔ §7Region §6%id% §aclaimed §8(§7volume §b%volume%§8)§7.",
   "msg.region.redefined": "§8[§3WGN§8] §a✔ §7Region §6%id% §aredefined§7.",
   "msg.region.removed": "§8[§3WGN§8] §a✔ §7Region §6%id% §cremoved§7.",
+  "msg.region.renamed": "§8[§3WGN§8] §a✔ §7Region §6%id% §7renamed to §6%new%§7.",
   "msg.region.unknown": "§8[§3WGN§8] §c✘ §7Unknown region §6%id%§7.",
   "msg.region.notyours": "§8[§3WGN§8] §c✘ §7You are not an §fowner §7of region §6%id%§7.",
   "msg.region.none-here-own": "§8[§3WGN§8] §7You are not standing in any region you own or belong to.",

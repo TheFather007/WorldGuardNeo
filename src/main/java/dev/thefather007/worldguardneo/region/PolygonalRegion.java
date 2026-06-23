@@ -86,4 +86,8 @@ public final class PolygonalRegion extends ProtectedRegion {
     @Override public Vec3   maximumBound() { return maxBound; }
     @Override public String type()         { return "polygonal"; }
     @Override public long   volume()       { return volume; }
+
+    @Override public ProtectedRegion withId(String newId) {
+        return new PolygonalRegion(newId, points, minY, maxY);
+    }
 }

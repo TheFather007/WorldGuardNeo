@@ -118,6 +118,13 @@ public final class WGCommands {
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.redefine"))
                         .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .executes(c -> redefineRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
+                .then(Commands.literal("rename")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.region.rename"))
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .then(Commands.argument("newId", StringArgumentType.word())
+                                        .executes(c -> renameRegion(c.getSource(),
+                                                StringArgumentType.getString(c, "id"),
+                                                StringArgumentType.getString(c, "newId"), mod)))))
                 .then(Commands.literal("wand")
                         // Hand out the built-in selection wand (configurable item). Obtainable once.
                         .requires(s -> mod.perms().has(s, "worldguardneo.selection.wand"))
@@ -773,6 +780,36 @@ public final class WGCommands {
      *   - {@code region.delete.others} → may remove any region (with or without ownership)
      *   - {@code region.bypass}        → implies {@code delete.others}
      */
+    /** /rg rename &lt;id&gt; &lt;newId&gt; — change a region's id, keeping geometry, flags, members and children. */
+    private static int renameRegion(CommandSourceStack src, String id, String newId, WorldGuardNeo mod)
+            throws CommandSyntaxException {
+        ServerPlayer p = src.getPlayerOrException();
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        var r = mgr.get(id);
+        if (r.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        if (r.get() instanceof dev.thefather007.worldguardneo.region.GlobalRegion) {
+            err(src, mod, "msg.region.global-remove"); return 0;
+        }
+        boolean admin   = mod.perms().has(p, "worldguardneo.region.bypass")
+                       || mod.perms().has(p, "worldguardneo.region.admin");
+        if (!admin && !r.get().isOwner(p.getUUID())) {
+            err(src, mod, "msg.region.notyours", "id", id); return 0;
+        }
+        if (!isValidRegionId(newId)) { err(src, mod, "msg.region.bad-id", "id", newId); return 0; }
+        if (mgr.get(newId).isPresent()) { err(src, mod, "msg.region.exists", "id", newId); return 0; }
+
+        var renamed = mgr.rename(id, newId);
+        if (renamed.isEmpty()) { err(src, mod, "msg.region.exists", "id", newId); return 0; }
+        mod.regions().save(p.serverLevel()); // prunes the old id, writes the new region + relinked children
+        var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
+        if (bm != null) { bm.removeRegion(p.serverLevel(), id); bm.updateRegion(p.serverLevel(), renamed.get()); }
+        var sq = dev.thefather007.worldguardneo.integrations.SquaremapIntegration.get();
+        if (sq != null) { sq.removeRegion(p.serverLevel(), id); sq.updateRegion(p.serverLevel(), renamed.get()); }
+        mod.audit().record(src, "rename", id, "-> " + newId);
+        ok(src, mod, "msg.region.renamed", "id", id, "new", newId);
+        return 1;
+    }
+
     private static int removeRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
         RegionManager mgr = mod.regions().get(p.serverLevel());
