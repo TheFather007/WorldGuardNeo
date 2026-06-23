@@ -93,6 +93,9 @@ public final class RegionManager {
         if (!old.membersView().isEmpty())      fresh.members().addAll(old.membersView());
         if (!old.memberGroupsView().isEmpty()) fresh.memberGroups().addAll(old.memberGroupsView());
         fresh.copyFlagsFrom(old);
+        // Preserve origin; renaming counts as a modification, so leave modifiedAt at "now".
+        fresh.setCreatedAt(old.createdAt());
+        fresh.setCreatedBy(old.createdBy());
 
         regions.put(key(newId), fresh);
         index.add(fresh);

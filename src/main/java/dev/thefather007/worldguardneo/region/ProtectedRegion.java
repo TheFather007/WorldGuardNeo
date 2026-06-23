@@ -27,6 +27,12 @@ public abstract class ProtectedRegion {
     private int priority = 0;
     private ProtectedRegion parent;
 
+    // Lifecycle metadata (epoch millis; createdBy nullable). createdAt/modifiedAt default to "now"
+    // for a freshly constructed region; the codec overwrites them via the raw setters when loading.
+    private long createdAt  = System.currentTimeMillis();
+    private long modifiedAt = createdAt;
+    private UUID createdBy;
+
     // Nullable — lazily allocated on first write. Reads tolerate null and substitute
     // empty collections so callers can iterate uniformly without null checks.
     private Set<UUID>   owners;
@@ -58,7 +64,7 @@ public abstract class ProtectedRegion {
 
     public final String id()                       { return id; }
     public final int    priority()                 { return priority; }
-    public final void   setPriority(int p)         { this.priority = p; bumpFlagEpoch(); }
+    public final void   setPriority(int p)         { this.priority = p; touch(); }
     public final ProtectedRegion parent()          { return parent; }
     public final void   setParent(ProtectedRegion p) {
         // Cycle check, bounded at 32 hops to defend against pre-corrupted data.
@@ -68,8 +74,26 @@ public abstract class ProtectedRegion {
             cursor = cursor.parent;
         }
         this.parent = p;
-        bumpFlagEpoch();
+        touch();
     }
+
+    /* -------------------- lifecycle metadata -------------------- */
+
+    public final long createdAt()  { return createdAt; }
+    public final long modifiedAt() { return modifiedAt; }
+    /** Who created the region; {@code null} for legacy data or console-created regions. */
+    public final UUID createdBy()  { return createdBy; }
+
+    /** Raw setters for the storage codec — they do NOT bump {@link #modifiedAt} or the epoch. */
+    public final void setCreatedAt(long t)  { this.createdAt = t; }
+    public final void setModifiedAt(long t) { this.modifiedAt = t; }
+    public final void setCreatedBy(UUID u)  { this.createdBy = u; }
+
+    /** Record a mutation: refresh {@link #modifiedAt} and bump the global flag epoch. Call this from
+     *  command code after changing owners/members through the mutable set views. */
+    public final void markModified() { touch(); }
+
+    private void touch() { this.modifiedAt = System.currentTimeMillis(); bumpFlagEpoch(); }
 
     /** Allocation-free "does this region set any flag values?" probe for cache relevance. */
     public final boolean hasFlags() { return flagValues != null && !flagValues.isEmpty(); }
@@ -124,7 +148,7 @@ public abstract class ProtectedRegion {
             if (flagValues == null) flagValues = new LinkedHashMap<>(4);
             flagValues.put(flag, value);
         }
-        bumpFlagEpoch();
+        touch();
     }
     /**
      * Set the group filter for a flag. Setting a group on a flag with no value is harmless
@@ -139,7 +163,7 @@ public abstract class ProtectedRegion {
             if (flagGroups == null) flagGroups = new LinkedHashMap<>(2);
             flagGroups.put(flag, g);
         }
-        bumpFlagEpoch();
+        touch();
     }
     public final Map<Flag<?>, Object>      flagsRaw()     {
         return flagValues == null ? Collections.emptyMap() : Collections.unmodifiableMap(flagValues);
@@ -159,7 +183,7 @@ public abstract class ProtectedRegion {
             if (flagGroups == null) flagGroups = new LinkedHashMap<>(other.flagGroups.size());
             flagGroups.putAll(other.flagGroups);
         }
-        bumpFlagEpoch();
+        touch();
     }
     public final Map<Flag<?>, RegionGroup> flagGroupsRaw(){
         return flagGroups == null ? Collections.emptyMap() : Collections.unmodifiableMap(flagGroups);

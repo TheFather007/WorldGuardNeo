@@ -60,6 +60,8 @@
   "msg.info.parent": "§8 ┃ §7Parent §8» §6%parent%",
   "msg.info.owners": "§8 ┃ §7Owners §8» §f%list%",
   "msg.info.members": "§8 ┃ §7Members §8» §f%list%",
+  "msg.info.created": "§8 ┃ §7Created §8» §f%date% §7by §f%by%",
+  "msg.info.modified": "§8 ┃ §7Modified §8» §f%date%",
   "msg.info.flags": "§8 ┃ §7Flags §8» §f%list%",
   "msg.info.none": "§8(none)",
 
