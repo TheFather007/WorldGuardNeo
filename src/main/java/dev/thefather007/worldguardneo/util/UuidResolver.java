@@ -19,12 +19,10 @@ import java.util.UUID;
  *   <li>Server's {@link GameProfileCache} (the {@code usercache.json} on disk). Synchronous lookup.</li>
  * </ol>
  *
- * <p>We deliberately do NOT call the Mojang session-server here. Hitting an external API
- * synchronously from a command thread would freeze the server for unknown players. Admins
- * who need to add an unseen player should first connect them, or paste their UUID directly.
+ * <p>Deliberately does NOT call the Mojang session-server: a synchronous external API hit would
+ * freeze the server for unknown players. For an unseen player, connect them first or paste the UUID.
  *
- * <p>The reverse direction ({@link #nameOf}) returns a best-effort display name, falling
- * back to the stringified UUID when the profile is unknown.
+ * <p>{@link #nameOf} is the reverse: a best-effort display name, falling back to the UUID string.
  */
 public final class UuidResolver {
 
@@ -36,8 +34,8 @@ public final class UuidResolver {
     public static Optional<UUID> resolve(MinecraftServer server, String input) {
         if (input == null || input.isEmpty()) return Optional.empty();
 
-        // 1. Raw UUID input. Accept dashed (36-char canonical) or undashed (32 hex chars).
-        // The strict length check avoids slow exception paths for short inputs like "Bob".
+        // 1. Raw UUID: dashed (36) or undashed (32 hex). Length check avoids slow exception paths
+        // for short inputs like "Bob".
         int len = input.length();
         boolean looksDashed   = len == 36 && input.charAt(8) == '-';
         boolean looksUndashed = len == 32 && input.indexOf('-') < 0;
@@ -69,10 +67,8 @@ public final class UuidResolver {
         // path — e.g. a web-map (BlueMap/squaremap) marker popup rendered during shutdown. Fall back
         // to the raw UUID rather than NPE on server.getPlayerList().
         if (server == null) return uuid.toString();
-        // Online?
         ServerPlayer online = server.getPlayerList().getPlayer(uuid);
         if (online != null) return online.getGameProfile().getName();
-        // Cached?
         try {
             GameProfileCache cache = server.getProfileCache();
             if (cache != null) {

@@ -4,23 +4,15 @@ import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
 import net.minecraft.server.level.ServerPlayer;
 
 /**
- * Fallback resolver when LuckPerms is not installed. Maps known permission node prefixes
- * to OP levels (defaults: admin=3, mod=2). Unknown nodes default to op-level 2.
- *
- * Server operators can tune the mapping by calling {@link #setLevel}.
- *
- * Uses {@link Object2IntOpenHashMap} to avoid boxing on the lookup path — permission
- * checks happen on most player actions and the difference adds up on busy servers.
+ * Fallback resolver when LuckPerms is not installed. Maps permission nodes to required OP levels
+ * (defaults: admin=3, mod=2; unknown nodes default to 2). Uses {@link Object2IntOpenHashMap} to
+ * avoid boxing on the lookup path, which runs on most player actions.
  */
 public final class OpResolver implements PermissionResolver {
 
     private static final int DEFAULT_LEVEL = 2;
 
-    /**
-     * Permission-node → required OP level. Primitive-valued map so {@link #has} doesn't
-     * box/unbox Integer on every check. The {@code defaultReturnValue} substitutes
-     * {@link Map#getOrDefault} cleanly without a wrapper instance.
-     */
+    /** Permission-node → required OP level. Primitive-valued to avoid boxing on every check. */
     private final Object2IntOpenHashMap<String> nodeToLevel = new Object2IntOpenHashMap<>();
 
     public OpResolver() {
@@ -29,20 +21,14 @@ public final class OpResolver implements PermissionResolver {
     }
 
     /**
-     * Rebuild the node→level table from the current config snapshot. Called by
-     * {@code /rg reload} so admins can change {@code defaultOpLevelAdmin}/{@code Mod}
-     * without restarting the server.
-     *
-     * <p>Safe to call multiple times. Clears any custom levels added via {@link #setLevel}
-     * — admins who want runtime-set levels must reapply them after reload (typically not
-     * an issue since {@code setLevel} isn't exposed to commands).
+     * Rebuild the node→level table from the current config snapshot. Called by {@code /rg reload}
+     * to pick up changed {@code defaultOpLevelAdmin}/{@code Mod}. Safe to call repeatedly; clears
+     * any custom levels added via {@link #setLevel}.
      */
     public void applyConfigLevels() {
         nodeToLevel.clear();
 
-        // Defer to the global config's defaultOpLevelAdmin/Mod when available — if WGN
-        // isn't booted yet (e.g. detect() is called before getInstance()), fall back to
-        // vanilla-style 3/2 levels.
+        // Defer to config's admin/mod levels when WGN is booted; else vanilla-style 3/2.
         int admin = 3, mod = 2;
         try {
             var modInst = dev.thefather007.worldguardneo.WorldGuardNeo.get();
@@ -53,21 +39,14 @@ public final class OpResolver implements PermissionResolver {
         } catch (Throwable ignored) {}
 
         // Region-management nodes.
-        // region.bypass is deliberately set to level 5 — ABOVE the maximum vanilla op level (4).
-        // This means being an operator does NOT auto-grant bypass via the OP fallback. Bypass
-        // is a protection-critical permission: on servers where builders/staff hold op for
-        // unrelated reasons, auto-granting bypass would silently let them ignore every claim,
-        // which is exactly the "protection doesn't work for my admin" trap. To get bypass now,
-        // grant the node EXPLICITLY (e.g. LuckPerms `/lp user X permission set
-        // worldguardneo.region.bypass true`, or a group). A plain op no longer bypasses.
+        // region.bypass is level 5 — ABOVE vanilla's max op level (4) — so OP never auto-grants this
+        // protection-critical node. It must be granted explicitly (e.g. via LuckPerms).
         nodeToLevel.put("worldguardneo.region.bypass",        5);
         nodeToLevel.put("worldguardneo.region.admin",         admin);
         nodeToLevel.put("worldguardneo.region.claim",         0);
         nodeToLevel.put("worldguardneo.region.info",          0);
         nodeToLevel.put("worldguardneo.region.info.others",   mod);
-        // OP 4 — strongest fallback. The global region holds world-wide defaults, accidental
-        // disclosure of its flags to a moderator could reveal server-internal balance choices
-        // (creative-mode safeguards, custom respawn behaviour, etc).
+        // OP 4 — global flags can reveal server-internal balance choices, so keep it admin-only.
         nodeToLevel.put("worldguardneo.region.info.global",   4);
         nodeToLevel.put("worldguardneo.region.list",          0);
         nodeToLevel.put("worldguardneo.region.list.others",   mod);
@@ -92,26 +71,18 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.region.flag.parent",   mod);
         nodeToLevel.put("worldguardneo.region.flags.list",    mod);  // /rg flags: op-2 or node
 
-        // Misc.
-        // selection.use gates the *wand item* (clicking blocks to pick corners). The selection
-        // commands each have their own node so admins can hand them out individually — all OP 0
-        // by default (everyone) to mirror open claiming.
+        // Misc. Selection nodes are OP 0 (everyone) to mirror open claiming; each has its own
+        // node so admins can restrict them individually. selection.use gates the wand item.
         nodeToLevel.put("worldguardneo.selection.use",        0);
         nodeToLevel.put("worldguardneo.selection.mode",       0);   // /rg sel cuboid|poly|clear
         nodeToLevel.put("worldguardneo.selection.pos1",       0);   // /rg pos1
         nodeToLevel.put("worldguardneo.selection.pos2",       0);   // /rg pos2
         nodeToLevel.put("worldguardneo.selection.point",      0);   // /rg point
-        // Explicit-coords pos1/pos2 — higher bar than the "here" variants since it can place a
-        // corner anywhere (and run from console via /execute as). OP 4.
+        // Explicit-coords pos can place a corner anywhere (and from console), so OP 4.
         nodeToLevel.put("worldguardneo.selection.pos.coords", 4);   // /rg pos1|pos2 <x y z>
-        // The wand-give command. OP 0 (everyone) by default so any player can grab the selection
-        // wand and claim land, mirroring selection.use. Admins can restrict via LuckPerms.
-        nodeToLevel.put("worldguardneo.selection.wand",       0);
-        // reload and backup are top-tier (OP 4) — reload swaps live config state and could
-        // brick a busy server if mis-edited config.toml reaches production; backup writes
-        // to disk and rotates retention. Both are dangerous enough to keep alongside bypass
-        // and info.global. Service accounts that need /rg backup as part of automation
-        // should be granted the explicit LP node rather than relying on OP level.
+        nodeToLevel.put("worldguardneo.selection.wand",       0);   // /rg wand — mirrors selection.use
+        // reload (swaps live config) and backup (disk write + rotation) are OP 4 — dangerous enough
+        // to sit alongside bypass/info.global; automation should use the explicit LP node.
         nodeToLevel.put("worldguardneo.reload",               4);
         nodeToLevel.put("worldguardneo.backup",               4);
         nodeToLevel.put("worldguardneo.migrate",              4);   // /rg migrate — convert storage backend
@@ -125,9 +96,7 @@ public final class OpResolver implements PermissionResolver {
 
     @Override
     public boolean has(ServerPlayer player, String node) {
-        // Per-flag nodes default to op-level 2 — admins can grant them individually via LP.
-        // Without LP, all per-flag editing requires op 2.
-        // getInt + defaultReturnValue — no Integer allocation on the lookup path.
+        // Unknown nodes fall to the default level (2). getInt avoids Integer allocation.
         int required = nodeToLevel.getInt(node);
         if (required == 0) return true;
         return player.hasPermissions(required);

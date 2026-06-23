@@ -30,11 +30,9 @@ public interface RegionStorage extends AutoCloseable {
     }
 
     /**
-     * Flush in-memory/journal state to the primary data file(s) so an external file-copy backup
-     * captures a consistent, up-to-date snapshot. For embedded SQL engines this checkpoints the
-     * write-ahead log into the main DB file; for the others it is a no-op. Called by
-     * {@link dev.thefather007.worldguardneo.backup.BackupManager} on the server thread immediately
-     * before it copies the data files. Best-effort: never throws.
+     * Flush journal state into the primary data file(s) so a file-copy backup is consistent.
+     * Embedded SQL engines checkpoint the WAL; others no-op. Called on the server thread just
+     * before BackupManager copies the files. Best-effort: never throws.
      */
     default void prepareForBackup() {}
 

@@ -17,17 +17,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Built-in region selection — the replacement for WorldEdit. Holds one {@link Selection} per
- * player (cuboid corners or polygon points), and renders it to the client via the WorldEdit-CUI
- * plugin channel (see {@link CuiPayload}).
+ * Built-in region selection (WorldEdit replacement). Holds one {@link Selection} per player
+ * (cuboid corners or polygon points) and renders it via the WorldEdit-CUI channel (see
+ * {@link CuiPayload}). Driven by the wand and {@code /rg pos1|pos2|point|sel}.
  *
- * <p>The wand item ({@code /rg wand}, configurable via {@code selection.wand-item}) drives this:
- * left-click sets position 1 / adds a polygon point, right-click sets position 2. The same state
- * can also be set with {@code /rg pos1}, {@code /rg pos2}, {@code /rg point}, and the selection
- * mode toggled with {@code /rg sel cuboid|poly}.
- *
- * <p>All access is from the server thread (interaction + command handlers, logout cleanup), so a
- * plain {@link HashMap} suffices — no synchronisation needed.
+ * <p>All access is from the server thread, so a plain {@link HashMap} suffices — no sync needed.
  */
 public final class SelectionStore {
 
@@ -56,8 +50,7 @@ public final class SelectionStore {
         Selection sel = getOrCreate(p.getUUID());
         if (sel.mode != mode) {
             sel.mode = mode;
-            // Mode change starts a fresh selection so stale cuboid corners don't leak into a
-            // polygon (and vice-versa). The client outline is cleared too.
+            // Fresh geometry so stale cuboid corners don't leak into a polygon (and vice-versa).
             resetGeometry(sel);
             render(p, sel);
         }
@@ -118,7 +111,7 @@ public final class SelectionStore {
     /** Drop the player's entire selection and clear the client outline. */
     public void reset(ServerPlayer p) {
         selections.remove(p.getUUID());
-        // An empty cuboid shape with no points tells WorldEditCUI to drop the box.
+        // Empty cuboid shape tells WorldEditCUI to drop the box.
         send(p, "s|cuboid");
     }
 
@@ -130,7 +123,7 @@ public final class SelectionStore {
     public Optional<ProtectedRegion> buildRegion(ServerPlayer p, String id) {
         Selection sel = selections.get(p.getUUID());
         if (sel == null) return Optional.empty();
-        // Corners/points are world-relative; refuse to build in a different world.
+        // Corners are world-relative; refuse to build in a different world.
         if (sel.world != null && sel.world != p.serverLevel().dimension()) return Optional.empty();
         if (sel.mode == Mode.CUBOID) {
             if (sel.pos1 == null || sel.pos2 == null) return Optional.empty();
@@ -162,11 +155,7 @@ public final class SelectionStore {
 
     /* ----------------------------------------------------------------- CUI rendering */
 
-    /**
-     * Push the current selection to the player's WorldEditCUI client. No-op (other than dropped
-     * packets) for clients without WorldEditCUI. Also used by {@code /rg info} to outline an
-     * existing region — see {@link #renderRegion}.
-     */
+    /** Push the current selection to the player's WorldEditCUI client (no-op without it). */
     public void render(ServerPlayer p, Selection sel) {
         if (sel.mode == Mode.CUBOID) {
             send(p, "s|cuboid");
@@ -210,9 +199,8 @@ public final class SelectionStore {
     }
 
     /**
-     * Send one CUI command, but only to clients that actually negotiated the {@code worldedit:cui}
-     * channel (i.e. have WorldEditCUI). Gating on {@code hasChannel} rather than catching a send
-     * failure means vanilla clients cost nothing — no exception thrown/caught per selection action.
+     * Send one CUI command, only to clients that negotiated the channel. Gating on
+     * {@code hasChannel} avoids a thrown/caught exception per action for vanilla clients.
      */
     private static void send(ServerPlayer p, String command) {
         if (!p.connection.hasChannel(CuiPayload.TYPE)) return;

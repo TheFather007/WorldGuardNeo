@@ -16,13 +16,12 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Dedicated, asynchronous audit log for administrative region changes — who changed what, when.
- * Records region create/redefine/delete/transfer, flag/priority/parent edits, and owner/member
- * changes to {@code logs/worldguardneo-audit.log}. Separate from the violation log (routine griefing
- * attempts) so the audit trail stays clean and reviewable.
+ * Asynchronous audit log for administrative region changes (create/redefine/delete/transfer,
+ * flag/priority/parent edits, owner/member changes) to {@code logs/worldguardneo-audit.log}.
+ * Separate from the violation log so the audit trail stays reviewable.
  *
- * <p>Same async single-writer / bounded-queue / best-effort design as {@link ViolationLog}: callers
- * on the game thread just hand over a pre-formatted line, so a slow disk never stalls the tick.
+ * <p>Same async single-writer / bounded-queue / best-effort design as {@link ViolationLog}: the
+ * game thread hands over a pre-formatted line, so a slow disk never stalls the tick.
  */
 public final class AuditLog {
 

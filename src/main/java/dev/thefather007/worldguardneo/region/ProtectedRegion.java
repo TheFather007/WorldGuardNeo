@@ -15,10 +15,9 @@ import java.util.*;
 public abstract class ProtectedRegion {
 
     /**
-     * Global mutation epoch, bumped on every flag/group/parent/priority change on ANY region. Lets
-     * consumers (e.g. the per-player tick cache) invalidate cached flag-derived state with one
-     * volatile read instead of re-resolving flags every tick. Single-writer (server thread), so the
-     * unguarded volatile increment is race-free.
+     * Global mutation epoch, bumped on every flag/group/parent/priority change on any region. Lets
+     * consumers (e.g. the per-player tick cache) invalidate cached state with one volatile read.
+     * Single-writer (server thread), so the unguarded increment is race-free.
      */
     private static volatile long flagEpoch;
     public  static long flagEpoch()     { return flagEpoch; }
@@ -40,8 +39,7 @@ public abstract class ProtectedRegion {
     private Map<Flag<?>, RegionGroup> flagGroups;
 
     protected ProtectedRegion(String id) {
-        // Manual validation, not regex.matches — avoids compiling a Pattern per region at boot.
-        // Spec: one or more [a-zA-Z0-9_\-:.]
+        // Manual validation (not regex) avoids compiling a Pattern per region at boot. Spec: [a-zA-Z0-9_\-:.]+
         if (id == null || id.isEmpty()) {
             throw new IllegalArgumentException("Invalid region id: empty");
         }

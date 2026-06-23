@@ -78,10 +78,8 @@ public final class RegionManager {
     public List<ProtectedRegion> getApplicable(double x, double y, double z) {
         List<ProtectedRegion> candidates = index.candidates(x, z);
         if (candidates.isEmpty()) return List.of();
-        // Hot-path optimization: walk first to count hits and capture the first hit. For the
-        // overwhelmingly common case of exactly 1 region at a position (or 0), we avoid the
-        // ArrayList allocation entirely by using List.of(first). Only when ≥2 regions match
-        // do we allocate the mutable list for sorting.
+        // Hot path: the common 0/1-region case avoids the ArrayList via List.of(first); only ≥2
+        // matches allocate the mutable list for sorting.
         ProtectedRegion first = null;
         List<ProtectedRegion> out = null;
         for (int i = 0, n = candidates.size(); i < n; i++) {
@@ -117,15 +115,11 @@ public final class RegionManager {
     }
 
     /**
-     * Allocation-free "would propagation from the source point to the target point cross INTO a
-     * region boundary?" probe. Returns true if any region that contains the TARGET does NOT also
-     * contain the SOURCE — i.e. fire/fluid/etc. spreading from source into target would ENTER a
-     * region the source isn't part of (wilderness→claim, or claimA→claimB). This is exactly the
-     * grief vector the adjacency guard protects against; propagation LEAVING a region into
-     * wilderness is intentionally not flagged (no claim there to protect), so only the target side
-     * is examined. Equivalent to comparing the target's applicable ids against the source's, but
-     * walks the spatial-index candidates directly with no list allocation or sort — important on
-     * the NeighborNotifyEvent path, the hottest event in the mod (every ocean/river/lava flow tick).
+     * Allocation-free probe: does propagation from source→target cross INTO a region boundary?
+     * True if any region containing the TARGET does not also contain the SOURCE — i.e. fire/fluid
+     * spreading would ENTER a region the source isn't part of (wilderness→claim, claimA→claimB).
+     * Propagation LEAVING a region into wilderness is intentionally not flagged. Walks spatial-index
+     * candidates directly (no list alloc or sort) — hot on NeighborNotifyEvent (every flow tick).
      */
     public boolean crossesBoundary(double sx, double sy, double sz,
                                    double tx, double ty, double tz) {
@@ -149,23 +143,16 @@ public final class RegionManager {
     }
 
     /**
-     * Build-access test that implements WorldGuard's core "regions are private by default"
-     * behaviour, which a plain {@link #testState} does NOT provide.
+     * Build-access test implementing WorldGuard's "regions are private by default" behaviour, which
+     * plain {@link #testState} doesn't: build-type flags default to ALLOW (so wilderness is open),
+     * but a claim must still keep non-members out unless a flag explicitly re-allows.
      *
-     * <p>The problem this solves: build-type flags (build, block-break, block-place, interact…)
-     * default to ALLOW so the wilderness stays unprotected. But that also means a freshly
-     * claimed region does nothing to keep strangers out — testState returns ALLOW because the
-     * flag was never explicitly set. In real WorldGuard, simply being inside a region you are
-     * not a member of denies building unless a flag explicitly re-allows it.
-     *
-     * <p>Rules (highest-priority region that applies wins, matching WG):
+     * <p>Rules (highest-priority applicable region wins):
      * <ol>
-     *   <li>No region here → wilderness → fall back to the global flag default (ALLOW).</li>
-     *   <li>If the flag is EXPLICITLY set on the applicable region(s), that value wins — this
-     *       lets admins open a region with {@code build allow} or lock wilderness with a global
-     *       {@code build deny}. Resolved via {@link #testState}.</li>
-     *   <li>Otherwise (flag not set), membership decides: owners/members may build, everyone
-     *       else is denied. This is the implicit protection a claim grants.</li>
+     *   <li>No region → wilderness → global flag default (ALLOW).</li>
+     *   <li>Flag EXPLICITLY set here → that value wins (via {@link #testState}); lets admins open a
+     *       region or lock wilderness globally.</li>
+     *   <li>Flag not set → membership decides: owners/members build, others denied.</li>
      * </ol>
      *
      * @param flag     the build-type state flag being tested
@@ -201,12 +188,10 @@ public final class RegionManager {
         if (applicable.isEmpty()) {
             return flag.test(globalRegion.getFlag(flag));
         }
-        // Walk regions in priority order (the list is sorted desc). We want the value from
-        // the HIGHEST priority tier that actually *contributes* a value for this player —
-        // i.e. a region where the flag is set AND its group filter matches the actor. A
-        // higher-priority region whose group EXCLUDES the player must NOT shadow a lower
-        // one that does include them, so we only "lock" to a priority tier once we've found
-        // a matching value there. Within the locked tier, DENY beats ALLOW.
+        // Walk in priority order (sorted desc). Take the value from the highest priority tier that
+        // actually contributes one (flag set AND group matches the actor): a higher-priority region
+        // whose group EXCLUDES the player must not shadow a lower one that includes them, so we only
+        // "lock" onto a tier once a match is found there. Within the locked tier, DENY beats ALLOW.
         StateFlag.State winning = null;
         int winningPriority = 0;
         boolean locked = false;
@@ -309,15 +294,13 @@ public final class RegionManager {
     /* --------------- internal helpers --------------- */
 
     /**
-     * Resolve a state flag for ONE specific region by walking its parent chain, applying the
-     * SOURCE region's group filter (not the starting region's). Returns the resolved state, or
-     * {@code null} if no region in the chain sets the flag or the source's group excludes the actor.
+     * Resolve a state flag for ONE region by walking its parent chain, applying the SOURCE region's
+     * group filter (not the starting region's). Null if no region in the chain sets it or the
+     * source's group excludes the actor.
      *
-     * <p>Used by movement handlers for the EXIT case: the player's current position is already
-     * OUTSIDE the region they are leaving, so a position-based {@link #testState} would never see
-     * it. This walks the leaving region directly. It mirrors {@link #testState}'s "group filter
-     * belongs to the source, not the child" semantics — previously the EXIT path read the child
-     * region's group for an inherited flag, which mis-applied group-scoped exit denials.
+     * <p>Used by the EXIT case: the player is already OUTSIDE the leaving region, so position-based
+     * {@link #testState} would never see it. Mirrors testState's "group filter belongs to the source"
+     * semantics so group-scoped exit denials inherited from a parent are honoured.
      */
     public StateFlag.State resolveStateForRegion(StateFlag flag, ProtectedRegion region, UUID actor) {
         ProtectedRegion source = resolveSourceWithParents(region, flag);
@@ -327,13 +310,9 @@ public final class RegionManager {
     }
 
     /**
-     * Walks the parent chain looking for the first region that has the flag set. Returns
-     * the source region (not the starting one) so callers can apply the source's group
-     * filter — important for inherited flags from a parent that may have a different
-     * {@link RegionGroup} than the child.
-     *
-     * <p>This was previously inlined and returned only the value; callers then applied the
-     * CHILD's group to the inherited value, which was wrong. The fix surfaces the source.
+     * Walks the parent chain for the first region with the flag set, returning that SOURCE region
+     * (not the starting one) so callers apply the source's group filter — an inherited flag from a
+     * parent may carry a different {@link RegionGroup} than the child.
      */
     private static ProtectedRegion resolveSourceWithParents(ProtectedRegion r, Flag<?> flag) {
         ProtectedRegion cursor = r;

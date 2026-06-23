@@ -26,7 +26,7 @@ public final class BlockEventHandler {
     private final WorldGuardNeo mod;
     public BlockEventHandler(WorldGuardNeo mod) { this.mod = mod; }
 
-    /* -------- BlockEvent.getLevel() returns LevelAccessor; only ServerLevel matters here. -------- */
+    /* BlockEvent.getLevel() returns LevelAccessor; only ServerLevel matters here. */
     private static ServerLevel asServerLevel(Object levelAccessor) {
         return (levelAccessor instanceof ServerLevel sl) ? sl : null;
     }
@@ -84,19 +84,16 @@ public final class BlockEventHandler {
         if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
                 .isOverridden(applicable.get(0), Flags.BUILD, p, "block-place")) return;
         e.setCanceled(true);
-        // Re-sync inventory: cancelling EntityPlaceEvent keeps the item server-side but the
+        // Resync inventory: cancelling EntityPlaceEvent keeps the item server-side but the
         // client already removed it from hand; without this the block vanishes until relog.
         syncInventory(p);
         denyMessage(p, mgr, bp, "place", null);
     }
 
     /**
-     * Farmland trampling: jumping on crops to destroy the farmland underneath (turning it back
-     * to dirt and killing the plant) is a classic claim-grief that block-break protection misses,
-     * because vanilla routes it through {@link BlockEvent.FarmlandTrampleEvent}, not a break. We
-     * gate PLAYER trampling by the same build-access membership rule as breaking: a non-member
-     * (no explicit allow) can't trample a claimed farm. Mob/entity trampling is left to vanilla
-     * (the {@code mobGriefing} game rule already governs that).
+     * Farmland trampling routes through FarmlandTrampleEvent, not a break, so block-break
+     * protection misses it. Gate PLAYER trampling by the same build-access rule as breaking;
+     * mob/entity trampling is left to vanilla (the {@code mobGriefing} game rule).
      */
     @SubscribeEvent
     public void onFarmlandTrample(BlockEvent.FarmlandTrampleEvent e) {
@@ -115,9 +112,8 @@ public final class BlockEventHandler {
     }
 
     /**
-     * Force the player's currently-open menu (always at least the inventory menu) to re-broadcast
-     * its contents to the client. Used after cancelling a place/use so the client's optimistic
-     * prediction (item already consumed) is corrected back to the real server state.
+     * Re-broadcast the player's open menu to the client after a cancelled place/use, correcting
+     * the client's optimistic prediction (item already consumed) back to real server state.
      */
     private static void syncInventory(ServerPlayer p) {
         try {
@@ -133,10 +129,8 @@ public final class BlockEventHandler {
         if (e.getLevel().isClientSide()) return;
         if (!mod.isProtectionActive(e.getLevel())) return;
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
-        // NeoForge fires RightClickBlock twice per actual click (MAIN_HAND then OFF_HAND) so
-        // both held items can react. We check both — off-hand can hold bonemeal while
-        // main hand holds a tool, and the bonemeal's right-click effect would otherwise
-        // bypass our INTERACT check.
+        // NeoForge fires RightClickBlock twice per click (MAIN_HAND then OFF_HAND); we check both
+        // so an off-hand item (e.g. bonemeal) can't bypass the INTERACT check.
         ServerLevel sl = p.serverLevel();
         RegionManager mgr = mod.regions().get(sl);
         BlockPos bp = e.getPos();
@@ -150,14 +144,10 @@ public final class BlockEventHandler {
             return;
         }
         UUID id = p.getUUID();
-        // Dedicated right-click toggles (all default ALLOW): each is an explicit state flag that,
-        // when set to deny, blocks that specific action even for members — independent of the
-        // generic interact/use gate below. So an admin can, e.g., allow interact but forbid sign
-        // editing, or forbid emptying buckets in a region.
-        //
-        // We resolve which toggle (if any) applies and test it FIRST, and only consult the
-        // permission backend for region.bypass when the toggle actually denies — mirroring the
-        // lazy-bypass pattern elsewhere so a normal allowed right-click never hits LuckPerms.
+        // Dedicated right-click toggles (all default ALLOW): an explicit deny blocks that specific
+        // action even for members, independent of the generic interact/use gate below. Resolve and
+        // test the toggle FIRST; only consult region.bypass when it denies (lazy-bypass pattern, so
+        // a normal allowed right-click never hits LuckPerms).
         StateFlag ded = null;
         String dmsg = null;
         if (heldItem instanceof net.minecraft.world.item.MinecartItem) {
@@ -194,9 +184,8 @@ public final class BlockEventHandler {
                     allowed = mgr.testBuildAccess(Flags.CHEST_ACCESS, x, y, z, id);
                 }
             } catch (Throwable t) {
-                // Fail SAFE: if we can't determine whether this is a container (e.g. a chunk-unload
-                // race throwing in getBlockEntity), treat it as a protected container and deny the
-                // interaction rather than silently letting a potential chest access through.
+                // Fail safe: if container detection throws (e.g. chunk-unload race), treat it as a
+                // protected container and deny rather than risk leaking chest access.
                 WorldGuardNeo.LOGGER.debug("container detection failed at {} — denying to be safe", bp, t);
                 isContainer = true;
                 allowed = false;
@@ -211,23 +200,14 @@ public final class BlockEventHandler {
                         p, isContainer ? "container" : "interact")) return;
         e.setCanceled(true);
         syncInventory(p);
-        // Pick the clearest message — or stay silent when a message would be noise.
-        // - Placing a block (BlockItem in hand): "can't build here".
-        // - Opening a container: "can't open containers".
-        // - Interacting with something that actually HAS a right-click action (door, button,
-        //   lever, bed, etc.): "can't interact here".
-        // - Right-clicking a plain block that has NO right-click behaviour (dirt, stone,
-        //   cobblestone…) with a non-block item or empty hand: the click does nothing in vanilla
-        //   anyway, so showing "can't interact here" is just confusing noise — we cancel silently
-        //   (no message, but still no interaction).
+        // Pick the clearest message — or stay silent when one would be noise (e.g. right-clicking
+        // a plain block with no vanilla right-click action: cancel silently, no confusing message).
         String action;
         if (isContainer) {
             action = "container";
         } else if (heldItem instanceof net.minecraft.world.item.BlockItem) {
             action = "place";
         } else {
-            // Resolve the clicked block's state once and reuse it for both the interactable
-            // check and the violation detail (was previously fetched twice).
             BlockState clicked = sl.getBlockState(bp);
             if (isInteractableBlock(clicked)) {
                 denyMessage(p, mgr, bp, "interact", blockId(clicked.getBlock()));
@@ -239,9 +219,8 @@ public final class BlockEventHandler {
     }
 
     /**
-     * Boats are placed via a right-click of the item (not a block click), so they bypass
-     * {@link #onRightClickBlock}. Gate them with {@code vehicle-place} at the player's position
-     * (the boat lands a few blocks along the look vector — close enough for region gating).
+     * Boats are placed via a right-click of the item (not a block click), bypassing
+     * {@link #onRightClickBlock}. Gate them with {@code vehicle-place} at the player's position.
      * Minecarts are placed on rails and go through the block-click path above.
      */
     @SubscribeEvent
@@ -260,16 +239,10 @@ public final class BlockEventHandler {
     }
 
     /**
-     * Heuristic for "does right-clicking this block actually DO something?" Used to decide
-     * whether a denied right-click deserves a feedback message. Plain building blocks (dirt,
-     * stone, ore, planks…) have no right-click action, so denying them silently avoids the
-     * confusing "you can't interact here" when the player wasn't really interacting.
-     *
-     * <p>We treat a block as interactable if it's a BlockEntity (chests, furnaces, signs, etc.)
-     * or matches one of the common interactive vanilla block types (doors, trapdoors, gates,
-     * buttons, levers, beds, anvils, workbenches, note blocks, jukeboxes, lecterns, bells,
-     * cauldrons, composters, …). This list doesn't need to be exhaustive — a false "not
-     * interactable" only means we skip a message for an action that was blocked anyway.
+     * Heuristic for "does right-clicking this block actually DO something?", deciding whether a
+     * denied right-click deserves a feedback message. A block is interactable if it has a
+     * BlockEntity or matches a common interactive vanilla type. The list need not be exhaustive —
+     * a false negative only means we skip a message for an action that was blocked anyway.
      */
     private static boolean isInteractableBlock(BlockState st) {
         var b = st.getBlock();
@@ -297,8 +270,6 @@ public final class BlockEventHandler {
         Level lvl = e.getLevel();
         if (lvl.isClientSide()) return;
         // Honour the per-world protection kill-switch (useRegions=false) like every other handler.
-        // Without this, explosions were still being filtered by region flags in a world where an
-        // admin had disabled WorldGuardNeo.
         if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
 
@@ -318,9 +289,8 @@ public final class BlockEventHandler {
                 }
                 if (touchesRegion) {
                     e.getAffectedBlocks().clear();
-                    // Only shield players who are themselves standing in a region — a player out
-                    // in the wilderness next to the blast shouldn't be made immune just because
-                    // some of the affected blocks happened to overlap a nearby claim.
+                    // Only shield players actually standing in a region; one in the wilderness
+                    // next to the blast shouldn't be made immune by a nearby claim overlap.
                     e.getAffectedEntities().removeIf(ent -> ent instanceof ServerPlayer
                             && mgr.hasAnyAt(ent.getX(), ent.getY(), ent.getZ()));
                     return;
@@ -344,14 +314,10 @@ public final class BlockEventHandler {
                             ent.getX(), ent.getY(), ent.getZ());
                 }
                 // Decorations (item frames, paintings, armor stands): gated by the same
-                // explosion-source flag as blocks. Otherwise a creeper would destroy
-                // someone's painting collection even in a creeper-explosion-DENY region.
-                // Use null actor — explosions have no "owner" for group resolution; only
-                // the global / region-level flag value matters.
+                // explosion-source flag as blocks. Null actor — explosions have no owner for
+                // group resolution; only the global/region flag value matters.
                 if (ent instanceof net.minecraft.world.entity.decoration.HangingEntity
                         || ent instanceof net.minecraft.world.entity.decoration.ArmorStand) {
-                    // Pass raw doubles — testState takes doubles; the old (int) casts truncated
-                    // toward zero, mis-binning decorations at negative coordinates by one block.
                     return !mgr.testState(finalFlag, null, ent.getX(), ent.getY(), ent.getZ());
                 }
                 return false; // Mobs, items, projectiles etc. — vanilla rules.
@@ -382,29 +348,23 @@ public final class BlockEventHandler {
 
     /* helpers */
     /**
-     * True only if the player may bypass region protection entirely. Governed by a SINGLE
-     * permission: {@code worldguardneo.region.bypass}, which must be granted explicitly (it is
-     * not implied by op status — see OpResolver, where it sits above op level 4).
-     *
-     * <p>Note: there is deliberately no "global build permission" backdoor here. An earlier
-     * version also honoured a configurable {@code buildPermNode}, but that node defaulted to an
-     * op-level-0 permission granted to everyone, so it silently let every player bypass all
-     * protection. That concept has been removed entirely; region bypass is this one node only.
+     * True only if the player may bypass region protection entirely. Governed by the single
+     * permission {@code worldguardneo.region.bypass}, which must be granted explicitly (not
+     * implied by op status — see OpResolver, where it sits above op level 4).
      */
     private boolean canBypass(ServerPlayer p) {
         return mod.perms().has(p, "worldguardneo.region.bypass");
     }
     /**
-     * Show the player the standard (or region-custom) "you can't do that here" message in the
-     * ACTION BAR, and record the attempt to the dedicated violation log. This replaces the old
-     * behaviour where denied actions produced console noise / vanilla desync warnings.
+     * Show the standard (or region-custom) deny message in the action bar and record the attempt
+     * to the violation log.
      *
      * @param action short verb for the log ("break", "place", "interact", "container", "use-item")
      * @param detail optional extra context (block/item id), may be null
      */
     private void denyMessage(ServerPlayer p, RegionManager mgr, BlockPos bp, String action, String detail) {
-        // Resolve the applicable list ONCE and reuse it for both the custom deny-message lookup and
-        // the violation-log region id (previously two separate getApplicable probes for one point).
+        // Resolve the applicable list once, shared by the custom deny-message lookup and the
+        // violation-log region id.
         var applicable = mgr.getApplicable(bp.getX(), bp.getY(), bp.getZ());
         String msg;
         String custom = mgr.resolveValue(Flags.DENY_MESSAGE, applicable, p.getUUID());
@@ -422,7 +382,6 @@ public final class BlockEventHandler {
             msg = mod.i18n().has(key) ? mod.i18n().raw(key) : mod.i18n().raw("msg.protection.deny");
         }
         p.displayClientMessage(Component.literal(msg), true);
-        // Record to the dedicated violation log (async, off the game thread).
         String regionId = applicable.isEmpty() ? null : applicable.get(0).id();
         mod.violations().record(p, action, detail,
                 bp.getX(), bp.getY(), bp.getZ(),
@@ -444,9 +403,8 @@ public final class BlockEventHandler {
     }
 
     /**
-     * Returns true if the given block is listed as "deny" in the world's blocked-blocks config.
-     * Accepts ANY modded ResourceLocation — comparison is case-sensitive against the
-     * canonical {@code namespace:path} form (e.g. {@code create:cardboard_block}).
+     * True if the block is listed as "deny" in the world's blocked-blocks config. Matches the
+     * canonical {@code namespace:path} form, or bare vanilla form for {@code minecraft:} blocks.
      */
     private boolean isBlockedBlock(ServerLevel lvl, net.minecraft.world.level.block.Block block) {
         if (block == null) return false;

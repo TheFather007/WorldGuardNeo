@@ -42,9 +42,8 @@ public final class RegionContainer {
     }
 
     /**
-     * Regions OWNED by a player across ALL dimensions. Limits must be global, not per-world —
-     * otherwise a player could re-claim the full quota in every dimension. The claim path must use
-     * THIS method (not the single-world {@code RegionManager.countOwned}) for the limit check.
+     * Count regions OWNED by a player across ALL dimensions. Claim limits must be global (the claim
+     * path uses this, not single-world {@code RegionManager.countOwned}), else the quota resets per dimension.
      */
     public int countOwnedGlobal(java.util.UUID player) {
         int n = 0;
@@ -82,8 +81,7 @@ public final class RegionContainer {
     }
 
     public void saveAll() {
-        // Immediate synchronous full save (/rg save, server stop). Drains all dirty/incremental sets
-        // since every world is now fully synced.
+        // Immediate synchronous full save (/rg save, server stop); drains all dirty/incremental sets.
         for (RegionManager m : managers.values()) {
             try { storage.save(m.world(), m); }
             catch (Exception ex) { WorldGuardNeo.LOGGER.error("Failed to save regions for {}", m.world(), ex); }
@@ -114,9 +112,8 @@ public final class RegionContainer {
     }
 
     /**
-     * Mark a SINGLE region for incremental save (upsert one row). Use after a single-region edit
-     * — flag/priority/parent/membership change, or a claim — so the flush touches only that region.
-     * Pass {@code "__global__"} after editing the global region's flags.
+     * Mark a SINGLE region for incremental save (upsert one row) after a single-region edit, so the
+     * flush touches only that region. Pass {@code "__global__"} after editing the global flags.
      */
     public void saveRegion(Level level, String regionId) {
         RegionManager m = byLevel.get(level);

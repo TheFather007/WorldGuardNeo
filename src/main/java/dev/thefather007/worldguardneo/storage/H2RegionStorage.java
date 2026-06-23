@@ -28,13 +28,13 @@ import java.util.Properties;
  *     world VARCHAR(255), region_id VARCHAR(255), payload CLOB, updated_at BIGINT,
  *     PRIMARY KEY (world, region_id));
  * </pre>
- * A single {@code /rg flag} edit upserts one row instead of rewriting the whole world. The
- * per-world {@code __global__} row holds the global-flags document. Region payloads match one entry
- * of the old whole-world document, so the legacy {@code world_regions} blob table is migrated
- * losslessly on first load (and kept as a backup).
+ * A single {@code /rg flag} edit upserts one row instead of rewriting the whole world; the per-world
+ * {@code __global__} row holds the global-flags document. Payloads match one entry of the old
+ * whole-world document, so the legacy {@code world_regions} blob table migrates losslessly on first
+ * load (kept as a backup).
  *
- * <p>The H2 driver ({@code org.h2.Driver}) is NOT bundled but is shipped by LuckPerms, so it is
- * usually present. If missing, this backend transparently defers to {@link JsonRegionStorage}.
+ * <p>The H2 driver ({@code org.h2.Driver}) is NOT bundled but ships with LuckPerms, so usually
+ * present. If missing, defers to {@link JsonRegionStorage}.
  */
 public final class H2RegionStorage implements RegionStorage, AutoCloseable {
 

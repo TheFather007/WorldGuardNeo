@@ -28,17 +28,15 @@ import java.util.Properties;
  *     world VARCHAR(255), region_id VARCHAR(255), payload LONGTEXT, updated_at BIGINT,
  *     PRIMARY KEY (world, region_id)) DEFAULT CHARSET=utf8mb4;
  * </pre>
- * A single {@code /rg flag} edit upserts one row instead of rewriting the whole world. The per-world
+ * A single {@code /rg flag} edit upserts one row instead of rewriting the whole world; the per-world
  * {@code __global__} row holds the global-flags document.
  *
- * <p><b>Migration.</b> A server from an older build has {@code <table>} in the old whole-world
- * blob schema (PK {@code world}, no {@code region_id}). On startup that table is renamed to
- * {@code <table>_legacy} and a fresh per-region {@code <table>} is created; each world is then
- * migrated lazily on first load. The legacy table is kept as a backup.
+ * <p>Migration: an older build's whole-world blob table (PK {@code world}, no {@code region_id}) is
+ * renamed to {@code <table>_legacy} on startup, a fresh per-region {@code <table>} is created, and
+ * each world is migrated lazily on first load. The legacy table is kept as a backup.
  *
- * <p>Connection settings come from the {@code [mysql]} section of {@code config.toml}. The driver is
- * NOT bundled; if missing or unreachable, this backend defers to {@link JsonRegionStorage}.
- * Connections are validated and reopened if dropped. All calls come from the server thread.
+ * <p>Settings come from the {@code [mysql]} config section. The driver is NOT bundled; if missing or
+ * unreachable, defers to {@link JsonRegionStorage}. Connections are validated/reopened. Server-thread only.
  */
 public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
 
@@ -131,7 +129,7 @@ public final class MySqlRegionStorage implements RegionStorage, AutoCloseable {
         boolean tableExists = exists("table", table);
         boolean hasRegionId = tableExists && exists("column", table);
         if (tableExists && !hasRegionId) {
-            // Old whole-world schema present — preserve it under <table>_legacy, then create per-region.
+            // Old whole-world schema — preserve under <table>_legacy, then create per-region.
             try (Statement st = conn().createStatement()) {
                 st.executeUpdate("RENAME TABLE " + table + " TO " + table + "_legacy");
             }

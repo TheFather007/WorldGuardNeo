@@ -41,8 +41,8 @@ public final class WorldEventHandler {
      */
     private boolean test(RegionManager mgr, StateFlag flag, BlockPos bp) {
         int x = bp.getX(), y = bp.getY(), z = bp.getZ();
-        // Allocation-free fast path: no region touches the point and global has no opinion → use
-        // the flag default (allow for the common wilderness case), skipping spatial resolution.
+        // Allocation-free fast path: no region at the point and global has no opinion → flag
+        // default, skipping spatial resolution.
         if (!mgr.hasAnyAt(x, y, z) && mgr.globalRegion().getFlag(flag) == null) {
             return flag.defaultAllow();
         }
@@ -57,10 +57,9 @@ public final class WorldEventHandler {
         if (lvl == null) return;
         if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
-        // FluidPlaceBlockEvent fires when a fluid solidifies (cobble/stone/obsidian/basalt).
-        // Every vanilla solidification involves lava, so all known products gate under LAVA_FLOW
-        // (cobblestone, the most common product, must not fall into the water-flow branch or
-        // "lava-flow deny" fails to stop cobble generators). WATER_FLOW is the modded fallback.
+        // Fluid solidification (cobble/stone/obsidian/basalt) always involves lava, so known
+        // products gate under LAVA_FLOW — else "lava-flow deny" fails to stop cobble generators.
+        // WATER_FLOW is the modded fallback.
         BlockState newState = e.getNewState();
         boolean lavaInvolved = newState.is(Blocks.OBSIDIAN)
                 || newState.is(Blocks.BASALT)
@@ -73,13 +72,10 @@ public final class WorldEventHandler {
     /* -------- redstone propagation -------- */
 
     /**
-     * Stops pistons from moving blocks ACROSS a region boundary — both pushing blocks INTO a
-     * region from outside and pulling blocks OUT of one with a sticky piston.
-     *
-     * <p>Approach: gather every cell the operation touches (piston, pushed blocks and their
-     * destinations, destroyed blocks); if any touched cell lies in a foreign region the piston
-     * isn't part of and that doesn't opt in, cancel. The boundary itself is the protection —
-     * pistons have no actor to permission-check. Wholly inside one zone or in wilderness → allowed.
+     * Stops pistons from moving blocks ACROSS a region boundary (pushing in from outside or
+     * pulling out with a sticky piston). Gather every cell the operation touches; if any lies in
+     * a foreign region the piston isn't part of and that doesn't opt in, cancel. Pistons have no
+     * actor to permission-check, so the boundary itself is the protection.
      */
     @SubscribeEvent
     public void onPistonPre(net.neoforged.neoforge.event.level.PistonEvent.Pre e) {
@@ -89,8 +85,8 @@ public final class WorldEventHandler {
         RegionManager mgr = mod.regions().get(lvl);
         net.minecraft.core.Direction dir = e.getDirection();
         BlockPos piston = e.getPos();
-        // getDirection() is the piston's FACING; retracting (sticky pull) moves blocks the
-        // OPPOSITE way, so retraction destinations must use the inverted direction.
+        // getDirection() is the piston's FACING; retraction (sticky pull) moves blocks the
+        // opposite way, so its destinations use the inverted direction.
         boolean extending = e.getPistonMoveType()
                 == net.neoforged.neoforge.event.level.PistonEvent.PistonMoveType.EXTEND;
         net.minecraft.core.Direction moveDir = extending ? dir : dir.getOpposite();
@@ -129,10 +125,9 @@ public final class WorldEventHandler {
         }
         if (violated == null) return; // move stays within the piston's own zone(s) → permit
 
-        // Cross-border move into a protected foreign region: break the offending piston and drop
-        // it (silent cancel left it visually stuck extended). Deferred to next tick via the server
-        // executor — mutating block state inside the event re-fires it → infinite loop → watchdog
-        // crash; deferring keeps us outside the dispatch and destroyBlock doesn't fire PistonEvent.
+        // Cross-border move into a protected foreign region: break and drop the offending piston
+        // (a silent cancel leaves it visually stuck extended). Deferred to next tick via the server
+        // executor — mutating block state inside the event re-fires it → infinite loop → crash.
         e.setCanceled(true);
         final BlockPos pistonPos = piston.immutable();
         lvl.getServer().execute(() -> {
@@ -174,9 +169,8 @@ public final class WorldEventHandler {
 
     /**
      * Single subscriber for {@link BlockEvent.NeighborNotifyEvent} covering both redstone gating
-     * and fire/lava/water propagation. NeighborNotify is the hottest block event (every block
-     * update fires it), so one subscriber shares the level/kill-switch filters and exits in a
-     * couple of comparisons for the vast majority of traffic.
+     * and fire/lava/water propagation. NeighborNotify is the hottest block event, so sharing the
+     * filters here lets the vast majority of traffic exit in a couple of comparisons.
      */
     @SubscribeEvent
     public void onNeighborNotify(BlockEvent.NeighborNotifyEvent e) {
@@ -205,7 +199,7 @@ public final class WorldEventHandler {
         BlockPos src = e.getPos();
 
         // World-wide kill-switches FIRST — they must apply in wilderness too (below the nearRegion
-        // bail they were silently ineffective away from claims). worldOrGlobal is a cached probe.
+        // bail they'd be ineffective away from claims).
         var ws = mod.config().worldOrGlobal(lvl);
         boolean killFire = ws != null && isFire && ws.preventFireSpread;
         boolean killLava = ws != null && isLava && ws.preventLavaFire;
@@ -213,15 +207,14 @@ public final class WorldEventHandler {
 
         StateFlag flag = isFire ? Flags.FIRE_SPREAD : (isLava ? Flags.LAVA_FIRE : null);
 
-        // Global-region flag (fire/lava only): applies everywhere, so honour it before the
-        // nearRegion bail below.
+        // Global-region flag (fire/lava only): applies everywhere, so honour it before nearRegion.
         if (flag != null) {
             StateFlag.State g = mgr.globalRegion().getFlag(flag);
             if (g == StateFlag.State.DENY) { e.setCanceled(true); return; }
         }
 
-        // Water/lava neighbour-notifies fire constantly. Before any set allocation, cheaply probe
-        // whether a region is near the source or any notified side; if not, there's nothing to do.
+        // Water/lava neighbour-notifies fire constantly; cheaply probe whether a region is near the
+        // source or any notified side before doing real work.
         boolean nearRegion = mgr.hasAnyAt(src.getX(), src.getY(), src.getZ());
         if (!nearRegion) {
             for (net.minecraft.core.Direction d : e.getNotifiedSides()) {
@@ -232,9 +225,8 @@ public final class WorldEventHandler {
         if (!nearRegion) return; // wilderness fluid/fire far from any claim → vanilla, zero cost
 
         // Single pass over notified sides doing both checks:
-        //  (1) cross-border containment — fluid/fire must not propagate into a neighbouring cell
-        //      belonging to a region the source isn't part of (symmetric, no owner check). Uses
-        //      the allocation-free crossesBoundary probe (water, flag == null, allocates nothing).
+        //  (1) cross-border containment — fluid/fire must not propagate into a cell belonging to a
+        //      region the source isn't part of (symmetric, allocation-free crossesBoundary probe).
         //  (2) per-region fire-spread/lava-fire flag at the target (fire & lava only; water has none).
         int sx = src.getX(), sy = src.getY(), sz = src.getZ();
         for (net.minecraft.core.Direction dir : e.getNotifiedSides()) {
@@ -256,9 +248,8 @@ public final class WorldEventHandler {
     @SubscribeEvent
     public void onExpDrop(LivingExperienceDropEvent e) {
         LivingEntity victim = e.getEntity();
-        // EXP_DROPS governs MOB experience (e.g. silencing a mob-farm region). Player death XP
-        // is owned exclusively by the KEEP_XP handler (PlayerEventHandler#onLivingExpDropPlayer);
-        // handling players here too would let `exp-drops deny` destroy player XP and fight keep-xp.
+        // EXP_DROPS governs MOB experience only; player death XP is owned by the KEEP_XP handler.
+        // Handling players here too would let `exp-drops deny` destroy player XP and fight keep-xp.
         if (victim instanceof ServerPlayer) return;
         Level lvl = victim.level();
         if (lvl.isClientSide()) return;
@@ -273,10 +264,8 @@ public final class WorldEventHandler {
     /* -------- lightning strikes -------- */
 
     /**
-     * Cancel lightning bolts that would land in a region forbidding them.
-     * Catches both natural strikes and trident/channeling-induced ones; the in-game effect
-     * is that the bolt simply never spawns. Falls back to the source position when the bolt
-     * has no level yet (very rare race with mod-summoned lightning).
+     * Cancel lightning bolts that would land in a region forbidding them (natural or
+     * trident/channeling-induced); the bolt simply never spawns.
      */
     @SubscribeEvent
     public void onLightningSpawn(net.neoforged.neoforge.event.entity.EntityJoinLevelEvent e) {
@@ -301,8 +290,8 @@ public final class WorldEventHandler {
     /* -------- mob effects (blocked-effects) -------- */
 
     /**
-     * Suppress potion / status effects inside regions that list them in {@code blocked-effects}.
-     * The set value matches by effect's registry path (e.g. "speed", "invisibility").
+     * Suppress potion/status effects listed in a region's {@code blocked-effects}. Matches by
+     * effect registry id or path (e.g. "minecraft:speed" or "speed").
      */
     @SubscribeEvent
     public void onEffectApplied(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable e) {
@@ -320,12 +309,10 @@ public final class WorldEventHandler {
             net.minecraft.resources.ResourceLocation rl =
                     net.minecraft.core.registries.BuiltInRegistries.MOB_EFFECT.getKey(holder.value());
             if (rl == null) return;
-            String id   = rl.toString();        // e.g. "minecraft:speed"
-            String path = rl.getPath();         // e.g. "speed"
+            String id   = rl.toString();
+            String path = rl.getPath();
             if (blocked.contains(id) || blocked.contains(path)) {
-                // MobEffectEvent.Applicable uses its OWN nested Result enum (NOT TriState):
-                //   APPLY = force apply, DEFAULT = vanilla canBeAffected() check,
-                //   DO_NOT_APPLY = prevent the effect. We want DO_NOT_APPLY.
+                // Applicable uses its own Result enum (NOT TriState); DO_NOT_APPLY prevents it.
                 e.setResult(net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY);
             }
         } catch (Throwable t) {
@@ -336,10 +323,9 @@ public final class WorldEventHandler {
     /* -------- crop / plant growth -------- */
 
     /**
-     * Stops a sapling near a region border from growing a canopy into an adjacent foreign region
-     * (adjacency grief). The event only carries the sapling position, so we apply a conservative
-     * rule: if any region within a small horizontal radius isn't the sapling's own, cancel growth.
-     * Trees fully inside their own region (or in wilderness) grow normally.
+     * Stops a sapling near a region border from growing a canopy into a foreign region (adjacency
+     * grief). The event only carries the sapling position, so apply a conservative rule: if any
+     * region within a small horizontal radius isn't the sapling's own, cancel growth.
      */
     @SubscribeEvent
     public void onTreeGrow(net.neoforged.neoforge.event.level.BlockGrowFeatureEvent e) {
@@ -374,8 +360,7 @@ public final class WorldEventHandler {
         if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         if (!test(mgr, Flags.CROP_GROWTH, e.getPos())) {
-            // CropGrowEvent.Pre uses its OWN nested Result enum (NOT TriState):
-            //   GROW = force growth, DEFAULT = vanilla checks, DO_NOT_GROW = prevent growth.
+            // CropGrowEvent.Pre uses its own Result enum (NOT TriState); DO_NOT_GROW prevents it.
             e.setResult(net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.DO_NOT_GROW);
         }
     }
@@ -383,16 +368,15 @@ public final class WorldEventHandler {
     /* -------- notify-enter / notify-leave fan-out -------- */
 
     /**
-     * Send a notification to every player holding {@code worldguardneo.notify}.
-     * Called from {@link PlayerEventHandler} when {@code notify-enter}/{@code notify-leave}
-     * is set on a region the player crosses.
+     * Send a notification to every player holding {@code worldguardneo.notify}. Called from
+     * {@link PlayerEventHandler} when {@code notify-enter}/{@code notify-leave} is crossed.
      */
     public void broadcastNotification(ServerPlayer mover, String regionId, boolean entered) {
         var server = mover.getServer();
         if (server == null) return;
         String key = entered ? "msg.notify.enter" : "msg.notify.leave";
-        // Lazily build the message on the first permission holder — if nobody online holds
-        // worldguardneo.notify, we never format the string.
+        // Lazily build the message on the first permission holder — if nobody online holds the
+        // node, we never format the string.
         Component msg = null;
         for (ServerPlayer p : server.getPlayerList().getPlayers()) {
             if (mod.perms().has(p, "worldguardneo.notify")) {
