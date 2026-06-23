@@ -74,6 +74,7 @@ public final class RegionJsonCodec {
                 }
                 fillOwnersMembers(region, obj);
                 fillFlags(region, obj);
+                fillMetadata(region, obj);
                 into.add(region);
             }
             // Resolve parent links once all regions exist.
@@ -127,6 +128,7 @@ public final class RegionJsonCodec {
         }
         fillOwnersMembers(region, obj);
         fillFlags(region, obj);
+        fillMetadata(region, obj);
         return region;
     }
 
@@ -210,6 +212,22 @@ public final class RegionJsonCodec {
         if (hasArray(obj, "member-groups")) addStrings(obj, "member-groups", r.memberGroups());
     }
 
+    /** Restore lifecycle metadata. Must run AFTER fillFlags/fillOwnersMembers/setPriority, since
+     *  those touch modifiedAt; here we overwrite it with the persisted value. Missing keys are left
+     *  at their constructor defaults (now), which is the right behaviour for legacy save files. */
+    private static void fillMetadata(ProtectedRegion r, JsonObject obj) {
+        if (obj.has("created-at") && obj.get("created-at").isJsonPrimitive()) {
+            try { r.setCreatedAt(obj.get("created-at").getAsLong()); } catch (Exception ignored) {}
+        }
+        if (obj.has("modified-at") && obj.get("modified-at").isJsonPrimitive()) {
+            try { r.setModifiedAt(obj.get("modified-at").getAsLong()); } catch (Exception ignored) {}
+        }
+        if (obj.has("created-by") && obj.get("created-by").isJsonPrimitive()) {
+            try { r.setCreatedBy(UUID.fromString(obj.get("created-by").getAsString())); }
+            catch (Exception ex) { WorldGuardNeo.LOGGER.warn("Invalid created-by UUID on '{}'", r.id()); }
+        }
+    }
+
     private static boolean hasArray(JsonObject obj, String key) {
         return obj.has(key) && obj.get(key).isJsonArray() && obj.getAsJsonArray(key).size() > 0;
     }
@@ -290,6 +308,11 @@ public final class RegionJsonCodec {
         writeStringArray(obj, "member-groups", r.memberGroupsView());
 
         obj.add("flags", writeFlags(r));
+
+        // Lifecycle metadata. createdBy is omitted when unknown (legacy/console-created regions).
+        obj.addProperty("created-at",  r.createdAt());
+        obj.addProperty("modified-at", r.modifiedAt());
+        if (r.createdBy() != null) obj.addProperty("created-by", r.createdBy().toString());
         return obj;
     }
 

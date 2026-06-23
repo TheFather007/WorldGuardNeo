@@ -60,6 +60,8 @@
   "msg.info.parent": "§8 ┃ §7Родитель §8» §6%parent%",
   "msg.info.owners": "§8 ┃ §7Владельцы §8» §f%list%",
   "msg.info.members": "§8 ┃ §7Участники §8» §f%list%",
+  "msg.info.created": "§8 ┃ §7Создан §8» §f%date% §7игроком §f%by%",
+  "msg.info.modified": "§8 ┃ §7Изменён §8» §f%date%",
   "msg.info.flags": "§8 ┃ §7Флаги §8» §f%list%",
   "msg.info.none": "§8(нет)",
 

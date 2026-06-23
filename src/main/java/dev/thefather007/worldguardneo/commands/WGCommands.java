@@ -595,6 +595,7 @@ public final class WGCommands {
             }
 
             finalRegion.owners().add(p.getUUID());
+            finalRegion.setCreatedBy(p.getUUID());
             applyAutoFlags(finalRegion, ws, mod);
             mgr.add(finalRegion);
             mod.regions().saveRegion(p.serverLevel(), finalId); // incremental: just this new region
@@ -758,6 +759,9 @@ public final class WGCommands {
             newRegion.copyFlagsFrom(existing);
             newRegion.setPriority(existing.priority());
             if (existing.parent() != null) newRegion.setParent(existing.parent());
+            // Redefine changes only geometry — keep the original origin metadata.
+            newRegion.setCreatedAt(existing.createdAt());
+            newRegion.setCreatedBy(existing.createdBy());
             // Collect children before mgr.remove unlinks them, so we can rewire to newRegion.
             java.util.List<ProtectedRegion> orphans = new java.util.ArrayList<>();
             for (ProtectedRegion r : mgr.all()) {
@@ -966,6 +970,16 @@ public final class WGCommands {
         return InfoVisibility.DENIED;
     }
 
+    // Render an epoch-millis timestamp in the server's local time zone. A fixed pattern (not locale
+    // -dependent) keeps logs/info reproducible regardless of the configured language.
+    private static final java.time.format.DateTimeFormatter TS_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+                    .withZone(java.time.ZoneId.systemDefault());
+
+    private static String formatTimestamp(long epochMillis) {
+        return TS_FMT.format(java.time.Instant.ofEpochMilli(epochMillis));
+    }
+
     /**
      * Pretty-print a region's metadata, owners, members and flags. For non-global regions the
      * AABB-center coordinates are included so the caller knows WHERE the region lives.
@@ -1001,6 +1015,15 @@ public final class WGCommands {
                 .map(u -> dev.thefather007.worldguardneo.util.UuidResolver.nameOf(server, u))
                 .collect(Collectors.joining(", "));
         src.sendSuccess(() -> Component.literal(i18n.format("msg.info.members", "list", members)), false);
+        // Lifecycle metadata — meaningless for the geometry-less global region, so skip it there.
+        if (!(r instanceof GlobalRegion)) {
+            String by = r.createdBy() == null ? none
+                    : dev.thefather007.worldguardneo.util.UuidResolver.nameOf(server, r.createdBy());
+            src.sendSuccess(() -> Component.literal(i18n.format("msg.info.created",
+                    "date", formatTimestamp(r.createdAt()), "by", by)), false);
+            src.sendSuccess(() -> Component.literal(i18n.format("msg.info.modified",
+                    "date", formatTimestamp(r.modifiedAt()))), false);
+        }
         String flagDump = r.flagsRaw().isEmpty() ? none : r.flagsRaw().entrySet().stream().map(e -> {
             Flag<?> f = e.getKey();
             return f.name() + "=" + f.displayRaw(e.getValue());
@@ -1388,6 +1411,7 @@ public final class WGCommands {
         UUID target = uuidOpt.get();
         var set = owner ? r.owners() : r.members();
         boolean changed = add ? set.add(target) : set.remove(target);
+        if (changed) r.markModified();
         if (!changed) {
             err(c.getSource(), mod, add ? "msg.member.already" : "msg.member.notpresent",
                     "player", dev.thefather007.worldguardneo.util.UuidResolver.nameOf(self.getServer(), target),
