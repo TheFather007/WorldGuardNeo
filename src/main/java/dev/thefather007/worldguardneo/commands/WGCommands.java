@@ -185,19 +185,31 @@ public final class WGCommands {
                 .then(Commands.literal("list")
                         // No-arg: own regions, region.list (default OP 0 = everyone).
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.list"))
-                        .executes(c -> listOwnRegions(c.getSource(), mod))
-                        // <player> (name or UUID): region.list.others (default OP 2).
+                        .executes(c -> listOwnRegions(c.getSource(), mod, 1))
+                        // [page] — own regions, given page (integer tried before the player word).
+                        .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                                .executes(c -> listOwnRegions(c.getSource(), mod,
+                                        IntegerArgumentType.getInteger(c, "page"))))
+                        // <player> [page] (name or UUID): region.list.others (default OP 2).
                         .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
                                 .requires(s -> mod.perms().has(s, "worldguardneo.region.list.others"))
                                 .executes(c -> listPlayerRegions(c.getSource(),
-                                        StringArgumentType.getString(c, "player"), mod))))
+                                        StringArgumentType.getString(c, "player"), mod, 1))
+                                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                                        .executes(c -> listPlayerRegions(c.getSource(),
+                                                StringArgumentType.getString(c, "player"), mod,
+                                                IntegerArgumentType.getInteger(c, "page"))))))
                 .then(Commands.literal("lists")
                         // Regions within radius (optional, default 50): region.lists.radius (default OP 2).
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.lists.radius"))
-                        .executes(c -> listInRadius(c.getSource(), 50, mod))
+                        .executes(c -> listInRadius(c.getSource(), 50, mod, 1))
                         .then(Commands.argument("radius", IntegerArgumentType.integer(1, 1000))
                                 .executes(c -> listInRadius(c.getSource(),
-                                        IntegerArgumentType.getInteger(c, "radius"), mod))))
+                                        IntegerArgumentType.getInteger(c, "radius"), mod, 1))
+                                .then(Commands.argument("page", IntegerArgumentType.integer(1))
+                                        .executes(c -> listInRadius(c.getSource(),
+                                                IntegerArgumentType.getInteger(c, "radius"), mod,
+                                                IntegerArgumentType.getInteger(c, "page"))))))
                 .then(Commands.literal("teleport")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.teleport"))
                         .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
@@ -1036,7 +1048,55 @@ public final class WGCommands {
     }
 
     /** /rg list — regions where the player is owner or member. Open to everyone. */
-    private static int listOwnRegions(CommandSourceStack src, WorldGuardNeo mod) throws CommandSyntaxException {
+    /* ---- clickable, paginated region listing ---- */
+
+    private static final int LIST_PAGE_SIZE = 10;
+
+    /** A region name that, clicked in chat, runs {@code /rg info <id>} (with a matching tooltip). */
+    private static Component clickableRegion(String text, String id) {
+        return Component.literal(text).withStyle(s -> s
+                .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                        net.minecraft.network.chat.ClickEvent.Action.RUN_COMMAND, "/rg info " + id))
+                .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                        net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT,
+                        Component.literal("/rg info " + id))));
+    }
+
+    private static Component navButton(String label, String cmd) {
+        return Component.literal(label).withStyle(s -> s.withClickEvent(
+                new net.minecraft.network.chat.ClickEvent(
+                        net.minecraft.network.chat.ClickEvent.Action.RUN_COMMAND, cmd)));
+    }
+
+    /**
+     * Render one page of {@code regs}: clickable entries (via {@code lineFn}) plus a clickable
+     * page footer when there is more than one page. {@code pageCmd} is the command minus the page
+     * number (e.g. {@code "/rg list"} or {@code "/rg lists 50"}); the page index is appended.
+     */
+    private static void sendRegionPage(CommandSourceStack src, WorldGuardNeo mod, List<ProtectedRegion> regs,
+                                       int page, java.util.function.Function<ProtectedRegion, String> lineFn,
+                                       String pageCmd) {
+        int total = regs.size();
+        int pages = Math.max(1, (total + LIST_PAGE_SIZE - 1) / LIST_PAGE_SIZE);
+        final int pg = Math.max(1, Math.min(page, pages));
+        int start = (pg - 1) * LIST_PAGE_SIZE, end = Math.min(start + LIST_PAGE_SIZE, total);
+        for (int i = start; i < end; i++) {
+            final ProtectedRegion r = regs.get(i);
+            final String text = lineFn.apply(r);
+            src.sendSuccess(() -> clickableRegion(text, r.id()), false);
+        }
+        if (pages > 1) {
+            src.sendSuccess(() -> {
+                var c = Component.literal("§8» ");
+                if (pg > 1) c.append(navButton("§b[«] ", pageCmd + " " + (pg - 1)));
+                c.append(Component.literal(mod.i18n().format("msg.list.page", "page", pg, "pages", pages)));
+                if (pg < pages) c.append(navButton(" §b[»]", pageCmd + " " + (pg + 1)));
+                return c;
+            }, false);
+        }
+    }
+
+    private static int listOwnRegions(CommandSourceStack src, WorldGuardNeo mod, int page) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
         java.util.UUID uid = p.getUUID();
         List<ProtectedRegion> own = new java.util.ArrayList<>();
@@ -1050,20 +1110,10 @@ public final class WGCommands {
         String world = p.serverLevel().dimension().location().toString();
         src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.header.own",
                 "world", world, "count", own.size())), false);
-        int max = 40;
-        int shown = Math.min(max, own.size());
-        for (int i = 0; i < shown; i++) {
-            ProtectedRegion r = own.get(i);
-            String role  = roleOf(mod, r, uid);
-            String coord = regionCenter(r);
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.entry.own",
-                    "id", r.id(), "role", role, "coord", coord)), false);
-        }
-        if (own.size() > max) {
-            int hidden = own.size() - max;
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.truncated",
-                    "hidden", hidden)), false);
-        }
+        sendRegionPage(src, mod, own, page,
+                r -> mod.i18n().format("msg.list.entry.own",
+                        "id", r.id(), "role", roleOf(mod, r, uid), "coord", regionCenter(r)),
+                "/rg list");
         return 1;
     }
 
@@ -1071,7 +1121,7 @@ public final class WGCommands {
      * /rg list &lt;player&gt; — regions where the named player is owner or member. Requires
      * region.list.others (default OP 2). Accepts a name or UUID string.
      */
-    private static int listPlayerRegions(CommandSourceStack src, String playerArg, WorldGuardNeo mod)
+    private static int listPlayerRegions(CommandSourceStack src, String playerArg, WorldGuardNeo mod, int page)
             throws CommandSyntaxException {
         ServerPlayer caller = src.getPlayerOrException();
         var server = src.getServer();
@@ -1096,20 +1146,10 @@ public final class WGCommands {
         String world = caller.serverLevel().dimension().location().toString();
         src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.header.player",
                 "player", resolvedName, "world", world, "count", regs.size())), false);
-        int max = 40;
-        int shown = Math.min(max, regs.size());
-        for (int i = 0; i < shown; i++) {
-            ProtectedRegion r = regs.get(i);
-            String role  = roleOf(mod, r, uid);
-            String coord = regionCenter(r);
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.entry.own",
-                    "id", r.id(), "role", role, "coord", coord)), false);
-        }
-        if (regs.size() > max) {
-            int hidden = regs.size() - max;
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.truncated",
-                    "hidden", hidden)), false);
-        }
+        sendRegionPage(src, mod, regs, page,
+                r -> mod.i18n().format("msg.list.entry.own",
+                        "id", r.id(), "role", roleOf(mod, r, uid), "coord", regionCenter(r)),
+                "/rg list " + resolvedName);
         return 1;
     }
 
@@ -1117,7 +1157,7 @@ public final class WGCommands {
      * /rg lists [radius] — regions within radius of the player; Y spans the whole world so a
      * region directly above/below is also found. Default radius 50. Requires region.lists.radius (OP 2).
      */
-    private static int listInRadius(CommandSourceStack src, int radius, WorldGuardNeo mod)
+    private static int listInRadius(CommandSourceStack src, int radius, WorldGuardNeo mod, int page)
             throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
         var lvl = p.serverLevel();
@@ -1140,21 +1180,11 @@ public final class WGCommands {
         }
         src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.header.radius",
                 "radius", radius, "count", regs.size())), false);
-        int max = 40;
-        int shown = Math.min(max, regs.size());
         var server = src.getServer();
-        for (int i = 0; i < shown; i++) {
-            ProtectedRegion r = regs.get(i);
-            String ownerName = primaryOwnerName(server, r);
-            String coord     = regionCenter(r);
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.entry.radius",
-                    "id", r.id(), "owner", ownerName, "coord", coord)), false);
-        }
-        if (regs.size() > max) {
-            int hidden = regs.size() - max;
-            src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.list.truncated",
-                    "hidden", hidden)), false);
-        }
+        sendRegionPage(src, mod, regs, page,
+                r -> mod.i18n().format("msg.list.entry.radius",
+                        "id", r.id(), "owner", primaryOwnerName(server, r), "coord", regionCenter(r)),
+                "/rg lists " + radius);
         return 1;
     }
 

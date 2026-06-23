@@ -75,6 +75,7 @@
   "msg.list.role.member": "участник",
   "msg.list.player.notfound": "§8[§3WGN§8] §c✘ §7Игрок §f%player% §7не найден.",
   "msg.list.truncated": "§8   … и ещё §7%hidden% §8(список обрезан).",
+  "msg.list.page": "§7страница §6%page%§7/§6%pages%",
 
   "msg.flags.header": "§3§m       §r §b§l◆ Доступные флаги §8(§e%count%§8) §r§3§m       ",
   "msg.flag.unknown": "§8[§3WGN§8] §c✘ §7Неизвестный флаг §6%flag%§7.",

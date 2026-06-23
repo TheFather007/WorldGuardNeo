@@ -75,6 +75,7 @@
   "msg.list.role.member": "member",
   "msg.list.player.notfound": "§8[§3WGN§8] §c✘ §7Player §f%player% §7not found.",
   "msg.list.truncated": "§8   … and §7%hidden% §8more (truncated).",
+  "msg.list.page": "§7page §6%page%§7/§6%pages%",
 
   "msg.flags.header": "§3§m       §r §b§l◆ Available flags §8(§e%count%§8) §r§3§m       ",
   "msg.flag.unknown": "§8[§3WGN§8] §c✘ §7Unknown flag §6%flag%§7.",
