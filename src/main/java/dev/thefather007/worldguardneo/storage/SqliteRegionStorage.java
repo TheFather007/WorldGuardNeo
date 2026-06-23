@@ -30,16 +30,13 @@ import java.util.Map;
  *     PRIMARY KEY (world, region_id));
  * </pre>
  * Each {@code payload} is the JSON for one region (the per-world {@code __global__} row holds the
- * global-flags document). Region payloads are byte-compatible with one entry of the old whole-world
- * document, so data migrates losslessly.
+ * global-flags document), byte-compatible with one entry of the old whole-world document.
  *
- * <p><b>Migration.</b> Servers from an older build have a {@code world_regions(world, payload)} blob
- * table. On first load of a world whose per-region rows are empty, the legacy blob is read, loaded,
- * and re-persisted per-region. The old table is left untouched as a backup.
+ * <p>Migration: an older build's {@code world_regions(world, payload)} blob table is read on first
+ * load of a world with no per-region rows and re-persisted per-region, leaving the old table as a backup.
  *
- * <p>A single long-lived connection is reused (SQLite connections are not thread-safe → all calls
- * come from the server thread). Falls back to {@link JsonRegionStorage} if {@code org.sqlite.JDBC}
- * isn't on the classpath.
+ * <p>A single long-lived connection is reused (SQLite connections aren't thread-safe → server-thread
+ * only). Falls back to {@link JsonRegionStorage} if {@code org.sqlite.JDBC} is absent.
  */
 public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
 
@@ -126,11 +123,7 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
         }
     }
 
-    /**
-     * One-time per-world migration: if the legacy {@code world_regions} blob table holds this
-     * world, load it whole and re-persist it per-region. The legacy table is left intact as a
-     * backup. No-op if the legacy table doesn't exist (fresh install).
-     */
+    /** One-time per-world migration from the legacy {@code world_regions} blob table (kept as a backup). */
     private void migrateLegacyWorld(String worldKey, RegionManager into) {
         String blob = null;
         try (PreparedStatement ps = conn().prepareStatement(
@@ -232,10 +225,8 @@ public final class SqliteRegionStorage implements RegionStorage, AutoCloseable {
 
     @Override
     public void prepareForBackup() {
-        // Checkpoint the WAL into the main .sqlite file so a plain file-copy backup captures all
-        // committed data. Without this, recent commits live only in the -wal sidecar (which the
-        // copy omits), so the snapshot could be stale or internally inconsistent. TRUNCATE also
-        // resets the -wal file. Best-effort: never propagate failures into the backup path.
+        // Checkpoint the WAL into the main .sqlite file so a file-copy backup captures all committed
+        // data (otherwise recent commits live only in the -wal sidecar the copy omits). Best-effort.
         if (!driverPresent) return;
         try (Statement s = conn().createStatement()) {
             s.execute("PRAGMA wal_checkpoint(TRUNCATE)");

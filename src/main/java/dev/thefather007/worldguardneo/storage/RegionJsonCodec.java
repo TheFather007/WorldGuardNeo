@@ -20,13 +20,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Pure-in-memory codec between {@link RegionManager} and a JSON document.
+ * Pure-in-memory codec between {@link RegionManager} and a JSON document, so all backends share one
+ * on-the-wire shape without duplicating parser/writer code. No I/O here.
  *
- * Exists so the JSON file backend and the SQLite blob backend can share exactly the same
- * on-the-wire shape without duplicating parser/writer code. No I/O happens here.
- *
- * Robustness: malformed entries are logged and skipped rather than aborting the whole load.
- * This ensures that a single corrupt region in a save file does not erase all the others.
+ * <p>Robustness: malformed entries are logged and skipped rather than aborting the load, so one
+ * corrupt region doesn't erase the others.
  */
 public final class RegionJsonCodec {
 
@@ -175,9 +173,8 @@ public final class RegionJsonCodec {
                 JsonArray pa = obj.getAsJsonArray("points");
                 List<PolygonalRegion.Point2> pts = new ArrayList<>(pa.size());
                 for (JsonElement pe : pa) {
-                    // Skip a malformed point (missing/non-numeric x or z) rather than dropping the
-                    // whole region — matches how flags/UUIDs are handled. The <3 guard below still
-                    // protects against a degenerate polygon.
+                    // Skip a malformed point rather than dropping the whole region; the <3 guard below
+                    // still rejects degenerate polygons.
                     try {
                         JsonObject po = pe.getAsJsonObject();
                         pts.add(new PolygonalRegion.Point2(po.get("x").getAsInt(), po.get("z").getAsInt()));
@@ -205,9 +202,8 @@ public final class RegionJsonCodec {
     }
 
     private static void fillOwnersMembers(ProtectedRegion r, JsonObject obj) {
-        // Only call the mutable getters (which lazy-allocate) if there's actual data to load.
-        // Regions without owners/members in JSON keep their lazy collections null, saving
-        // 4 collections × ~40 bytes per region on large servers.
+        // Only call the lazy-allocating getters if there's data to load, so empty regions keep their
+        // collections null (saves ~4 collections per region on large servers).
         if (hasArray(obj, "owners"))        addUuids(obj,   "owners",        r.owners());
         if (hasArray(obj, "owner-groups"))  addStrings(obj, "owner-groups",  r.ownerGroups());
         if (hasArray(obj, "members"))       addUuids(obj,   "members",       r.members());
@@ -286,9 +282,8 @@ public final class RegionJsonCodec {
             obj.addProperty("max-y", p.maxY());
         }
 
-        // Use *View() reads which return Collections.emptySet() when the underlying set is
-        // null — avoids allocating empty collections on save for regions that have no
-        // owners/members. Real data still gets serialized correctly.
+        // *View() reads return emptySet() for null underlying sets — no empty-collection allocation
+        // for regions with no owners/members.
         writeUuidArray(obj, "owners",        r.ownersView());
         writeStringArray(obj, "owner-groups", r.ownerGroupsView());
         writeUuidArray(obj, "members",       r.membersView());

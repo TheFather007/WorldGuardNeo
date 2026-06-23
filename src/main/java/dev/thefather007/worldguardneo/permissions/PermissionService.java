@@ -16,8 +16,8 @@ public final class PermissionService implements PermissionResolver {
     private PermissionService(PermissionResolver delegate) { this.delegate = delegate; }
 
     /**
-     * Pick the best resolver. Caller passes {@code useLuckPerms} explicitly to avoid
-     * forming a cycle with the still-constructing {@code WorldGuardNeo} instance.
+     * Pick the best resolver. {@code useLuckPerms} is passed explicitly to avoid a cycle with the
+     * still-constructing {@code WorldGuardNeo} instance.
      */
     public static PermissionService detect(boolean useLuckPerms) {
         boolean lpAvailable = ModList.get().isLoaded("luckperms");

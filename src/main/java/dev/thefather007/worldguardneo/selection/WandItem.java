@@ -13,18 +13,11 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.component.CustomData;
 
 /**
- * The built-in selection wand item handed out by {@code /rg wand}. The item type is configurable
- * ({@code selection.wand-item}, default {@code minecraft:stick}); we tag every wand we create with
- * a hidden {@code wgn_wand} marker so it's recognised reliably regardless of type or renaming, and
- * so the config item can be changed without orphaning wands already in players' inventories.
- *
- * <p>Two protections enforce the spec:
- * <ul>
- *   <li>obtainable once — {@code /rg wand} refuses to hand out a second wand if one is already in
- *       the player's inventory (see {@link #hasWand});</li>
- *   <li>selection-only — the interaction handler cancels the wand's normal item/block use so it
- *       can only pick selection corners.</li>
- * </ul>
+ * The built-in selection wand handed out by {@code /rg wand}. Item type is configurable
+ * ({@code selection.wand-item}); every wand carries a hidden {@code wgn_wand} marker so it's
+ * recognised regardless of type/renaming and the config item can change without orphaning
+ * existing wands. Obtainable once ({@link #hasWand}); its normal use is cancelled so it only
+ * picks selection corners.
  */
 public final class WandItem {
 
@@ -59,9 +52,8 @@ public final class WandItem {
     }
 
     /**
-     * True only for a stack carrying our hidden marker tag (a renamed vanilla item won't match).
-     * Uses {@link CustomData#contains} so the common case — clicking any non-wand item — never
-     * allocates a tag copy; this runs at {@code HIGHEST} priority for every block interaction.
+     * True only for a stack carrying our hidden marker tag. Uses {@link CustomData#contains} so the
+     * common non-wand case allocates nothing — this runs for every block interaction.
      */
     public static boolean isWand(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;

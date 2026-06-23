@@ -10,25 +10,17 @@ import java.util.Properties;
 /**
  * Classloader-robust JDBC bootstrapping shared by the SQL storage backends.
  *
- * <p><b>Why this exists.</b> In a modded environment the JDBC driver jar is very often loaded by
- * a different classloader than WorldGuardNeo (a sibling mod's dependency loader, a libraries
- * directory, LuckPerms' isolated loader, …). {@link java.sql.DriverManager#getConnection} only
- * considers drivers registered by the <i>caller's own</i> classloader (and its ancestors), so it
- * throws {@code "No suitable driver found"} even though {@code Class.forName} located the class.
- * This was the cause of "H2 init failed → falling back to JSON" on servers that clearly had H2
- * present. We sidestep DriverManager entirely: locate the {@link Driver} class (trying both the
- * caller and the thread-context classloaders), instantiate it, and call {@link Driver#connect}
- * directly — that path doesn't care which classloader loaded the driver.
+ * <p>In a modded environment the driver jar is often loaded by a different classloader than us, and
+ * {@link java.sql.DriverManager} only sees drivers registered by the caller's own classloader — so
+ * it throws "No suitable driver found" even when {@code Class.forName} locates the class. We sidestep
+ * DriverManager: find the {@link Driver} class (caller + thread-context loaders), instantiate it, and
+ * call {@link Driver#connect} directly, which doesn't care which classloader loaded the driver.
  */
 final class JdbcSupport {
 
     private JdbcSupport() {}
 
-    /**
-     * Locate a driver class by trying each candidate name against the current classloader and
-     * then the thread-context classloader. Returns the loaded {@link Class}, or null if none of
-     * the candidates resolve anywhere.
-     */
+    /** Locate a driver class by name, trying the current then thread-context classloader. Null if none resolve. */
     static Class<?> findDriverClass(String... candidates) {
         ClassLoader ctx = Thread.currentThread().getContextClassLoader();
         for (String name : candidates) {
@@ -45,9 +37,8 @@ final class JdbcSupport {
     }
 
     /**
-     * Open a connection through a {@link Driver} instance built from {@code driverClass},
-     * bypassing {@link java.sql.DriverManager}. {@code props} may carry user/password/options;
-     * pass an empty {@link Properties} for none.
+     * Open a connection via a {@link Driver} instance built from {@code driverClass}, bypassing
+     * {@link java.sql.DriverManager}. {@code props} may carry user/password/options (or be empty).
      *
      * @throws SQLException if instantiation fails or the driver rejects the URL
      */

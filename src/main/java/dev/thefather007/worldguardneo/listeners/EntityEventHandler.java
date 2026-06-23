@@ -35,9 +35,8 @@ public final class EntityEventHandler {
     /* ---------------- Mob block griefing ---------------- */
 
     /**
-     * Gate vanilla mob griefing (Enderman block pickup, sheep eating grass, zombies breaking
-     * doors, …) by the per-region {@code mob-grief} flag, without touching the world-wide
-     * {@code mobGriefing} game rule. Default ALLOW — admins opt in with {@code mob-grief deny}.
+     * Gate vanilla mob griefing by the per-region {@code mob-grief} flag without touching the
+     * world-wide {@code mobGriefing} game rule. Default ALLOW — admins opt in with deny.
      */
     @SubscribeEvent
     public void onMobGriefing(net.neoforged.neoforge.event.entity.EntityMobGriefingEvent e) {
@@ -65,8 +64,8 @@ public final class EntityEventHandler {
         try {
             var ws = mod.config().worldOrGlobal(sl);
             if (ws != null && ws.blockedEntities != null && !ws.blockedEntities.isEmpty()) {
-                // getKey is null for keyless modded mobs — guard it; an NPE here used to be
-                // swallowed by the catch, silently skipping the hostile-mob suppressor below too.
+                // getKey is null for keyless modded mobs — guard it, else an NPE here gets
+                // swallowed by the catch and silently skips the hostile-mob suppressor below.
                 var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
                         .getKey(e.getEntity().getType());
                 if (key != null) {
@@ -120,9 +119,9 @@ public final class EntityEventHandler {
             }
         }
 
-        // Per-type spawn caps (spawn-limit): for each region declaring a cap matching this type,
-        // count live entities of that type in its bounds and cancel once the cap is reached. Uses
-        // each region's OWN value (not inherited); the count scan only runs when a cap matches.
+        // Per-type spawn caps (spawn-limit): for each region declaring a cap for this type, count
+        // live entities of that type in its bounds and cancel once the cap is reached. Uses each
+        // region's OWN value (not inherited); the count scan only runs when a cap matches.
         try {
             for (int i = 0, n = applicable.size(); i < n; i++) {
                 var reg = applicable.get(i);
@@ -191,9 +190,9 @@ public final class EntityEventHandler {
         var applicable = mgr.getApplicable(x, y, z);
         UUID actor = attacker.getUUID();
 
-        // Decoration (HangingEntity/ArmorStand) checked FIRST. ArmorStand is a LivingEntity in
-        // vanilla but is decoration, so routing it through MOB_DAMAGE would conflate "kill a mob"
-        // with "vandalize decoration". Both gate on BUILD + BLOCK_BREAK instead.
+        // Decoration (HangingEntity/ArmorStand) checked FIRST. ArmorStand is a LivingEntity but
+        // is decoration, so MOB_DAMAGE would conflate killing a mob with vandalizing decoration;
+        // both gate on BUILD + BLOCK_BREAK instead.
         boolean isDecoration = target instanceof net.minecraft.world.entity.decoration.HangingEntity
                             || target instanceof net.minecraft.world.entity.decoration.ArmorStand;
         if (isDecoration) {
@@ -209,7 +208,7 @@ public final class EntityEventHandler {
         if (target instanceof Player) {
             if (!mgr.testState(Flags.PVP, applicable, actor)) {
                 e.setCanceled(true);
-                // Show attacker WHY their attack didn't land — silent cancel feels broken.
+                // Tell the attacker why — a silent cancel feels broken.
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.pvp-denied")), true);
                 return;
@@ -224,8 +223,8 @@ public final class EntityEventHandler {
         }
 
         if (target instanceof AbstractMinecart || target instanceof Boat) {
-            // World-wide protectVehicles: protect vehicles regardless of region flags. bypass was
-            // already checked at the top of this method.
+            // World-wide protectVehicles: protect regardless of region flags (bypass already
+            // checked at the top of this method).
             var ws = mod.config().worldOrGlobal(lvl);
             if (ws != null && ws.protectVehicles) {
                 e.setCanceled(true);
@@ -268,10 +267,9 @@ public final class EntityEventHandler {
     /* ---------------- Right-click EXACTLY on an entity (armor stand armor swap) ---------------- */
 
     /**
-     * Armor stands swap gear via {@code Entity#interactAt}, which runs after
-     * {@link PlayerInteractEvent.EntityInteractSpecific} — NOT after the regular EntityInteract
-     * that {@link #onEntityInteract} hooks, so armor swaps slip past that handler. Cancelling
-     * here prevents {@code interactAt} (the swap). Gated by the same build-access check.
+     * Armor stands swap gear via {@code interactAt}, which fires EntityInteractSpecific, not the
+     * regular EntityInteract that {@link #onEntityInteract} hooks — so swaps slip past it.
+     * Cancelling here blocks the swap. Gated by the same build-access check.
      */
     @SubscribeEvent
     public void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific e) {
@@ -308,11 +306,9 @@ public final class EntityEventHandler {
     /* ---------------- Right-click on entity (rotate item frame, swap armor stand gear, etc) ---------------- */
 
     /**
-     * Right-click on decoration — item frames (place/rotate/remove) and armor stands (swap armor).
-     * These fire {@code EntityInteract}, not {@link AttackEntityEvent}; without this a non-owner
-     * could pop an item out of a claimed frame. Gated on BUILD + INTERACT (right-click is logically
-     * a "use"; BUILD doubles as the member gate). Mobs/players/vehicles fall through to their own
-     * flags or vanilla rules.
+     * Right-click on decoration (item frames, armor stands). These fire {@code EntityInteract},
+     * not {@link AttackEntityEvent}; without this a non-owner could pop an item from a claimed
+     * frame. Gated on BUILD + INTERACT. Mobs/players/vehicles fall through to their own flags.
      */
     @SubscribeEvent
     public void onEntityInteract(PlayerInteractEvent.EntityInteract e) {
@@ -329,8 +325,8 @@ public final class EntityEventHandler {
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
         // Dedicated decoration toggles (default ALLOW): an explicit deny blocks even members.
-        // item-frame-rotate only applies to a frame that already holds an item (rotating);
-        // placing/removing still falls under the build-access gate below.
+        // item-frame-rotate only applies to a frame already holding an item; placing/removing
+        // falls under the build-access gate below.
         if (target instanceof net.minecraft.world.entity.decoration.ItemFrame frame
                 && !frame.getItem().isEmpty()
                 && !mgr.testState(Flags.ITEM_FRAME_ROTATE, actor, x, y, z)) {
@@ -346,7 +342,6 @@ public final class EntityEventHandler {
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
             return;
         }
-        // INTERACT + BUILD must both allow (members pass, strangers blocked when flags unset).
         if (!mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor)
                 || !mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)) {
             e.setCanceled(true);
@@ -358,11 +353,9 @@ public final class EntityEventHandler {
     /* ---------------- Projectile hits decoration ---------------- */
 
     /**
-     * Stops projectiles (arrows, snowballs, tridents, …) from breaking decoration where BUILD is
-     * denied; these don't route through {@link AttackEntityEvent}, so otherwise a hostile player
-     * could destroy decorations from afar even when melee is blocked. Mirrors left-click: BUILD +
-     * BLOCK_BREAK must both allow. Shooter (if any) is the actor; source-less projectiles pass null.
-     * Cancelling makes the projectile pass through without damage while still flying on.
+     * Stops projectiles from breaking decoration/vehicles where protection denies it; these don't
+     * route through {@link AttackEntityEvent}, so otherwise a player could destroy them from afar
+     * even when melee is blocked. Shooter (if any) is the actor; source-less projectiles pass null.
      */
     @SubscribeEvent
     public void onProjectileImpactEntity(ProjectileImpactEvent e) {
@@ -383,9 +376,8 @@ public final class EntityEventHandler {
         if (lvl.isClientSide()) return;
         if (!mod.isProtectionActive(lvl)) return;
 
-        // Identify the shooter (if any) so owner/member resolution can match group filters.
-        // A shooter with bypass walks through; null-shooter (e.g. dispenser) falls back to
-        // global flag defaults.
+        // Identify the shooter for owner/member resolution. A shooter with bypass walks through;
+        // null-shooter (e.g. dispenser) falls back to global flag defaults.
         UUID shooterId = null;
         Entity owner = e.getProjectile().getOwner();
         if (owner instanceof ServerPlayer sp) {
@@ -426,23 +418,18 @@ public final class EntityEventHandler {
         if (levelObj.isClientSide()) return;
         if (!mod.isProtectionActive(levelObj)) return;
 
-        // Cache the manager once for use across world-config and per-region paths below.
         RegionManager mgr = mod.regions().get(levelObj);
 
         // ---- player-sourced damage: melee AND ranged (arrows, tridents, potions, …) ----
-        // DamageSource#getEntity resolves to the CAUSING entity — the shooter for projectiles —
-        // so this closes the classic bypass where AttackEntityEvent gates melee but a bow shot
-        // sails through pvp=deny / mob-damage=deny untouched. Melee passes through both this
-        // and AttackEntityEvent with the same verdict, which is harmless.
-        // Victim's applicable regions, resolved at most once and shared between the player-attack
-        // gate and the environmental-damage cascade below (both at the victim's position). Lazy:
-        // the common mob-environmental-damage path returns before it's needed and never pays for it.
+        // DamageSource#getEntity resolves to the causing entity (shooter for projectiles), closing
+        // the bypass where AttackEntityEvent gates melee but a bow shot sails through pvp/mob-damage.
+        // applicable: victim's regions, resolved lazily at most once and shared with the
+        // environmental-damage cascade below (the common mob-damage path returns before it's needed).
         java.util.List<dev.thefather007.worldguardneo.region.ProtectedRegion> applicable = null;
 
         if (e.getSource().getEntity() instanceof ServerPlayer attacker && attacker != victim
                 && !(victim instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
-            // Armor stands are decoration: their BUILD/BLOCK_BREAK gating lives in the
-            // melee/projectile handlers, not under mob-damage.
+            // Armor stands are decoration; their gating lives in the melee/projectile handlers.
             if (!mod.perms().has(attacker, "worldguardneo.region.bypass")) {
                 applicable = mgr.getApplicable(victim.getX(), victim.getY(), victim.getZ());
                 StateFlag gate = victim instanceof Player ? Flags.PVP : Flags.MOB_DAMAGE;
@@ -465,8 +452,8 @@ public final class EntityEventHandler {
 
         if (!(victim instanceof ServerPlayer sp)) return;
 
-        // World-wide config: invincibleRegions forces all-region invincibility, preventMobDamage
-        // blocks ALL mob-sourced damage across the world (regardless of regions).
+        // World-wide config: preventMobDamage blocks all mob-sourced damage; invincibleRegions
+        // makes a player inside any region take no damage.
         if (levelObj instanceof ServerLevel slvl) {
             var ws = mod.config().worldOrGlobal(slvl);
             if (ws != null) {
@@ -475,8 +462,7 @@ public final class EntityEventHandler {
                     e.setCanceled(true);
                     return;
                 }
-                // invincibleRegions: if the player is inside ANY region, take no damage.
-                // Cheap O(1) bucket lookup via the spatial index, no allocations.
+                // O(1) bucket lookup via the spatial index, no allocations.
                 if (ws.invincibleRegions
                         && mgr.hasAnyAt(victim.getX(), victim.getY(), victim.getZ())) {
                     e.setCanceled(true); return;
@@ -485,18 +471,14 @@ public final class EntityEventHandler {
         }
 
         double x = victim.getX(), y = victim.getY(), z = victim.getZ();
-        // Reuse the list already resolved by the player-attack gate above (same position) when
-        // present; otherwise resolve it once here for the environmental-damage cascade below.
+        // Reuse the list resolved by the player-attack gate above when present (same position).
         if (applicable == null) applicable = mgr.getApplicable(x, y, z);
         UUID id = sp.getUUID();
 
-        // Wilderness fast path: if there are no applicable regions AND the global region has
-        // no damage-related flags set, all testState calls below would return the flag default
-        // (allow) and we'd do nothing. Skip the cascade entirely. Most of the world is
-        // wilderness with vanilla damage rules, so this short-circuit fires often.
+        // Wilderness fast path: with no applicable regions and no damage-related flags on global,
+        // every testState below returns the allow default — skip the cascade entirely. Most of the
+        // world is wilderness with vanilla rules, so this fires often.
         if (applicable.isEmpty()) {
-            // Probe just one common damage-related flag on global — if unset, none of the
-            // others matter for cancellation (defaults allow damage). Cheap shortcut.
             var globalReg = mgr.globalRegion();
             if (globalReg.getFlag(Flags.INVINCIBLE) == null
                     && globalReg.getFlag(Flags.FALL_DAMAGE) == null
@@ -515,7 +497,7 @@ public final class EntityEventHandler {
         }
 
         DamageSource src = e.getSource();
-        // Typed damage-key references — robust to localization and mods adding new sources.
+        // Typed damage-key references — robust to localization and modded sources.
         if (src.is(DamageTypes.FALL)) {
             if (!mgr.testState(Flags.FALL_DAMAGE, applicable, id)) e.setCanceled(true);
         } else if (src.is(DamageTypes.IN_FIRE)

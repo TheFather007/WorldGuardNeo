@@ -15,16 +15,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Mod configuration, stored as a human-editable TOML file with inline comments — the same
- * format other NeoForge mods use. A single global config plus per-world overrides.
- *
- * <p>On first run {@code config/worldguardneo/config.toml} is written with every key documented
- * by a comment. Admins edit it directly and run {@code /rg reload}. Per-world overrides live in
- * {@code config/worldguardneo/worlds/<dimension>.toml} and inherit from the global {@code
- * [defaults]} section.
- *
- * <p>Comments live in the file itself (TOML supports them natively), so there is no separate
- * help document — the previous {@code CONFIG_HELP.md} has been removed.
+ * Mod configuration: a human-editable TOML file (config.toml) with inline comments, plus per-world
+ * overrides in worlds/&lt;dimension&gt;.toml that inherit from the global [defaults] section. On first
+ * run every key is written with a documenting comment; admins edit it and run {@code /rg reload}.
  */
 public final class WGConfig {
 
@@ -145,9 +138,8 @@ public final class WGConfig {
             WorldGuardNeo.LOGGER.error(
                     "config.toml is malformed — keeping values parsed so far, defaults for the rest. " +
                     "Fix the file or delete it to regenerate.", ex);
-            // Return the partially-populated section (g started as defaults and was overwritten
-            // field-by-field up to the failure), NOT a fresh defaults() — otherwise one bad key
-            // deep in the file silently discards every admin setting parsed before it.
+            // Return the partially-parsed section, NOT a fresh defaults() — otherwise one bad key
+            // deep in the file would discard every admin setting parsed before it.
             return g;
         }
         return g;
@@ -180,8 +172,8 @@ public final class WGConfig {
     /* ---- typed readers tolerant of missing keys / wrong types ---- */
     private static String str(Config c, String path, String def) {
         Object v = c.get(path);
-        // Type-guard like bool()/intOf(): a non-string value (e.g. storage-format = true) falls
-        // back to the default instead of being coerced to garbage ("true") via String.valueOf.
+        // Type-guard: a non-string value (e.g. storage-format = true) falls back to the default
+        // rather than being coerced to garbage via String.valueOf.
         return v instanceof String s ? s : def;
     }
     private static boolean bool(Config c, String path, boolean def) {
@@ -239,9 +231,8 @@ public final class WGConfig {
         CommentedConfig c = CommentedConfig.inMemory();
         GlobalSection g = global;
 
-        // night-config writes keys in insertion order, so the order below IS the file layout.
-        // Keys are grouped into labelled sections; each section's first key carries a banner
-        // comment so the generated config.toml reads top-to-bottom in a logical order.
+        // night-config writes keys in insertion order, so the order below IS the file layout;
+        // each section's first key carries a banner comment.
 
         /* ───────────────────────── GENERAL ───────────────────────── */
         c.setComment("locale",
@@ -579,15 +570,13 @@ public final class WGConfig {
         public int     backupRetainCount     = 10;
         public boolean backupCompress        = true;
 
-        // Claim expiry — automatically delete player regions whose owners have ALL been offline
-        // for longer than claim-expiry.days. Admin/unowned regions are never touched. Disabled by
-        // default. The scan runs at server start and every claim-expiry.check-hours.
+        // Claim expiry — auto-delete player regions whose owners have all been offline past
+        // claimExpiryDays. Admin/unowned regions untouched; disabled by default.
         public boolean claimExpiryEnabled    = false;
         public int     claimExpiryDays       = 60;
         public int     claimExpiryCheckHours = 6;
 
-        // Selection wand — the item handed out by /rg wand for picking region corners/points.
-        // Built in, no WorldEdit needed. Defaults to a wooden stick; change to any item id.
+        // Item handed out by /rg wand for picking region corners/points (no WorldEdit needed).
         public String  wandItem             = "minecraft:stick";
 
         // MySQL connection settings — used only when storage-format = "mysql".
@@ -646,15 +635,10 @@ public final class WGConfig {
         public Map<String, String> blockedItems     = new LinkedHashMap<>();
         public Map<String, String> blockedBlocks    = new LinkedHashMap<>();
         public Map<String, String> blockedEntities  = new LinkedHashMap<>();
-        // Flags auto-applied to every newly claimed region in this world. Each entry is
-        // "flag-name=value" (e.g. "pvp=deny"). Empty list = none.
+        // Flags auto-applied to newly claimed regions, each "flag-name=value" (e.g. "pvp=deny").
         public java.util.List<String> autoFlags     = new java.util.ArrayList<>();
-        // Automatic vertical expansion on claim: "none" | "full" | "fixed".
-        //   none  — keep the selection's Y span.
-        //   full  — expand to the world's full build height (protects against tunnelling from
-        //           below and bridging in from above).
-        //   fixed — expand vertical-expand-down blocks down and vertical-expand-up blocks up
-        //           from the selection (each clamped to the world's build limits).
+        // Auto vertical expansion on claim: "none" (keep Y span) | "full" (full build height) |
+        // "fixed" (expand by verticalExpandDown/Up, clamped to build limits).
         public String  verticalExpansion             = "none";
         public int     verticalExpandDown            = 0;
         public int     verticalExpandUp              = 0;
