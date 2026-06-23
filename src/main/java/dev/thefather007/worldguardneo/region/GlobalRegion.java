@@ -20,4 +20,9 @@ public final class GlobalRegion extends ProtectedRegion {
     @Override public Vec3 maximumBound() { return MAX; }
     @Override public String type()       { return "global"; }
     @Override public long   volume()     { return Long.MAX_VALUE; }
+
+    /** The global region is a singleton fallback and is never renamed or copied. */
+    @Override public ProtectedRegion withId(String newId) {
+        throw new UnsupportedOperationException("the global region cannot be renamed");
+    }
 }

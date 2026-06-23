@@ -172,6 +172,10 @@ public abstract class ProtectedRegion {
     public abstract String  type();
     public abstract long    volume();
 
+    /** A new region of the same shape/geometry but a different id; metadata is NOT copied
+     *  (priority, parent, owners/members, flags) — see {@link RegionManager#rename}. */
+    public abstract ProtectedRegion withId(String newId);
+
     /** Cheap AABB-vs-AABB pre-check used in spatial indexing. */
     public boolean intersectsBounds(ProtectedRegion o) {
         Vec3 a1 = minimumBound(), a2 = maximumBound();

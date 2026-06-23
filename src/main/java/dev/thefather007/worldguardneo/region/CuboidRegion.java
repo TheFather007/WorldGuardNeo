@@ -33,4 +33,6 @@ public final class CuboidRegion extends ProtectedRegion {
     @Override public String type()       { return "cuboid"; }
 
     @Override public long volume() { return min.volumeWith(max); }
+
+    @Override public ProtectedRegion withId(String newId) { return new CuboidRegion(newId, min, max); }
 }

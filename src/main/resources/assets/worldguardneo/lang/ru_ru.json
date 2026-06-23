@@ -37,6 +37,7 @@
   "msg.region.defined": "§8[§3WGN§8] §a✔ §7Регион §6%id% §aсоздан §8(§7объём §b%volume%§8)§7.",
   "msg.region.redefined": "§8[§3WGN§8] §a✔ §7Регион §6%id% §aпереопределён§7.",
   "msg.region.removed": "§8[§3WGN§8] §a✔ §7Регион §6%id% §cудалён§7.",
+  "msg.region.renamed": "§8[§3WGN§8] §a✔ §7Регион §6%id% §7переименован в §6%new%§7.",
   "msg.region.unknown": "§8[§3WGN§8] §c✘ §7Неизвестный регион §6%id%§7.",
   "msg.region.notyours": "§8[§3WGN§8] §c✘ §7Вы не §fвладелец §7региона §6%id%§7.",
   "msg.region.none-here-own": "§8[§3WGN§8] §7Вы не находитесь в регионе, которым владеете или в котором состоите.",

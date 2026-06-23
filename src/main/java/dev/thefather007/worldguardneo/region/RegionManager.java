@@ -74,6 +74,37 @@ public final class RegionManager {
 
     public void rebuildIndex() { index.rebuild(regions.values()); }
 
+    /**
+     * Rename a region, preserving its geometry, priority, parent, owners/members and flags, and
+     * re-pointing any child regions to the renamed instance. Returns the new region, or empty if
+     * the source is missing, the target id is taken, or the target is the reserved global id.
+     */
+    public Optional<ProtectedRegion> rename(String oldId, String newId) {
+        if (newId == null || GlobalRegion.ID.equalsIgnoreCase(newId)) return Optional.empty();
+        ProtectedRegion old = regions.get(key(oldId));
+        if (old == null) return Optional.empty();
+        if (regions.containsKey(key(newId))) return Optional.empty();
+
+        ProtectedRegion fresh = old.withId(newId);
+        fresh.setPriority(old.priority());
+        fresh.setParent(old.parent());
+        if (!old.ownersView().isEmpty())       fresh.owners().addAll(old.ownersView());
+        if (!old.ownerGroupsView().isEmpty())  fresh.ownerGroups().addAll(old.ownerGroupsView());
+        if (!old.membersView().isEmpty())      fresh.members().addAll(old.membersView());
+        if (!old.memberGroupsView().isEmpty()) fresh.memberGroups().addAll(old.memberGroupsView());
+        fresh.copyFlagsFrom(old);
+
+        regions.put(key(newId), fresh);
+        index.add(fresh);
+        // Re-point children before dropping the old instance (remove() would otherwise null them).
+        for (ProtectedRegion r : regions.values()) {
+            if (r != fresh && r.parent() == old) r.setParent(fresh);
+        }
+        regions.remove(key(oldId));
+        index.remove(old);
+        return Optional.of(fresh);
+    }
+
     /** Regions containing the point, sorted by priority desc, then by id (stable). */
     public List<ProtectedRegion> getApplicable(double x, double y, double z) {
         List<ProtectedRegion> candidates = index.candidates(x, z);
