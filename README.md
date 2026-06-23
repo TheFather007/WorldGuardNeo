@@ -2,7 +2,7 @@
 
 # WorldGuardNeo
 
-**Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created with a built-in selection wand and protected by 90+ per-region flags. No WorldEdit required.**
+**Server-side region protection for NeoForge — a WorldGuard-model reimplementation. Regions are created with a built-in selection wand and protected by 90+ per-region flags.**
 
 ![Version](https://img.shields.io/badge/Version-1.3-44cc11)
 ![Minecraft](https://img.shields.io/badge/Minecraft-1.21.1-44cc11)
@@ -23,7 +23,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 
 ## Features
 
-- **Built-in selection wand** — `/rg wand` hands out a selection item (a stick by default, configurable). Left/right-click two corners for a cuboid, or build a polygon point-by-point. The outline renders client-side for players who have [WorldEditCUI](https://www.curseforge.com/minecraft/mc-mods/worldedit-cui).
+- **Built-in selection wand** — `/rg wand` hands out a selection item (a stick by default, configurable). Left/right-click two corners for a cuboid, or build a polygon point-by-point. The outline renders client-side for players who have [WorldEditCUI](https://modrinth.com/mod/worldeditcui).
 - **90+ flags** — build, block-break/place, interact, use, chest-access, pvp, mob-spawning, mob-damage, tnt/creeper/other explosions, fire-spread, lava-fire, lightning, redstone, pistons, dispenser-output, fluids, growth, entry/exit, greetings, game-mode/time/weather locks, keep-inventory/xp, and more.
 - **Per-region & per-world** — flags per region; world-wide toggles per dimension via override files.
 - **Membership model** — owners and members; build-type flags respect them (WorldGuard "private by default").
@@ -52,14 +52,14 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 
 | Dependency | Enables |
 | --- | --- |
-| **LuckPerms** 5.4+ | Permission nodes + per-group region limits (otherwise OP levels) |
-| **BlueMap** | Region rendering on the 3D web map |
-| **squaremap** | Region rendering on the 2D web map |
-| **WorldEditCUI** (client) | Renders the selection/region outline client-side |
-| **sqlite-jdbc** jar | `storage-format = "sqlite"` |
-| **H2** jar | `storage-format = "h2"` (LuckPerms already ships H2) |
-| **mysql-connector-j** or **MariaDB** jar | `storage-format = "mysql"` |
-| **JDK 21** | Building from source only |
+| [**LuckPerms**](https://luckperms.net) 5.4+ | Permission nodes + per-group region limits (otherwise OP levels) |
+| [**BlueMap**](https://modrinth.com/mod/bluemap) | Region rendering on the 3D web map |
+| [**squaremap**](https://modrinth.com/mod/squaremap) | Region rendering on the 2D web map |
+| [**WorldEditCUI**](https://modrinth.com/mod/worldeditcui) (client) | Renders the selection/region outline client-side |
+| [**sqlite-jdbc**](https://github.com/xerial/sqlite-jdbc) jar | `storage-format = "sqlite"` |
+| [**H2**](https://www.h2database.com) jar | `storage-format = "h2"` (LuckPerms already ships H2) |
+| [**mysql-connector-j**](https://dev.mysql.com/downloads/connector/j/) or [**MariaDB**](https://mariadb.com/downloads/connectors/) jar | `storage-format = "mysql"` |
+| [**JDK 21**](https://adoptium.net) | Building from source only |
 
 The mod is **server-side only**. Vanilla clients connect normally; no client-side installation is required. The selection outline is drawn for clients that have the **WorldEditCUI** client mod (the server speaks the `worldedit:cui` protocol directly); clients without it still select and claim normally, just without the visual box. Any database backend whose driver is absent falls back to JSON automatically, so a missing optional jar never stops the server.
 
