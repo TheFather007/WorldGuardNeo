@@ -4,7 +4,7 @@
 
 **Query regions and flags from KubeJS (or any JVM scripting layer) through the public static API.**
 
-[🏠 Home](README.md) · [⚙️ API](API.md) · [🚩 Flags](FLAGS.md)
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · **🧩 KubeJS** · [📋 Changelog](CHANGELOG.md)
 
 </div>
 

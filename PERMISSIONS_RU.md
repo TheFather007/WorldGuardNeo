@@ -6,7 +6,7 @@
 
 [English](PERMISSIONS.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · **🔑 Права** · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · **🔑 Права** · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [🧩 KubeJS](KUBEJS.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
