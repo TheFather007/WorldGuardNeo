@@ -212,13 +212,10 @@ public final class PlayerEventHandler {
             }
         }
 
-        // exit: farewells + exit-deny test.
-        //
-        // EXIT semantics: a region the player just left (was in lastRegions, not in current)
-        // is checked individually. We walk that region's parents up to 32 hops looking for
-        // an EXIT flag value. RegionGroup matching is done against the leaving region.
-        // We can't use RegionManager.testState because the player's current position is
-        // already outside the region, so resolution there would always return the default.
+        // exit: farewells + exit-deny test. A region just left (in lastRegions, not in current) is
+        // checked individually via mgr.resolveStateForRegion, which walks the region's parents for an
+        // EXIT value and matches the group against the flag's SOURCE region. We can't use testState
+        // here: the player is already outside the region, so it would always return the default.
         if (!unchanged && !st.lastRegions.isEmpty()) {
             String denyMsg = null;
             boolean denyExit = false;

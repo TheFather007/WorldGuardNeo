@@ -22,19 +22,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Async, rotating backups of the region files.
- *
- * <p>Backups are full copies of {@code worldguardneo/regions/}, written into
- * {@code worldguardneo/backups/<timestamp>/} as gzipped region files. Rotation
- * keeps only the newest N directories; older ones are removed.
- *
- * <p>All disk I/O runs on a single-threaded executor — never on the server tick
- * thread. The server tick only flips a "is it time?" check via {@link #tick}.
- * Concurrent backup attempts are guarded by an {@code in-flight} atomic flag;
- * if a previous backup is still running when the next one is due, the new one
- * is dropped (logged at info-level) rather than corrupting the snapshot.
- *
- * <p>The executor is a daemon thread so it doesn't prevent JVM shutdown.
+ * Async, rotating backups of the region files: full gzipped copies of {@code regions/} into
+ * {@code backups/<timestamp>/}, keeping only the newest N. All I/O runs on a single daemon
+ * executor (never the tick thread); an in-flight flag drops overlapping runs rather than
+ * corrupting a snapshot.
  */
 public final class BackupManager implements AutoCloseable {
 
@@ -73,12 +64,10 @@ public final class BackupManager implements AutoCloseable {
     }
 
     /**
-     * Server-tick scheduler. Submits an async backup task if the configured interval
-     * has elapsed since the last run. Cheap — the common case (interval not yet up,
-     * or already running) is a single AtomicLong read.
+     * Server-tick scheduler: submits an async backup once the interval has elapsed. The first
+     * backup runs ~one interval after start (not at boot, to avoid racing world load).
      *
-     * @param currentTick current server tick
-     * @param intervalMinutes minutes between backups; if {@code <= 0}, scheduling is disabled
+     * @param intervalMinutes minutes between backups; {@code <= 0} disables scheduling
      */
     public void tick(long currentTick, int intervalMinutes) {
         if (intervalMinutes <= 0) return;
