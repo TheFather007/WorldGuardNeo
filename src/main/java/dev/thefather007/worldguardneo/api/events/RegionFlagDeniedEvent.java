@@ -8,29 +8,10 @@ import net.neoforged.bus.api.ICancellableEvent;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Fired when a region flag denies an action, giving other mods a chance to OVERRIDE the denial.
- *
- * <p>Coverage: block-break, block-place, interact, container (chest-access), and PvP denials all
- * fire this event. Purely environmental denials with no entity actor (fire/fluid spread, random
- * ticks, dispensers) do not.
- *
- * <p>Implements {@link ICancellableEvent} — listeners can call {@code setCanceled(true)}
- * to OVERRIDE the denial and let the action proceed. This is the integration point for
- * mods that want to grant special exceptions (e.g. "creative mode players bypass all
- * region restrictions in their own claim"). Use cautiously — bypassing protection
- * defeats its purpose.
- *
- * <p>Cancellation semantics:
- * <ul>
- *   <li>{@code setCanceled(false)} (default) — the denial stands; the action stays blocked</li>
- *   <li>{@code setCanceled(true)} — the denial is overridden; the action is permitted</li>
- * </ul>
- *
- * <p>Fired SYNCHRONOUSLY from the protection-check call site, so the underlying
- * Minecraft event isn't yet cancelled when listeners run. WorldGuardNeo will check
- * this event's {@code isCanceled()} state after dispatch.
- *
- * <p>The actor may be null for non-player triggers (mob attacks, explosions, dispensers).
+ * Fired (synchronously, cancellable) when a region flag denies an action, letting other mods
+ * OVERRIDE the denial: {@code setCanceled(true)} permits the action. Covers block-break/place,
+ * interact, chest-access and PvP denials; purely environmental ones (spread, ticks, dispensers)
+ * don't fire it. The actor may be null for non-player triggers.
  */
 public final class RegionFlagDeniedEvent extends Event implements ICancellableEvent {
 
