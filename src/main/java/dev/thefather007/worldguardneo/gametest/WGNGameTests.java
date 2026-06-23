@@ -1951,4 +1951,29 @@ public final class WGNGameTests {
                 "nameOf(null, null) → (none)");
         h.succeed();
     }
+
+    @GameTest(template = TPL)
+    public static void regionRenamePreservesEverything(GameTestHelper h) {
+        CuboidRegion r = region(h, "rn_old");
+        r.setPriority(7);
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);
+        UUID owner = UUID.randomUUID();  r.owners().add(owner);
+        UUID member = UUID.randomUUID(); r.members().add(member);
+        CuboidRegion child = makeRegion(h, "rn_child", new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
+        child.setParent(r);
+
+        var renamed = mgr(h).rename("rn_old", "rn_new");
+        h.assertTrue(renamed.isPresent(), "rename returns the new region");
+        h.assertTrue(mgr(h).get("rn_old").isEmpty(), "old id is freed");
+
+        var nw = mgr(h).get("rn_new");
+        h.assertTrue(nw.isPresent(), "new id exists");
+        h.assertTrue(nw.get().priority() == 7, "priority preserved");
+        h.assertTrue(nw.get().getFlag(Flags.PVP) == StateFlag.State.DENY, "flags preserved");
+        h.assertTrue(nw.get().isOwner(owner), "owner preserved");
+        h.assertTrue(nw.get().isMember(member), "member preserved");
+        h.assertTrue(child.parent() == nw.get(), "child re-pointed to renamed region");
+        h.assertTrue(mgr(h).rename("rn_new", "rn_child").isEmpty(), "rename to a taken id fails");
+        h.succeed();
+    }
 }
