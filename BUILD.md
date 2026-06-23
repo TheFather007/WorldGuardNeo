@@ -54,7 +54,7 @@ worldguardneo/
 
 * **LuckPerms** (≥ 5.4) — optional. Fine-grained permissions via groups/contexts + per-group region limits. Without it, all permissions map to OP levels.
 * **BlueMap** / **squaremap** — optional. Region rendering on the web map.
-* **WorldEditCUI** (client only) — selection/region outline highlighting. The server speaks the `worldedit:cui` plugin-channel protocol directly (no WorldEdit needed); install WorldEditCUI client-side to see the box.
+* **WorldEditCUI** (client only) — highlights the selection/region outline. The server speaks the `worldedit:cui` plugin-channel protocol directly; install WorldEditCUI client-side to see the box. (It's a standalone client mod — WorldEdit itself is not involved.)
 
 For alternative region storage (`storage-format`), the matching JDBC driver must be on the server classpath: **sqlite-jdbc** for `sqlite`, **H2** for `h2` (LuckPerms already ships H2), **mysql-connector-j** *or* the **MariaDB** driver for `mysql`. Drivers are located across classloaders and used directly (not via `DriverManager`), so a driver loaded by another mod still works. Without any driver the mod falls back to `json` automatically.
 
@@ -97,8 +97,6 @@ Two complementary layers:
 
 
 ## Troubleshooting
-
-**`Could not find com.sk89q.worldedit:worldedit-neoforge:...`** — this shouldn't happen in the current version: WorldEdit was removed from build dependencies. If you hit it, make sure you're using the current `build.gradle.kts` (no `compileOnly("com.sk89q.worldedit...")` line).
 
 **Gradle can't find JDK 21** — install JDK 21 or let Gradle download it automatically (any Java is needed to start the wrapper).
 

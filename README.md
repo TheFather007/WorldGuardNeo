@@ -19,11 +19,11 @@
 
 ---
 
-WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an area with the **built-in selection wand** (no WorldEdit needed), claim it as a region, and control what can happen inside with a large set of flags — building, PvP, mob spawning, fire, explosions, redstone, fluids, and much more. It also protects **between adjacent regions**, so a neighbour can't grief you across a shared border. Everything is configured in a commented TOML file and applies live with `/rg reload`.
+WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an area with the **built-in selection wand**, claim it as a region, and control what can happen inside with a large set of flags — building, PvP, mob spawning, fire, explosions, redstone, fluids, and much more. It also protects **between adjacent regions**, so a neighbour can't grief you across a shared border. Everything is configured in a commented TOML file and applies live with `/rg reload`.
 
 ## Features
 
-- **Built-in selection wand** — `/rg wand` hands out a selection item (a stick by default, configurable). Left/right-click two corners for a cuboid, or build a polygon point-by-point. No WorldEdit dependency. The outline renders client-side for players who have [WorldEditCUI](https://www.curseforge.com/minecraft/mc-mods/worldedit-cui).
+- **Built-in selection wand** — `/rg wand` hands out a selection item (a stick by default, configurable). Left/right-click two corners for a cuboid, or build a polygon point-by-point. The outline renders client-side for players who have [WorldEditCUI](https://www.curseforge.com/minecraft/mc-mods/worldedit-cui).
 - **90+ flags** — build, block-break/place, interact, use, chest-access, pvp, mob-spawning, mob-damage, tnt/creeper/other explosions, fire-spread, lava-fire, lightning, redstone, pistons, dispenser-output, fluids, growth, entry/exit, greetings, game-mode/time/weather locks, keep-inventory/xp, and more.
 - **Per-region & per-world** — flags per region; world-wide toggles per dimension via override files.
 - **Membership model** — owners and members; build-type flags respect them (WorldGuard "private by default").
@@ -34,7 +34,11 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 - **Pluggable storage** — `json` (default), `sqlite`, `h2`, or `mysql`. Any DB backend falls back to JSON if its driver is missing.
 - **LuckPerms integration** — permissions resolved through LuckPerms when installed (OP-level fallback otherwise), plus per-group region limits.
 - **Web-map integration** — regions render on **BlueMap** and **squaremap** if present.
-- **Automatic backups** — scheduled, rotating, gzip-compressed region backups.
+- **Automatic backups** — scheduled, rotating, gzip-compressed region backups; trigger one with `/rg backup`.
+- **Soft-delete & undo** — `/rg remove` trashes a region recoverably; `/rg undo` restores the one most recently removed this session.
+- **Inactive-claim expiry** — optionally auto-delete player regions whose owners have all been offline longer than a configurable number of days (`/rg cleanup` runs the scan on demand).
+- **Audit & violation logs** — region changes (create/redefine/remove/transfer/flag/…) go to `logs/worldguardneo-audit.log`; denied griefing attempts to `logs/worldguardneo-violations.log`.
+- **Storage migration** — `/rg migrate <json|sqlite|h2|mysql>` converts existing region data to another backend.
 - **Localized** — English and Russian out of the box; drop a `<tag>.json` for more.
 
 ## Requirements
@@ -54,7 +58,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 | **WorldEditCUI** (client) | Renders the selection/region outline client-side |
 | **sqlite-jdbc** jar | `storage-format = "sqlite"` |
 | **H2** jar | `storage-format = "h2"` (LuckPerms already ships H2) |
-| **mysql-connector-j** jar | `storage-format = "mysql"` |
+| **mysql-connector-j** or **MariaDB** jar | `storage-format = "mysql"` |
 | **JDK 21** | Building from source only |
 
 The mod is **server-side only**. Vanilla clients connect normally; no client-side installation is required. The selection outline is drawn for clients that have the **WorldEditCUI** client mod (the server speaks the `worldedit:cui` protocol directly); clients without it still select and claim normally, just without the visual box. Any database backend whose driver is absent falls back to JSON automatically, so a missing optional jar never stops the server.
@@ -234,7 +238,7 @@ JDK 21 is required. From the project folder:
 ./gradlew clean build
 ```
 
-The finished `.jar` is written to `build/libs/`. WorldGuardNeo has **no** WorldEdit dependency — region selection is built in. The only runtime soft-deps are LuckPerms, BlueMap and squaremap (all optional, declared in `neoforge.mods.toml`).
+The finished `.jar` is written to `build/libs/`. The only runtime soft-deps are LuckPerms, BlueMap and squaremap — all optional and declared in `neoforge.mods.toml`.
 
 ## License
 
