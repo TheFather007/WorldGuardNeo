@@ -39,7 +39,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 - **Inactive-claim expiry** — optionally auto-delete player regions whose owners have all been offline longer than a configurable number of days (`/rg cleanup` runs the scan on demand).
 - **Audit & violation logs** — region changes (create/redefine/remove/transfer/flag/…) go to `logs/worldguardneo-audit.log`; denied griefing attempts to `logs/worldguardneo-violations.log`.
 - **Storage migration** — `/rg migrate <json|sqlite|h2|mysql>` converts existing region data to another backend.
-- **Localized** — English and Russian out of the box; drop a `<tag>.json` for more.
+- **Localized** — English, Russian, German, Spanish, French and Simplified Chinese out of the box; drop a `<tag>.json` for more.
 
 ## Requirements
 
