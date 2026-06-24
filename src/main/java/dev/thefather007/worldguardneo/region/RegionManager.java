@@ -254,6 +254,28 @@ public final class RegionManager {
         return winning == StateFlag.State.ALLOW;
     }
 
+    /**
+     * The region to expose to {@code RegionFlagDeniedEvent} for a denial at this point: the
+     * highest-priority applicable region that resolves any of {@code flags} to an explicit DENY for
+     * {@code playerId} (walking parents and group filters exactly like {@link #testState}). Falls
+     * back to the top region when the denial was implicit (membership) rather than a flag, so the
+     * override hook always sees the controlling region rather than blindly {@code applicable.get(0)}.
+     *
+     * <p>Callers must pass a non-empty {@code applicable} (guard with {@code isEmpty()} first).
+     */
+    public ProtectedRegion denyingRegion(List<ProtectedRegion> applicable, UUID playerId, StateFlag... flags) {
+        for (int i = 0, n = applicable.size(); i < n; i++) {
+            ProtectedRegion r = applicable.get(i);
+            for (StateFlag flag : flags) {
+                ProtectedRegion source = resolveSourceWithParents(r, flag);
+                if (source == null) continue;
+                if (!groupMatches(source.getFlagGroup(flag), source, playerId)) continue;
+                if (source.getFlag(flag) == StateFlag.State.DENY) return r;
+            }
+        }
+        return applicable.get(0); // implicit membership denial → the top region controls the spot
+    }
+
     public <T> T resolveValue(Flag<T> flag, double x, double y, double z, UUID actor) {
         return resolveValue(flag, getApplicable(x, y, z), actor);
     }
