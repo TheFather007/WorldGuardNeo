@@ -18,6 +18,7 @@ import dev.thefather007.worldguardneo.util.Vec3;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.commands.arguments.DimensionArgument;
 import net.minecraft.commands.arguments.coordinates.BlockPosArgument;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -102,6 +103,53 @@ public final class WGCommands {
     private static final SuggestionProvider<CommandSourceStack> PLAYER_SUGGEST =
             (c, b) -> SharedSuggestionProvider.suggest(c.getSource().getOnlinePlayerNames(), b);
 
+    /**
+     * Resolve the region world for a command: the optional {@code -w <world>} operand if the caller
+     * supplied it, otherwise the source's own level. {@link DimensionArgument#getDimension} throws
+     * {@code IllegalArgumentException} when the {@code world} node wasn't matched, which is our
+     * "no operand given" signal — so the same executor works for both the plain and {@code -w} forms.
+     */
+    private static ServerLevel cmdLevel(CommandContext<CommandSourceStack> c) {
+        // IllegalArgumentException → no `world` node matched (plain form). CommandSyntaxException can't
+        // happen here (the operand is validated at parse time) but is declared, so catch it too.
+        try { return DimensionArgument.getDimension(c, "world"); }
+        catch (Exception e) { return c.getSource().getLevel(); }
+    }
+
+    /** {@code <id> <player> [-w <world>]} subtree shared by addowner/removeowner/addmember/removemember. */
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String>
+            membershipIdSubtree(SuggestionProvider<CommandSourceStack> RID, SuggestionProvider<CommandSourceStack> PLR,
+                                WorldGuardNeo mod, boolean owner, boolean add) {
+        return Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
+                        .executes(c -> changeMembership(c, "id", "player", cmdLevel(c), mod, owner, add))
+                        .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                .executes(c -> changeMembership(c, "id", "player", cmdLevel(c), mod, owner, add)))));
+    }
+
+    /** {@code <id> <flag> [-g <group>] [value]} subtree, attached both directly and under {@code -w <world>}. */
+    private static com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String>
+            flagIdSubtree(WorldGuardNeo mod, SuggestionProvider<CommandSourceStack> RID,
+                          SuggestionProvider<CommandSourceStack> FLAGN, SuggestionProvider<CommandSourceStack> FLAGV) {
+        return Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                .then(Commands.argument("flag", StringArgumentType.word()).suggests(FLAGN)
+                        .then(Commands.literal("-g")
+                                // Privileged -g: hide from tab-complete for players who lack the group
+                                // node (setFlag() rejects it anyway).
+                                .requires(s -> canUseFlagGroup(s, mod))
+                                .then(Commands.argument("group", StringArgumentType.word())
+                                        .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FLAGV)
+                                                .executes(c -> setFlagGrouped(c, cmdLevel(c), mod)))))
+                        .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FLAGV)
+                                .executes(c -> setFlag(c.getSource(),
+                                        StringArgumentType.getString(c, "id"),
+                                        StringArgumentType.getString(c, "flag"),
+                                        StringArgumentType.getString(c, "value"), null, cmdLevel(c), mod)))
+                        .executes(c -> setFlag(c.getSource(),
+                                StringArgumentType.getString(c, "id"),
+                                StringArgumentType.getString(c, "flag"), "", null, cmdLevel(c), mod)));
+    }
+
     private static LiteralArgumentBuilder<CommandSourceStack> buildRoot(String alias, WorldGuardNeo mod) {
         final SuggestionProvider<CommandSourceStack> RID = regionIdSuggest(mod);
         final SuggestionProvider<CommandSourceStack> FLAGN = flagNameSuggest();
@@ -159,7 +207,9 @@ public final class WGCommands {
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.delete")
                                     || mod.perms().has(s, "worldguardneo.region.delete.others"))
                         .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .executes(c -> removeRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod))))
+                                .executes(c -> removeRegion(c.getSource(), StringArgumentType.getString(c, "id"), cmdLevel(c), mod))
+                                .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                        .executes(c -> removeRegion(c.getSource(), StringArgumentType.getString(c, "id"), cmdLevel(c), mod))))))
                 .then(Commands.literal("undo")
                         // Restore the most recently removed region in this world (session trash).
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.undo"))
@@ -167,7 +217,9 @@ public final class WGCommands {
                 .then(Commands.literal("info")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.info"))
                         .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .executes(c -> infoRegion(c.getSource(), StringArgumentType.getString(c, "id"), mod)))
+                                .executes(c -> infoRegion(c.getSource(), StringArgumentType.getString(c, "id"), cmdLevel(c), mod))
+                                .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                        .executes(c -> infoRegion(c.getSource(), StringArgumentType.getString(c, "id"), cmdLevel(c), mod)))))
                         .executes(c -> infoRegionAtPlayer(c.getSource(), mod)))
                 .then(Commands.literal("select")
                         // Load an existing region's geometry into your selection (for redefine /
@@ -218,59 +270,50 @@ public final class WGCommands {
                         // Hide the subcommand from players who can't set any flag (per-flag node
                         // and ownership are still enforced in setFlag()).
                         .requires(s -> canUseFlags(s, mod))
-                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .then(Commands.argument("flag", StringArgumentType.word()).suggests(FLAGN)
-                                        .then(Commands.literal("-g")
-                                                // Privileged -g: hide from tab-complete for players
-                                                // who lack the group node (setFlag() rejects it anyway).
-                                                .requires(s -> canUseFlagGroup(s, mod))
-                                                .then(Commands.argument("group", StringArgumentType.word())
-                                                        .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FLAGV)
-                                                                .executes(c -> setFlagGrouped(c, mod)))))
-                                        .then(Commands.argument("value", StringArgumentType.greedyString()).suggests(FLAGV)
-                                                .executes(c -> setFlag(c.getSource(),
-                                                        StringArgumentType.getString(c, "id"),
-                                                        StringArgumentType.getString(c, "flag"),
-                                                        StringArgumentType.getString(c, "value"), null, mod)))
-                                        .executes(c -> setFlag(c.getSource(),
-                                                StringArgumentType.getString(c, "id"),
-                                                StringArgumentType.getString(c, "flag"), "", null, mod)))))
+                        // The value is a greedy string, so the cross-world operand can't trail it —
+                        // it goes up front: /rg flag -w <world> <id> <flag> [value].
+                        .then(flagIdSubtree(mod, RID, FLAGN, FLAGV))
+                        .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                .then(flagIdSubtree(mod, RID, FLAGN, FLAGV)))))
                 .then(Commands.literal("priority")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flag.priority"))
                         .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .then(Commands.argument("value", IntegerArgumentType.integer())
                                         .executes(c -> setPriority(c.getSource(),
                                                 StringArgumentType.getString(c, "id"),
-                                                IntegerArgumentType.getInteger(c, "value"), mod)))))
+                                                IntegerArgumentType.getInteger(c, "value"), cmdLevel(c), mod))
+                                        .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                                .executes(c -> setPriority(c.getSource(),
+                                                        StringArgumentType.getString(c, "id"),
+                                                        IntegerArgumentType.getInteger(c, "value"), cmdLevel(c), mod)))))))
                 .then(Commands.literal("setparent")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flag.parent"))
                         .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
                                 .then(Commands.argument("parent", StringArgumentType.word()).suggests(RID)
                                         .executes(c -> setParent(c.getSource(),
                                                 StringArgumentType.getString(c, "id"),
-                                                StringArgumentType.getString(c, "parent"), mod)))
+                                                StringArgumentType.getString(c, "parent"), cmdLevel(c), mod))
+                                        .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                                .executes(c -> setParent(c.getSource(),
+                                                        StringArgumentType.getString(c, "id"),
+                                                        StringArgumentType.getString(c, "parent"), cmdLevel(c), mod)))))
                                 .executes(c -> setParent(c.getSource(),
-                                        StringArgumentType.getString(c, "id"), null, mod))))
+                                        StringArgumentType.getString(c, "id"), null, cmdLevel(c), mod))
+                                .then(Commands.literal("-w").then(Commands.argument("world", DimensionArgument.dimension())
+                                        .executes(c -> setParent(c.getSource(),
+                                                StringArgumentType.getString(c, "id"), null, cmdLevel(c), mod))))))
                 .then(Commands.literal("addowner")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.addowner"))
-                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
-                                        .executes(c -> changeMembership(c, "id", "player", mod, true,  true)))))
+                        .then(membershipIdSubtree(RID, PLR, mod, true, true)))
                 .then(Commands.literal("removeowner")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.removeowner"))
-                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
-                                        .executes(c -> changeMembership(c, "id", "player", mod, true,  false)))))
+                        .then(membershipIdSubtree(RID, PLR, mod, true, false)))
                 .then(Commands.literal("addmember")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.addmember"))
-                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
-                                        .executes(c -> changeMembership(c, "id", "player", mod, false, true)))))
+                        .then(membershipIdSubtree(RID, PLR, mod, false, true)))
                 .then(Commands.literal("removemember")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.removemember"))
-                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
-                                .then(Commands.argument("player", StringArgumentType.word()).suggests(PLR)
-                                        .executes(c -> changeMembership(c, "id", "player", mod, false, false)))))
+                        .then(membershipIdSubtree(RID, PLR, mod, false, false)))
                 .then(Commands.literal("reload")
                         .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
                         .executes(c -> reload(c.getSource(), mod)))
@@ -826,9 +869,9 @@ public final class WGCommands {
         return 1;
     }
 
-    private static int removeRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
+    private static int removeRegion(CommandSourceStack src, String id, ServerLevel level, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
+        RegionManager mgr = mod.regions().get(level);
         var r = mgr.get(id);
         if (r.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
         // Global region holds world-wide defaults; without this guard remove() silently no-ops
@@ -847,16 +890,16 @@ public final class WGCommands {
         // Fire DELETED before removal so listeners still see the region state.
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                 new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
-                        p.serverLevel(), r.get(),
+                        level, r.get(),
                         dev.thefather007.worldguardneo.api.events.RegionModifyEvent.ModifyType.DELETED, p));
         // Soft-delete: keep the region object in the per-world trash so /rg undo can restore it.
-        mod.trash().push(p.serverLevel().dimension(), r.get());
+        mod.trash().push(level.dimension(), r.get());
         mgr.remove(id);
-        mod.regions().save(p.serverLevel());
+        mod.regions().save(level);
         var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
-        if (bm != null) bm.removeRegion(p.serverLevel(), id);
+        if (bm != null) bm.removeRegion(level, id);
         var sq = dev.thefather007.worldguardneo.integrations.SquaremapIntegration.get();
-        if (sq != null) sq.removeRegion(p.serverLevel(), id);
+        if (sq != null) sq.removeRegion(level, id);
         mod.audit().record(src, "remove", id, null);
         ok(src, mod, "msg.region.removed", "id", id);
         return 1;
@@ -900,9 +943,9 @@ public final class WGCommands {
      *     <li>Global region → requires {@code worldguardneo.region.info.global} (OP 4)
      *   </ul>
      */
-    private static int infoRegion(CommandSourceStack src, String id, WorldGuardNeo mod) throws CommandSyntaxException {
+    private static int infoRegion(CommandSourceStack src, String id, ServerLevel level, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
+        RegionManager mgr = mod.regions().get(level);
         var ropt = mgr.get(id);
         if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
         ProtectedRegion r = ropt.get();
@@ -1255,9 +1298,9 @@ public final class WGCommands {
      * "invincible -g OWNERS allow"). {@code region.flag.bypass} skips the per-flag and group checks.
      */
     private static int setFlag(CommandSourceStack src, String id, String flagName, String value,
-                               String group, WorldGuardNeo mod) throws CommandSyntaxException {
+                               String group, ServerLevel level, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
+        RegionManager mgr = mod.regions().get(level);
         var ropt = mgr.get(id);
         if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
         ProtectedRegion region = ropt.get();
@@ -1295,7 +1338,7 @@ public final class WGCommands {
             RegionGroup rg = (effectiveGroup != null && !effectiveGroup.isEmpty())
                     ? RegionGroup.parse(effectiveGroup) : null;
             Object parsed = flag.parseAndApply(region, value, rg);
-            mod.regions().saveRegion(p.serverLevel(), region.id()); // incremental: just this region
+            mod.regions().saveRegion(level, region.id()); // incremental: just this region
 
             mod.audit().record(src, "flag", id, flagName + "=" + (parsed == null ? "<unset>" : parsed));
         ok(src, mod, "msg.flag.set", "id", id, "flag", flagName, "value", parsed == null ? "<unset>" : parsed);
@@ -1306,18 +1349,18 @@ public final class WGCommands {
         }
     }
 
-    private static int setFlagGrouped(CommandContext<CommandSourceStack> c, WorldGuardNeo mod) throws CommandSyntaxException {
+    private static int setFlagGrouped(CommandContext<CommandSourceStack> c, ServerLevel level, WorldGuardNeo mod) throws CommandSyntaxException {
         return setFlag(c.getSource(),
                 StringArgumentType.getString(c, "id"),
                 StringArgumentType.getString(c, "flag"),
                 StringArgumentType.getString(c, "value"),
                 StringArgumentType.getString(c, "group"),
-                mod);
+                level, mod);
     }
 
-    private static int setPriority(CommandSourceStack src, String id, int value, WorldGuardNeo mod) throws CommandSyntaxException {
+    private static int setPriority(CommandSourceStack src, String id, int value, ServerLevel level, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        var ropt = mod.regions().get(p.serverLevel()).get(id);
+        var ropt = mod.regions().get(level).get(id);
         if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
         // Global region has no geometry — priority is meaningless on it.
         if (ropt.get() instanceof GlobalRegion) {
@@ -1331,7 +1374,7 @@ public final class WGCommands {
             return 0;
         }
         ropt.get().setPriority(value);
-        mod.regions().saveRegion(p.serverLevel(), ropt.get().id()); // incremental: just this region
+        mod.regions().saveRegion(level, ropt.get().id()); // incremental: just this region
         mod.audit().record(src, "priority", id, String.valueOf(value));
         ok(src, mod, "msg.priority.set", "id", id, "value", value);
         return 1;
@@ -1344,9 +1387,9 @@ public final class WGCommands {
             || mod.perms().has(p, "worldguardneo.region.flag.others");
     }
 
-    private static int setParent(CommandSourceStack src, String id, String parent, WorldGuardNeo mod) throws CommandSyntaxException {
+    private static int setParent(CommandSourceStack src, String id, String parent, ServerLevel level, WorldGuardNeo mod) throws CommandSyntaxException {
         ServerPlayer p = src.getPlayerOrException();
-        RegionManager mgr = mod.regions().get(p.serverLevel());
+        RegionManager mgr = mod.regions().get(level);
         var ropt = mgr.get(id);
         if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
         if (ropt.get() instanceof GlobalRegion) {
@@ -1373,7 +1416,7 @@ public final class WGCommands {
             catch (Exception e) { err(src, mod, "msg.parent.cycle"); return 0; }
             ok(src, mod, "msg.parent.set", "child", id, "parent", parent);
         }
-        mod.regions().saveRegion(p.serverLevel(), ropt.get().id()); // incremental: just this child
+        mod.regions().saveRegion(level, ropt.get().id()); // incremental: just this child
         mod.audit().record(src, "setparent", id, parent == null ? "<none>" : parent);
         return 1;
     }
@@ -1384,13 +1427,13 @@ public final class WGCommands {
      * be looked up (no Mojang API calls).
      */
     private static int changeMembership(CommandContext<CommandSourceStack> c,
-                                        String idArg, String playerArg, WorldGuardNeo mod,
+                                        String idArg, String playerArg, ServerLevel level, WorldGuardNeo mod,
                                         boolean owner, boolean add) throws CommandSyntaxException {
         ServerPlayer self = c.getSource().getPlayerOrException();
         String id   = StringArgumentType.getString(c, idArg);
         String who  = StringArgumentType.getString(c, playerArg);
 
-        var ropt = mod.regions().get(self.serverLevel()).get(id);
+        var ropt = mod.regions().get(level).get(id);
         if (ropt.isEmpty()) { err(c.getSource(), mod, "msg.region.unknown", "id", id); return 0; }
 
         // Owner OR region.bypass, else any OP-2 player (default region.addowner) could add
@@ -1418,7 +1461,7 @@ public final class WGCommands {
                     "id", id, "role", owner ? "owner" : "member");
             return 0;
         }
-        mod.regions().saveRegion(self.serverLevel(), r.id()); // incremental: just this region
+        mod.regions().saveRegion(level, r.id()); // incremental: just this region
         mod.audit().record(c.getSource(), (add ? "add-" : "remove-") + (owner ? "owner" : "member"),
                 id, "player=" + target);
         ok(c.getSource(), mod, add ? "msg.member.added" : "msg.member.removed",

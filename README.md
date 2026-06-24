@@ -183,6 +183,7 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg select <id>` | Load a region's geometry into your selection (to redefine/expand) |
 | `/rg claim <id>` | Claim your current selection as a new region |
 | `/rg redefine <id>` | Resize a region to your current selection |
+| `/rg rename <id> <newId>` | Change a region's id, keeping all its data |
 | `/rg remove <id>` | Delete a region (recoverable with `/rg undo`) |
 | `/rg undo` | Restore the most recently removed region in this world |
 | `/rg transfer <id> <player>` | Hand sole ownership to another player |
@@ -203,6 +204,8 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg cleanup` | Run the claim-expiry scan now (admin) |
 | `/rg migrate <json\|sqlite\|h2\|mysql>` | Convert region data to another storage backend (activates on restart) |
 | `/rg debug` | Diagnostics: spatial-index stats, active integrations |
+
+The id-addressed commands (`info`, `remove`, `flag`, `priority`, `setparent`, `addowner`/`removeowner`/`addmember`/`removemember`) accept an optional `-w <world>` operand to target a region in another world without traveling there — e.g. `/rg flag spawn pvp deny -w minecraft:the_nether`. For `flag` the operand goes before the id (`/rg flag -w <world> <id> <flag> [value]`) because the value is greedy; for the others it trails the arguments.
 
 ## Permissions
 
