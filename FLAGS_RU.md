@@ -46,6 +46,7 @@
 | `drown-damage` | состояние (allow/deny) | allow | `worldguardneo.flag.drown-damage` | Разрешить или запретить урон от утопления. |
 | `enderdragon` | состояние (allow/deny) | allow | `worldguardneo.flag.enderdragon` | Разрешить или запретить разрушение блоков драконом Края. |
 | `enderpearl` | состояние (allow/deny) | allow | `worldguardneo.flag.enderpearl` | Разрешить или запретить телепорт жемчугом Края. |
+| `entity-leash` | состояние (allow/deny) | allow | `worldguardneo.flag.entity-leash` | Разрешить или запретить привязывание поводка к мобу. |
 | `entry` | состояние (allow/deny) | allow | `worldguardneo.flag.entry` | Разрешить или запретить вход в регион (для игроков без bypass). |
 | `entry-deny-message` | текст | — | `worldguardneo.flag.entry-deny-message` | Своё сообщение при запрете входа. |
 | `entry-vehicle` | состояние (allow/deny) | allow | `worldguardneo.flag.entry-vehicle` | Разрешить или запретить вход в регион верхом на транспорте. |
@@ -99,6 +100,7 @@
 | `pvp` | состояние (allow/deny) | allow | `worldguardneo.flag.pvp` | Разрешить или запретить урон между игроками. |
 | `receive-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Разрешить или запретить получение чужого чата внутри региона. |
 | `redstone` | состояние (allow/deny) | allow | `worldguardneo.flag.redstone` | Разрешить или запретить распространение редстоун-сигнала в регионе. |
+| `ride` | состояние (allow/deny) | allow | `worldguardneo.flag.ride` | Разрешить или запретить езду на мобах (лошадь, свинья, лавоход). Вагонетки/лодки — `vehicle-enter`. |
 | `send-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.send-chat` | Разрешить или запретить отправку чата из региона. |
 | `sleep` | состояние (allow/deny) | allow | `worldguardneo.flag.sleep` | Разрешить или запретить сон в кроватях. |
 | `snow-fall` | состояние (allow/deny) | allow | `worldguardneo.flag.snow-fall` | Разрешить или запретить накопление снега. |
@@ -119,6 +121,7 @@
 | `glide` | состояние (allow/deny) | allow | `worldguardneo.flag.glide` | Разрешить или запретить полёт на элитрах; запрет принудительно прерывает планирование в регионе. |
 | `bucket-fill` | состояние (allow/deny) | allow | `worldguardneo.flag.bucket-fill` | Разрешить или запретить наполнение вёдер (вода, лава, снег). |
 | `bucket-empty` | состояние (allow/deny) | allow | `worldguardneo.flag.bucket-empty` | Разрешить или запретить выливание вёдер (установку жидкостей). |
+| `villager-trade` | состояние (allow/deny) | allow | `worldguardneo.flag.villager-trade` | Разрешить или запретить открытие меню торговли жителей / странствующего торговца. |
 | `vine-growth` | состояние (allow/deny) | allow | `worldguardneo.flag.vine-growth` | Разрешить или запретить рост лиан. |
 | `water-flow` | состояние (allow/deny) | allow | `worldguardneo.flag.water-flow` | Разрешить или запретить течение воды. |
 | `weather-lock` | текст | — | `worldguardneo.flag.weather-lock` | Фиксация клиентской погоды (clear, rain, thunder). |

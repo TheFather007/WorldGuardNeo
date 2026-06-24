@@ -125,6 +125,12 @@ public final class Flags {
     public static final StateFlag  MOB_TELEPORT      = new StateFlag("mob-teleport",    true);
     /** DENY = mobs can't change blocks here (enderman pick/place, sheep eat grass, etc.). */
     public static final StateFlag  MOB_GRIEF         = new StateFlag("mob-grief",       true);
+    /** DENY = players can't open a villager / wandering-trader trade GUI here. */
+    public static final StateFlag  VILLAGER_TRADE    = new StateFlag("villager-trade",  true);
+    /** DENY = players can't mount rideable mobs (horse, pig, strider, …) here. Minecarts/boats use vehicle-enter. */
+    public static final StateFlag  RIDE              = new StateFlag("ride",            true);
+    /** DENY = players can't attach a lead to a mob here. */
+    public static final StateFlag  ENTITY_LEASH      = new StateFlag("entity-leash",    true);
 
     private static final Map<String, Flag<?>> REGISTRY = new LinkedHashMap<>();
 
@@ -169,6 +175,7 @@ public final class Flags {
         register(GAME_MODE); register(TIME_LOCK); register(WEATHER_LOCK);
         register(TELE_LOC); register(SPAWN_LOC);
         register(KEEP_INVENTORY); register(KEEP_XP); register(MOB_TELEPORT); register(MOB_GRIEF);
+        register(VILLAGER_TRADE); register(RIDE); register(ENTITY_LEASH);
     }
 
     public static <F extends Flag<?>> F register(F flag) {
