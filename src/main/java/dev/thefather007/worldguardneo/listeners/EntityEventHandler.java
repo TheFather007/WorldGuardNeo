@@ -251,16 +251,25 @@ public final class EntityEventHandler {
         if (!e.isMounting()) return;
         if (!(e.getEntityMounting() instanceof ServerPlayer p)) return;
         Entity vehicle = e.getEntityBeingMounted();
-        if (!(vehicle instanceof AbstractMinecart) && !(vehicle instanceof Boat)) return;
         if (e.getLevel().isClientSide()) return;
         if (!mod.isProtectionActive(e.getLevel())) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
+        // Minecarts/boats are "vehicles" (vehicle-enter); living rideable mobs use the ride flag.
+        final StateFlag flag;
+        final String denyKey;
+        if (vehicle instanceof AbstractMinecart || vehicle instanceof Boat) {
+            flag = Flags.VEHICLE_ENTER; denyKey = "msg.vehicle.enter-denied";
+        } else if (vehicle instanceof net.minecraft.world.entity.Mob) {
+            flag = Flags.RIDE;          denyKey = "msg.ride.denied";
+        } else {
+            return; // not a thing we gate
+        }
         // Resolve the flag first; only consult region.bypass when it denies (lazy-bypass pattern).
-        if (!mgr.testState(Flags.VEHICLE_ENTER, p.getUUID(), vehicle.getX(), vehicle.getY(), vehicle.getZ())
+        if (!mgr.testState(flag, p.getUUID(), vehicle.getX(), vehicle.getY(), vehicle.getZ())
                 && !mod.perms().has(p, "worldguardneo.region.bypass")) {
             e.setCanceled(true);
             p.displayClientMessage(
-                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.vehicle.enter-denied")), true);
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw(denyKey)), true);
         }
     }
 
@@ -316,14 +325,34 @@ public final class EntityEventHandler {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         if (mod.perms().has(p, "worldguardneo.region.bypass")) return;
         Entity target = e.getTarget();
-        if (!(target instanceof net.minecraft.world.entity.decoration.HangingEntity)
-                && !(target instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
-            return; // not a decoration — let vanilla / other mods handle
-        }
         if (!mod.isProtectionActive(p.serverLevel())) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
+
+        // Leashing a mob (right-click with a lead). Vanilla applies the lead before any other
+        // interaction, so check this first. canBeLeashed() filters out non-leashable mobs.
+        if (target instanceof net.minecraft.world.entity.Mob mob && mob.canBeLeashed()
+                && p.getItemInHand(e.getHand()).is(net.minecraft.world.item.Items.LEAD)
+                && !mgr.testState(Flags.ENTITY_LEASH, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.entity-denied")), true);
+            return;
+        }
+        // Villager / wandering-trader trade GUI.
+        if (target instanceof net.minecraft.world.entity.npc.AbstractVillager
+                && !mgr.testState(Flags.VILLAGER_TRADE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.entity-denied")), true);
+            return;
+        }
+
+        if (!(target instanceof net.minecraft.world.entity.decoration.HangingEntity)
+                && !(target instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
+            return; // not a decoration — let vanilla / other mods handle
+        }
         // Dedicated decoration toggles (default ALLOW): an explicit deny blocks even members.
         // item-frame-rotate only applies to a frame already holding an item; placing/removing
         // falls under the build-access gate below.
