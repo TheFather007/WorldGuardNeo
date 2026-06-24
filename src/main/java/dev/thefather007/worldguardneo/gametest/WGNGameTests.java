@@ -2062,4 +2062,26 @@ public final class WGNGameTests {
                 "in-range Y is left untouched");
         h.succeed();
     }
+
+    /* ---------------- entity-interaction flags respect membership ---------------- */
+
+    @GameTest(template = TPL)
+    public static void entityInteractFlagsRespectMembership(GameTestHelper h) {
+        CuboidRegion r = region(h, "ent_claim");
+        UUID owner = UUID.randomUUID();   r.owners().add(owner);
+        UUID member = UUID.randomUUID();  r.members().add(member);
+        UUID stranger = UUID.randomUUID();
+        BlockPos abs = h.absolutePos(new BlockPos(4, 2, 4));
+        double x = abs.getX(), y = abs.getY(), z = abs.getZ();
+        RegionManager m = mgr(h);
+        // villager-trade / ride / entity-leash gate on: deny if !testState(flag) || !testBuildAccess(INTERACT).
+        // With the flags unset (default allow), the membership model decides via INTERACT access.
+        h.assertTrue(m.testBuildAccess(Flags.INTERACT, x, y, z, owner),     "owner passes interact in a claim");
+        h.assertTrue(m.testBuildAccess(Flags.INTERACT, x, y, z, member),    "member passes interact in a claim");
+        h.assertTrue(!m.testBuildAccess(Flags.INTERACT, x, y, z, stranger), "stranger is denied interact in a claim");
+        // An explicit interact=allow re-opens it to everyone (public villager/mount setup).
+        r.setFlag(Flags.INTERACT, StateFlag.State.ALLOW);
+        h.assertTrue(m.testBuildAccess(Flags.INTERACT, x, y, z, stranger),  "interact=allow opens it to strangers");
+        h.succeed();
+    }
 }
