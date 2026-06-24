@@ -2117,6 +2117,32 @@ public final class WGNGameTests {
         h.succeed();
     }
 
+    /* ---------------- tree-grow adjacency area query ---------------- */
+
+    @GameTest(template = TPL)
+    public static void treeAdjacencyAreaQueryFindsForeignRegion(GameTestHelper h) {
+        RegionManager m = mgr(h);
+        // Base region around the sapling; a foreign region 2 blocks away (within the R=3 footprint).
+        CuboidRegion base    = makeRegion(h, "tree_base",    new BlockPos(3, 1, 3), new BlockPos(5, 4, 5));
+        CuboidRegion foreign = makeRegion(h, "tree_foreign", new BlockPos(6, 1, 6), new BlockPos(8, 4, 8));
+        BlockPos center = h.absolutePos(new BlockPos(4, 2, 4));
+        final int R = 3;
+        // The single area query that replaced the 48 per-cell lookups must surface BOTH overlapping
+        // regions, so onTreeGrow still sees the foreign one and cancels.
+        var candidates = m.overlapping(
+                new dev.thefather007.worldguardneo.util.Vec3(center.getX() - R, center.getY(), center.getZ() - R),
+                new dev.thefather007.worldguardneo.util.Vec3(center.getX() + R, center.getY(), center.getZ() + R));
+        h.assertTrue(candidates.contains(base) && candidates.contains(foreign),
+                "area query surfaces both the base and the foreign region");
+        // Center sits only in base; the foreign region genuinely reaches a footprint cell (precise contains).
+        var here = m.getApplicable(center.getX(), center.getY(), center.getZ());
+        h.assertTrue(here.contains(base) && !here.contains(foreign), "center sits only in the base region");
+        BlockPos nb = h.absolutePos(new BlockPos(6, 2, 6)); // dx=2, dz=2 — inside the footprint
+        h.assertTrue(foreign.contains(nb.getX(), nb.getY(), nb.getZ()), "foreign region reaches a footprint cell");
+        h.assertTrue(!base.contains(nb.getX(), nb.getY(), nb.getZ()),   "base region does not reach that cell");
+        h.succeed();
+    }
+
     /* ---------------- JDBC storage round-trip (AbstractJdbcRegionStorage) ---------------- */
 
     /**
