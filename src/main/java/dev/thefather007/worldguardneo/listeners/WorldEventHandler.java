@@ -339,13 +339,19 @@ public final class WorldEventHandler {
         var baseRegions = mgr.getApplicable(pos.getX(), pos.getY(), pos.getZ());
         // Margin covering oak/birch/spruce/jungle canopy without being huge.
         final int R = 3;
-        for (int dx = -R; dx <= R; dx++) {
-            for (int dz = -R; dz <= R; dz++) {
-                if (dx == 0 && dz == 0) continue;
-                int nx = pos.getX() + dx, ny = pos.getY(), nz = pos.getZ() + dz;
-                for (ProtectedRegion r : mgr.getApplicable(nx, ny, nz)) {
-                    if (!containsRegion(baseRegions, r.id())) {
-                        e.setCanceled(true);
+        // One area query for the whole footprint instead of 48 per-cell lookups. Any region whose AABB
+        // overlaps the footprint is a candidate; the precise per-cell contains() below runs only for
+        // FOREIGN candidates (usually none), so the outcome is identical to the old cell-by-cell scan.
+        var candidates = mgr.overlapping(
+                new dev.thefather007.worldguardneo.util.Vec3(pos.getX() - R, pos.getY(), pos.getZ() - R),
+                new dev.thefather007.worldguardneo.util.Vec3(pos.getX() + R, pos.getY(), pos.getZ() + R));
+        for (ProtectedRegion r : candidates) {
+            if (containsRegion(baseRegions, r.id())) continue; // the sapling's own region → fine
+            for (int dx = -R; dx <= R; dx++) {
+                for (int dz = -R; dz <= R; dz++) {
+                    if (dx == 0 && dz == 0) continue;
+                    if (r.contains(pos.getX() + dx, pos.getY(), pos.getZ() + dz)) {
+                        e.setCanceled(true); // a foreign region's canopy would grow into this spot
                         return;
                     }
                 }
