@@ -33,16 +33,14 @@ jobs:
         run: bash tests/run.sh
 
   # In-game GameTests — exercise the real event/mixin enforcement path in a live ServerLevel.
-  # Heavier (downloads NeoForge/Minecraft and boots a dedicated gametest server). Marked
-  # continue-on-error: it runs and reports results, but does NOT gate the workflow — booting a
-  # full Minecraft server in CI is environment-sensitive (asset downloads, native libs, headless
-  # quirks), so the deterministic JVM suite above is the authoritative gate. Treat a red mark here
-  # as "investigate", not "blocked". For authoritative GameTest results, run it locally:
+  # Heavier (downloads NeoForge/Minecraft and boots a dedicated gametest server). This is a
+  # BLOCKING gate: the full battery (~860 tests) must pass for the workflow to go green. The
+  # NeoForge gametest runner exits non-zero on any failure, so a red mark here means a real
+  # regression in the enforcement path — fix it. Reproduce locally with:
   #   ./gradlew runGameTestServer
   gametest:
-    name: In-game GameTests (informational)
+    name: In-game GameTests
     runs-on: ubuntu-latest
-    continue-on-error: true
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4

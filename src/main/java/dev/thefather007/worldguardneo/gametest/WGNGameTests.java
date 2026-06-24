@@ -1954,6 +1954,10 @@ public final class WGNGameTests {
 
     @GameTest(template = TPL)
     public static void regionRenamePreservesEverything(GameTestHelper h) {
+        // The RegionManager is shared across the whole gametest level; rn_new is only ever produced
+        // by rename() (never by region()/makeRegion(), which self-clean), so drop it up front to keep
+        // this test idempotent if the level is reused.
+        mgr(h).remove("rn_new");
         CuboidRegion r = region(h, "rn_old");
         r.setPriority(7);
         r.setFlag(Flags.PVP, StateFlag.State.DENY);
@@ -1974,6 +1978,70 @@ public final class WGNGameTests {
         h.assertTrue(nw.get().isMember(member), "member preserved");
         h.assertTrue(child.parent() == nw.get(), "child re-pointed to renamed region");
         h.assertTrue(mgr(h).rename("rn_new", "rn_child").isEmpty(), "rename to a taken id fails");
+        h.succeed();
+    }
+
+    /* ---------------- region lifecycle metadata ---------------- */
+
+    @GameTest(template = TPL)
+    public static void regionMetadataLifecycle(GameTestHelper h) {
+        CuboidRegion r = region(h, "meta_life");
+        h.assertTrue(r.createdAt() > 0, "createdAt is stamped on construction");
+        h.assertTrue(r.modifiedAt() >= r.createdAt(), "modifiedAt starts at/after createdAt");
+        h.assertTrue(r.createdBy() == null, "createdBy is null until set");
+
+        UUID who = UUID.randomUUID();
+        r.setCreatedBy(who);
+        h.assertTrue(who.equals(r.createdBy()), "createdBy round-trips");
+
+        r.setModifiedAt(1_000L);                       // pretend the last edit was long ago
+        r.setFlag(Flags.PVP, StateFlag.State.DENY);    // a mutation must refresh modifiedAt
+        h.assertTrue(r.modifiedAt() > 1_000L, "setFlag refreshes modifiedAt");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void metadataSurvivesCodecRoundTrip(GameTestHelper h) {
+        CuboidRegion r = region(h, "meta_codec");
+        UUID who = UUID.randomUUID();
+        r.setCreatedBy(who);
+        r.setCreatedAt(1_700_000_000_000L);
+        r.setModifiedAt(1_700_000_500_000L);
+
+        var json = dev.thefather007.worldguardneo.storage.RegionJsonCodec.regionToJson(r);
+        ProtectedRegion back = dev.thefather007.worldguardneo.storage.RegionJsonCodec.readRegion(
+                "meta_codec", json, new java.util.HashMap<>());
+        h.assertTrue(back != null, "region parses back");
+        h.assertTrue(back.createdAt()  == 1_700_000_000_000L, "createdAt persisted");
+        h.assertTrue(back.modifiedAt() == 1_700_000_500_000L, "modifiedAt persisted");
+        h.assertTrue(who.equals(back.createdBy()), "createdBy persisted");
+        h.succeed();
+    }
+
+    /* ---------------- new entity-interaction flags ---------------- */
+
+    @GameTest(template = TPL)
+    public static void newEntityFlagsRegisteredAndDefaultAllow(GameTestHelper h) {
+        h.assertTrue(Flags.get("villager-trade") != null, "villager-trade is registered");
+        h.assertTrue(Flags.get("ride") != null,           "ride is registered");
+        h.assertTrue(Flags.get("entity-leash") != null,   "entity-leash is registered");
+
+        BlockPos abs = h.absolutePos(new BlockPos(4, 2, 4));
+        UUID stranger = UUID.randomUUID();
+        RegionManager m = mgr(h);
+        region(h, "ent_flags"); // covers the platform, no flags set
+        // Unset → default ALLOW for a stranger.
+        h.assertTrue(m.testState(Flags.VILLAGER_TRADE, stranger, abs.getX(), abs.getY(), abs.getZ()),
+                "villager-trade defaults to allow");
+        h.assertTrue(m.testState(Flags.RIDE, stranger, abs.getX(), abs.getY(), abs.getZ()),
+                "ride defaults to allow");
+        h.assertTrue(m.testState(Flags.ENTITY_LEASH, stranger, abs.getX(), abs.getY(), abs.getZ()),
+                "entity-leash defaults to allow");
+
+        // Explicit DENY is honoured.
+        region(h, "ent_flags").setFlag(Flags.RIDE, StateFlag.State.DENY);
+        h.assertTrue(!m.testState(Flags.RIDE, stranger, abs.getX(), abs.getY(), abs.getZ()),
+                "ride deny is enforced");
         h.succeed();
     }
 }
