@@ -2084,4 +2084,66 @@ public final class WGNGameTests {
         h.assertTrue(m.testBuildAccess(Flags.INTERACT, x, y, z, stranger),  "interact=allow opens it to strangers");
         h.succeed();
     }
+
+    /* ---------------- JDBC storage round-trip (AbstractJdbcRegionStorage) ---------------- */
+
+    /**
+     * Round-trips a full region set through {@link dev.thefather007.worldguardneo.storage.SqliteRegionStorage}.
+     * When the sqlite-jdbc driver is on the run classpath this exercises the real SQL dialect of the
+     * shared {@code AbstractJdbcRegionStorage}; otherwise the storage transparently defers to the JSON
+     * backend and this still validates the storage contract end-to-end. Either way it guards the
+     * save/load/saveRegion/deleteRegion paths against regressions.
+     */
+    @GameTest(template = TPL)
+    public static void jdbcStorageRoundTrip(GameTestHelper h) throws Exception {
+        java.nio.file.Path tmp = java.nio.file.Files.createTempDirectory("wgn_sqlite_test");
+        var storage = new dev.thefather007.worldguardneo.storage.SqliteRegionStorage(tmp);
+        try {
+            RegionManager src = new RegionManager("testworld");
+            CuboidRegion a = new CuboidRegion("sq_a",
+                    new dev.thefather007.worldguardneo.util.Vec3(0, 0, 0),
+                    new dev.thefather007.worldguardneo.util.Vec3(5, 5, 5));
+            a.setPriority(9);
+            a.setFlag(Flags.PVP, StateFlag.State.DENY);
+            a.setFlagGroup(Flags.PVP, RegionGroup.NON_OWNERS);
+            UUID owner = UUID.randomUUID(); a.owners().add(owner);
+            a.setCreatedBy(owner); a.setCreatedAt(123456789L); a.setModifiedAt(987654321L);
+            src.add(a);
+            CuboidRegion b = new CuboidRegion("sq_b",
+                    new dev.thefather007.worldguardneo.util.Vec3(10, 0, 10),
+                    new dev.thefather007.worldguardneo.util.Vec3(12, 4, 12));
+            b.setParent(a);
+            src.add(b);
+            src.globalRegion().setFlag(Flags.TNT, StateFlag.State.DENY);
+
+            storage.save("testworld", src);
+
+            RegionManager dst = new RegionManager("testworld");
+            storage.load("testworld", dst);
+            var ra = dst.get("sq_a"); var rb = dst.get("sq_b");
+            h.assertTrue(ra.isPresent() && rb.isPresent(),                          "both regions round-trip");
+            h.assertTrue(ra.get().priority() == 9,                                 "priority round-trips");
+            h.assertTrue(ra.get().getFlag(Flags.PVP) == StateFlag.State.DENY,      "flag value round-trips");
+            h.assertTrue(ra.get().getFlagGroup(Flags.PVP) == RegionGroup.NON_OWNERS, "flag group round-trips");
+            h.assertTrue(ra.get().isOwner(owner),                                 "owner round-trips");
+            h.assertTrue(ra.get().createdAt() == 123456789L && ra.get().modifiedAt() == 987654321L,
+                    "metadata round-trips");
+            h.assertTrue(rb.get().parent() == ra.get(),                           "parent link round-trips");
+            h.assertTrue(dst.globalRegion().getFlag(Flags.TNT) == StateFlag.State.DENY,
+                    "global flag round-trips");
+
+            // Incremental upsert + delete on the per-region row.
+            a.setPriority(2);
+            storage.saveRegion("testworld", src, "sq_a");
+            src.remove("sq_b");
+            storage.deleteRegion("testworld", src, "sq_b");
+            RegionManager dst2 = new RegionManager("testworld");
+            storage.load("testworld", dst2);
+            h.assertTrue(dst2.get("sq_a").map(z -> z.priority() == 2).orElse(false), "saveRegion upsert persisted");
+            h.assertTrue(dst2.get("sq_b").isEmpty(),                              "deleteRegion removed the row");
+        } finally {
+            storage.close();
+        }
+        h.succeed();
+    }
 }
