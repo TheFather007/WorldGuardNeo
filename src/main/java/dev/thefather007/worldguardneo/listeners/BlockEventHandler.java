@@ -54,7 +54,8 @@ public final class BlockEventHandler {
         if (canBypass(p)) return;
         var applicable = mgr.getApplicable(x, y, z);
         if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
-                .isOverridden(applicable.get(0), Flags.BUILD, p, "block-break")) return;
+                .isOverridden(mgr.denyingRegion(applicable, id, Flags.BLOCK_BREAK, Flags.BUILD),
+                        Flags.BUILD, p, "block-break")) return;
         e.setCanceled(true);
         denyMessage(p, mgr, bp, "break", null);
     }
@@ -82,7 +83,8 @@ public final class BlockEventHandler {
         // Public API override hook (see RegionFlagDeniedEvent) — a listener may cancel to permit.
         var applicable = mgr.getApplicable(x, y, z);
         if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
-                .isOverridden(applicable.get(0), Flags.BUILD, p, "block-place")) return;
+                .isOverridden(mgr.denyingRegion(applicable, id, Flags.BLOCK_PLACE, Flags.BUILD),
+                        Flags.BUILD, p, "block-place")) return;
         e.setCanceled(true);
         // Resync inventory: cancelling EntityPlaceEvent keeps the item server-side but the
         // client already removed it from hand; without this the block vanishes until relog.
@@ -197,9 +199,14 @@ public final class BlockEventHandler {
         if (canBypass(p)) return;
         // Public API override hook for interact/container denials (see RegionFlagDeniedEvent).
         var applicable = mgr.getApplicable(x, y, z);
-        if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
-                .isOverridden(applicable.get(0), isContainer ? Flags.CHEST_ACCESS : Flags.INTERACT,
-                        p, isContainer ? "container" : "interact")) return;
+        if (!applicable.isEmpty()) {
+            var denier = isContainer
+                    ? mgr.denyingRegion(applicable, id, Flags.CHEST_ACCESS, Flags.INTERACT, Flags.USE)
+                    : mgr.denyingRegion(applicable, id, Flags.INTERACT, Flags.USE);
+            if (dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent.isOverridden(denier,
+                    isContainer ? Flags.CHEST_ACCESS : Flags.INTERACT,
+                    p, isContainer ? "container" : "interact")) return;
+        }
         e.setCanceled(true);
         syncInventory(p);
         // Pick the clearest message — or stay silent when one would be noise (e.g. right-clicking

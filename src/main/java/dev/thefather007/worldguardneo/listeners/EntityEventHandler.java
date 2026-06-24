@@ -486,7 +486,8 @@ public final class EntityEventHandler {
                     // Public API override hook (see RegionFlagDeniedEvent) — a listener may permit.
                     boolean overridden = !applicable.isEmpty()
                             && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent.isOverridden(
-                                    applicable.get(0), gate, attacker, victim instanceof Player ? "pvp" : "mob-damage");
+                                    mgr.denyingRegion(applicable, attacker.getUUID(), gate),
+                                    gate, attacker, victim instanceof Player ? "pvp" : "mob-damage");
                     if (!overridden) {
                         e.setCanceled(true);
                         attacker.displayClientMessage(
