@@ -2085,6 +2085,38 @@ public final class WGNGameTests {
         h.succeed();
     }
 
+    /* ---------------- override-API deciding region ---------------- */
+
+    @GameTest(template = TPL)
+    public static void denyingRegionPicksTheDecider(GameTestHelper h) {
+        RegionManager m = mgr(h);
+        // Two overlapping regions; the high-priority one sets no pvp flag, the low-priority one denies.
+        CuboidRegion hi = makeRegion(h, "dr_hi", new BlockPos(0, 0, 0), new BlockPos(8, 5, 8));
+        hi.setPriority(10);
+        CuboidRegion lo = makeRegion(h, "dr_lo", new BlockPos(0, 0, 0), new BlockPos(8, 5, 8));
+        lo.setPriority(0);
+        lo.setFlag(Flags.PVP, StateFlag.State.DENY);
+
+        UUID actor = UUID.randomUUID();
+        BlockPos abs = h.absolutePos(new BlockPos(4, 2, 4));
+        var applicable = m.getApplicable(abs.getX(), abs.getY(), abs.getZ());
+        h.assertTrue(applicable.get(0) == hi, "the top (priority-sorted) region is the high-priority one");
+        h.assertTrue(!m.testState(Flags.PVP, applicable, actor), "pvp is denied here");
+        // The decider is the LOW-priority region that set pvp=deny — NOT applicable.get(0).
+        h.assertTrue(m.denyingRegion(applicable, actor, Flags.PVP) == lo,
+                "denyingRegion returns the region that set the deny, not the top region");
+
+        // Implicit membership denial (no flag set) → falls back to the top region.
+        CuboidRegion owned = makeRegion(h, "dr_owned", new BlockPos(0, 0, 0), new BlockPos(8, 5, 8));
+        owned.setPriority(20);
+        owned.owners().add(UUID.randomUUID()); // owned by someone else; actor is a stranger
+        var app2 = m.getApplicable(abs.getX(), abs.getY(), abs.getZ());
+        h.assertTrue(app2.get(0) == owned, "the new highest-priority region is on top");
+        h.assertTrue(m.denyingRegion(app2, actor, Flags.BUILD) == owned,
+                "membership denial (no flag) falls back to the controlling top region");
+        h.succeed();
+    }
+
     /* ---------------- JDBC storage round-trip (AbstractJdbcRegionStorage) ---------------- */
 
     /**
