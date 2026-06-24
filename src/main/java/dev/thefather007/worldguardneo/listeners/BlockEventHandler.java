@@ -115,7 +115,9 @@ public final class BlockEventHandler {
      * Re-broadcast the player's open menu to the client after a cancelled place/use, correcting
      * the client's optimistic prediction (item already consumed) back to real server state.
      */
-    private static void syncInventory(ServerPlayer p) {
+    /** Resend the player's open container to undo a client-side optimistic prediction after a
+     *  cancelled interaction (e.g. a consumed bucket/lead). Package-private so sibling listeners reuse it. */
+    static void syncInventory(ServerPlayer p) {
         try {
             p.containerMenu.sendAllDataToRemote();
         } catch (Throwable t) {

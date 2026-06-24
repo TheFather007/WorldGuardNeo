@@ -531,6 +531,7 @@ public final class WGCommands {
         r.owners().clear();
         if (!r.ownerGroupsView().isEmpty()) r.ownerGroups().clear();
         r.owners().add(target);
+        r.markModified(); // ownership changed through the raw sets — refresh modifiedAt + bump epoch
         mod.regions().saveRegion(self.serverLevel(), r.id());
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                 new dev.thefather007.worldguardneo.api.events.RegionModifyEvent(
@@ -1332,9 +1333,20 @@ public final class WGCommands {
             return 0;
         }
 
+        // Reject a typo'd -g group instead of silently treating it as ALL (which would drop the
+        // restriction the user intended). Only validated when -g was actually supplied.
+        if (group != null && !group.isEmpty() && RegionGroup.parseStrict(group) == null) {
+            err(src, mod, "msg.flag.group-unknown", "group", group);
+            return 0;
+        }
+
         try {
-            // null effective group means "leave group untouched".
-            String effectiveGroup = group != null ? group : mod.config().global().defaultRegionGroup;
+            // Group resolution: an explicit -g always wins. Without -g, apply the configured
+            // default-region-group ONLY when this flag is NEW on the region — editing an existing
+            // flag's value must NOT silently wipe a previously-set group (rg=null leaves it untouched).
+            boolean isNewFlag = region.getFlag(flag) == null;
+            String effectiveGroup = group != null ? group
+                    : (isNewFlag ? mod.config().global().defaultRegionGroup : null);
             RegionGroup rg = (effectiveGroup != null && !effectiveGroup.isEmpty())
                     ? RegionGroup.parse(effectiveGroup) : null;
             Object parsed = flag.parseAndApply(region, value, rg);

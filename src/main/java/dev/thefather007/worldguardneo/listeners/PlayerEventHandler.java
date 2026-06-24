@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.util.TriState;
@@ -671,13 +670,15 @@ public final class PlayerEventHandler {
         }
 
         UUID uid = p.getUUID();
-        Set<String> allowed = mgr.resolveValue(Flags.ALLOWED_CMDS, x, y, z, uid);
+        // One spatial lookup shared by both flag resolutions (was two separate getApplicable calls).
+        var applicable = mgr.getApplicable(x, y, z);
+        Set<String> allowed = mgr.resolveValue(Flags.ALLOWED_CMDS, applicable, uid);
         if (allowed != null && !allowed.isEmpty() && !containsCmd(allowed, head)) {
             e.setCanceled(true);
             p.displayClientMessage(Component.literal(mod.i18n().raw("msg.protection.cmd-blocked")), true);
             return;
         }
-        Set<String> blocked = mgr.resolveValue(Flags.BLOCKED_CMDS, x, y, z, uid);
+        Set<String> blocked = mgr.resolveValue(Flags.BLOCKED_CMDS, applicable, uid);
         if (blocked != null && containsCmd(blocked, head)) {
             e.setCanceled(true);
             p.displayClientMessage(Component.literal(mod.i18n().raw("msg.protection.cmd-blocked")), true);

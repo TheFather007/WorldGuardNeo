@@ -2,6 +2,7 @@ package dev.thefather007.worldguardneo.mixin;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flags;
+import dev.thefather007.worldguardneo.flags.StateFlag;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -40,10 +41,11 @@ public abstract class PressurePlateBlockMixin {
             if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-            // Fast path: no region here AND no global USE opinion → vanilla, no allocation.
-            // The global check keeps a world-wide "use deny" effective on wilderness plates.
+            // Fast path: no region here AND global USE isn't an explicit DENY → vanilla, no entity
+            // scan. Only a world-wide "use deny" needs enforcing on wilderness plates; a global
+            // ALLOW (or unset) means the plate just fires normally, so skip the allocation/scan.
             if (!mgr.hasAnyAt(x, y, z)
-                    && mgr.globalRegion().getFlag(Flags.USE) == null) return;
+                    && mgr.globalRegion().getFlag(Flags.USE) != StateFlag.State.DENY) return;
 
             // Allow only if a member of the controlling region is standing on it.
             AABB box = TOUCH_AABB.move(pos);

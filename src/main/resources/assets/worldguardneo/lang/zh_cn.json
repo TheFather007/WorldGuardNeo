@@ -17,7 +17,6 @@
   "msg.selection.pos2": "§8[§3WGN§8] §a✔ §7点2已设置为 §b%pos%§7。",
   "msg.selection.point": "§8[§3WGN§8] §a✔ §7已添加多边形顶点 §e#%n% §7于 §b%pos%§7。",
   "msg.selection.poly-cleared": "§8[§3WGN§8] §a✔ §7多边形顶点已清除。",
-  "msg.selection.need-poly": "§8[§3WGN§8] §e⚠ §7多边形至少需要 §f3 §7个顶点。",
   "msg.selection.needs-player": "§8[§3WGN§8] §c✘ §7选区需要玩家 —— 请以玩家身份运行，或通过 §f/execute as <player>§7 执行。",
   "msg.selection.dims": "§b%w%§7×§b%h%§7×§b%l% §8(§e%vol% §7个方块§8)",
   "msg.selection.poly-dims": "§b%n% §7个顶点 §8· §7Y §b%miny%§7–§b%maxy%",
@@ -76,7 +75,6 @@
   "msg.list.role.owner": "所有者",
   "msg.list.role.member": "成员",
   "msg.list.player.notfound": "§8[§3WGN§8] §c✘ §7未找到玩家 §f%player%§7。",
-  "msg.list.truncated": "§8   …… 以及另外 §7%hidden% §8个（已截断）。",
   "msg.list.page": "§7第 §6%page%§7/§6%pages% §7页",
 
   "msg.flags.header": "§3§m       §r §b§l◆ 可用旗标 §8(§e%count%§8) §r§3§m       ",
@@ -85,6 +83,7 @@
   "msg.flag.set": "§8[§3WGN§8] §a✔ §7旗标 §e%flag% §8= §b%value% §7已设置于 §6%id%§7。",
   "msg.flag.denied": "§8[§3WGN§8] §c✘ §7你无权更改旗标 §6%flag%§7。",
   "msg.flag.group-denied": "§8[§3WGN§8] §c✘ §7你无权使用 §e-g §7组语法 §8(§7worldguardneo.region.flag.group§8)§7。",
+  "msg.flag.group-unknown": "§8[§3WGN§8] §c✘ §7未知的组 §6%group%§7。可用：ALL、OWNERS、MEMBERS、NON_OWNERS、NON_MEMBERS。",
 
   "msg.priority.set": "§8[§3WGN§8] §a✔ §7区域 §6%id% §7的优先级已设置为 §e%value%§7。",
   "msg.parent.set": "§8[§3WGN§8] §a✔ §7区域 §6%child% §7的父区域已设置为 §6%parent%§7。",
@@ -221,7 +220,5 @@
   "flag.teleport.desc": "/rg teleport 的目的地，格式 x,y,z。",
   "flag.spawn.desc": "区域绑定玩家的重生坐标。",
 
-  "msg.wand.given": "§8[§3WGN§8] §a✔ §7已获得选区工具。§f左键 §7= 点1，§f右键 §7= 点2。",
-  "msg.wand.already": "§8[§3WGN§8] §e⚠ §7你已经拥有选区工具。",
   "item.wand.name": "§6§lWorldGuardNeo §r§6选区工具"
 }
