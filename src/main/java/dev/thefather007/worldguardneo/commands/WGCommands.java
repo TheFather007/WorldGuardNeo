@@ -1269,7 +1269,7 @@ public final class WGCommands {
             if (parts.length >= 3) {
                 try {
                     tx = Double.parseDouble(parts[0]);
-                    ty = Double.parseDouble(parts[1]);
+                    ty = dev.thefather007.worldguardneo.util.Locations.clampY(lvl, Double.parseDouble(parts[1]));
                     tz = Double.parseDouble(parts[2]);
                     p.teleportTo(tx, ty, tz);
                     ok(src, mod, "msg.teleport.done", "id", id);
