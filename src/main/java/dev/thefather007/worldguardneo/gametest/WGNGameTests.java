@@ -2044,4 +2044,22 @@ public final class WGNGameTests {
                 "ride deny is enforced");
         h.succeed();
     }
+
+    /* ---------------- spawn/teleport Y-clamp ---------------- */
+
+    @GameTest(template = TPL)
+    public static void spawnTeleportYClampedToBuildHeight(GameTestHelper h) {
+        ServerLevel lvl = h.getLevel();
+        double min = lvl.getMinBuildHeight();
+        double max = lvl.getMaxBuildHeight() - 1;
+
+        h.assertTrue(dev.thefather007.worldguardneo.util.Locations.clampY(lvl, 1_000_000) == max,
+                "Y above the world clamps to maxBuildHeight-1");
+        h.assertTrue(dev.thefather007.worldguardneo.util.Locations.clampY(lvl, -1_000_000) == min,
+                "Y below the world clamps to minBuildHeight");
+        double inRange = min + 5;
+        h.assertTrue(dev.thefather007.worldguardneo.util.Locations.clampY(lvl, inRange) == inRange,
+                "in-range Y is left untouched");
+        h.succeed();
+    }
 }
