@@ -985,7 +985,7 @@ public final class PlayerEventHandler {
                 String[] parts = spawnTarget.trim().split("[,\\s]+");
                 if (parts.length >= 3) {
                     double tx = Double.parseDouble(parts[0]);
-                    double ty = Double.parseDouble(parts[1]);
+                    double ty = dev.thefather007.worldguardneo.util.Locations.clampY(p.serverLevel(), Double.parseDouble(parts[1]));
                     double tz = Double.parseDouble(parts[2]);
                     p.teleportTo(tx, ty, tz);
                 }
