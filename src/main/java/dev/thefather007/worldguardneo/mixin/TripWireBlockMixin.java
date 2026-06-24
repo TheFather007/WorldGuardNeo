@@ -2,6 +2,7 @@ package dev.thefather007.worldguardneo.mixin;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flags;
+import dev.thefather007.worldguardneo.flags.StateFlag;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -37,8 +38,9 @@ public abstract class TripWireBlockMixin {
             if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-            // Fast path: no region here AND no global USE opinion → vanilla, no allocation.
-            if (!mgr.hasAnyAt(x, y, z) && mgr.globalRegion().getFlag(Flags.USE) == null) return;
+            // Fast path: no region here AND global USE isn't an explicit DENY → vanilla, no scan.
+            // (A global USE=allow must NOT cancel wilderness trips for mobs/items, so bail here too.)
+            if (!mgr.hasAnyAt(x, y, z) && mgr.globalRegion().getFlag(Flags.USE) != StateFlag.State.DENY) return;
             // An authorised member (USE build-access) trips it normally.
             if (entity instanceof Player pl && mgr.testBuildAccess(Flags.USE, x, y, z, pl.getUUID())) return;
             // Stranger, mob, item, or projectile → don't let it trip the wire.

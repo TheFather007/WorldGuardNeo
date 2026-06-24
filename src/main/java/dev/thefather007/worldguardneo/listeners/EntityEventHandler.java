@@ -45,7 +45,10 @@ public final class EntityEventHandler {
         if (!(entity.level() instanceof ServerLevel sl)) return;
         if (!mod.isProtectionActive(sl)) return;
         RegionManager mgr = mod.regions().get(sl);
-        if (!mgr.testState(Flags.MOB_GRIEF, null, entity.getX(), entity.getY(), entity.getZ())) {
+        double gx = entity.getX(), gy = entity.getY(), gz = entity.getZ();
+        // Fast path: no region here and no global default → nothing to do (endermen/etc. fire this a lot).
+        if (!mgr.hasAnyAt(gx, gy, gz) && mgr.globalRegion().getFlag(Flags.MOB_GRIEF) == null) return;
+        if (!mgr.testState(Flags.MOB_GRIEF, null, gx, gy, gz)) {
             e.setCanGrief(false);
         }
     }
@@ -179,7 +182,6 @@ public final class EntityEventHandler {
     @SubscribeEvent
     public void onPlayerAttack(AttackEntityEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer attacker)) return;
-        if (mod.perms().has(attacker, "worldguardneo.region.bypass")) return;
         Entity target = e.getTarget();
         if (target == null) return;
         ServerLevel lvl = attacker.serverLevel();
@@ -189,6 +191,8 @@ public final class EntityEventHandler {
         // Single spatial lookup reused across the three state-flag tests below.
         var applicable = mgr.getApplicable(x, y, z);
         UUID actor = attacker.getUUID();
+        // Lazy bypass: resolve flags first and only query the permission backend when an action would
+        // be denied. Keeps wilderness combat (the common case) off the LuckPerms path entirely.
 
         // Decoration (HangingEntity/ArmorStand) checked FIRST. ArmorStand is a LivingEntity but
         // is decoration, so MOB_DAMAGE would conflate killing a mob with vandalizing decoration;
@@ -196,8 +200,8 @@ public final class EntityEventHandler {
         boolean isDecoration = target instanceof net.minecraft.world.entity.decoration.HangingEntity
                             || target instanceof net.minecraft.world.entity.decoration.ArmorStand;
         if (isDecoration) {
-            if (!mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)
-                    || !mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, actor)) {
+            if ((!mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)
+                    || !mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, actor)) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.build-denied")), true);
@@ -206,7 +210,7 @@ public final class EntityEventHandler {
         }
 
         if (target instanceof Player) {
-            if (!mgr.testState(Flags.PVP, applicable, actor)) {
+            if (!mgr.testState(Flags.PVP, applicable, actor) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 // Tell the attacker why — a silent cancel feels broken.
                 attacker.displayClientMessage(
@@ -214,7 +218,7 @@ public final class EntityEventHandler {
                 return;
             }
         } else if (target instanceof LivingEntity) {
-            if (!mgr.testState(Flags.MOB_DAMAGE, applicable, actor)) {
+            if (!mgr.testState(Flags.MOB_DAMAGE, applicable, actor) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.mob-denied")), true);
@@ -223,21 +227,27 @@ public final class EntityEventHandler {
         }
 
         if (target instanceof AbstractMinecart || target instanceof Boat) {
-            // World-wide protectVehicles: protect regardless of region flags (bypass already
-            // checked at the top of this method).
+            // World-wide protectVehicles: protect regardless of region flags.
             var ws = mod.config().worldOrGlobal(lvl);
             if (ws != null && ws.protectVehicles) {
-                e.setCanceled(true);
-                attacker.displayClientMessage(
-                        net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.vehicle-denied")), true);
+                if (!canBypass(attacker)) {
+                    e.setCanceled(true);
+                    attacker.displayClientMessage(
+                            net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.vehicle-denied")), true);
+                }
                 return;
             }
-            if (!mgr.testState(Flags.VEHICLE_DESTROY, applicable, actor)) {
+            if (!mgr.testState(Flags.VEHICLE_DESTROY, applicable, actor) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.vehicle-denied")), true);
             }
         }
+    }
+
+    /** region.bypass holders skip protection. Queried lazily (only when an action would be denied). */
+    private boolean canBypass(ServerPlayer p) {
+        return mod.perms().has(p, "worldguardneo.region.bypass");
     }
 
     /* ---------------- Vehicle mounting (boats / minecarts) ---------------- */
@@ -254,19 +264,25 @@ public final class EntityEventHandler {
         if (e.getLevel().isClientSide()) return;
         if (!mod.isProtectionActive(e.getLevel())) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
-        // Minecarts/boats are "vehicles" (vehicle-enter); living rideable mobs use the ride flag.
-        final StateFlag flag;
+        double vx = vehicle.getX(), vy = vehicle.getY(), vz = vehicle.getZ();
+        UUID actor = p.getUUID();
+        // Minecarts/boats are "vehicles" (vehicle-enter). Living rideable mobs use the ride flag AND
+        // the membership model (a stranger can't ride a claimed mob unless interact is re-allowed),
+        // mirroring how the decoration/villager/leash interactions are gated.
+        final boolean denied;
         final String denyKey;
         if (vehicle instanceof AbstractMinecart || vehicle instanceof Boat) {
-            flag = Flags.VEHICLE_ENTER; denyKey = "msg.vehicle.enter-denied";
+            denied = !mgr.testState(Flags.VEHICLE_ENTER, actor, vx, vy, vz);
+            denyKey = "msg.vehicle.enter-denied";
         } else if (vehicle instanceof net.minecraft.world.entity.Mob) {
-            flag = Flags.RIDE;          denyKey = "msg.ride.denied";
+            denied = !mgr.testState(Flags.RIDE, actor, vx, vy, vz)
+                  || !mgr.testBuildAccess(Flags.INTERACT, vx, vy, vz, actor);
+            denyKey = "msg.ride.denied";
         } else {
             return; // not a thing we gate
         }
         // Resolve the flag first; only consult region.bypass when it denies (lazy-bypass pattern).
-        if (!mgr.testState(flag, p.getUUID(), vehicle.getX(), vehicle.getY(), vehicle.getZ())
-                && !mod.perms().has(p, "worldguardneo.region.bypass")) {
+        if (denied && !canBypass(p)) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw(denyKey)), true);
@@ -331,18 +347,22 @@ public final class EntityEventHandler {
         UUID actor = p.getUUID();
 
         // Leashing a mob (right-click with a lead). Vanilla applies the lead before any other
-        // interaction, so check this first. canBeLeashed() filters out non-leashable mobs.
+        // interaction, so check this first. canBeLeashed() filters out non-leashable mobs. Denied by
+        // an explicit entity-leash=deny OR the membership model (a stranger can't leash a claimed mob).
         if (target instanceof net.minecraft.world.entity.Mob mob && mob.canBeLeashed()
                 && p.getItemInHand(e.getHand()).is(net.minecraft.world.item.Items.LEAD)
-                && !mgr.testState(Flags.ENTITY_LEASH, actor, x, y, z)) {
+                && (!mgr.testState(Flags.ENTITY_LEASH, actor, x, y, z)
+                    || !mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor))) {
             e.setCanceled(true);
+            BlockEventHandler.syncInventory(p); // lead is consumed client-side on the optimistic leash; resync it
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.entity-denied")), true);
             return;
         }
-        // Villager / wandering-trader trade GUI.
+        // Villager / wandering-trader trade GUI — explicit villager-trade=deny OR membership model.
         if (target instanceof net.minecraft.world.entity.npc.AbstractVillager
-                && !mgr.testState(Flags.VILLAGER_TRADE, actor, x, y, z)) {
+                && (!mgr.testState(Flags.VILLAGER_TRADE, actor, x, y, z)
+                    || !mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor))) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.entity-denied")), true);
