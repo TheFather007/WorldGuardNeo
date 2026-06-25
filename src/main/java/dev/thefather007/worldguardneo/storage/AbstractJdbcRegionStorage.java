@@ -15,7 +15,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,15 +44,68 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
     /** Per-world row id holding the global region's flags. */
     protected static final String GLOBAL_KEY = "__global__";
 
+    /** Current on-disk schema version. Bump and add a migration branch in {@link #ensureSchemaVersion}
+     *  whenever the persisted shape changes, so old databases upgrade cleanly instead of by heuristic. */
+    public static final int SCHEMA_VERSION = 1;
+
     protected final RegionStorage fallback;
     /** Set by the subclass constructor once the driver is present and the schema is initialised. */
     protected boolean             usable;
+    /** Schema version read/written at init; -1 until {@link #ensureSchemaVersion} runs (or fallback). */
+    protected int                 schemaVersion = -1;
     /** Shared connection. Lazily opened on first use; closed at server stop via {@link #close()}. */
     protected Connection          conn;
 
     protected AbstractJdbcRegionStorage(RegionStorage fallback) {
         this.fallback = fallback;
     }
+
+    /* ---------------- schema versioning ---------------- */
+
+    /** {@code <table>_meta} key/value table holding the schema version (and room for future markers). */
+    private String metaTable() { return table() + "_meta"; }
+
+    /**
+     * Ensure the meta table exists and carries a schema version. On a fresh DB it stamps
+     * {@link #SCHEMA_VERSION}; on an existing one it reads (and, in future, migrates) it. Call from the
+     * subclass constructor right after {@code initSchema()}. Best-effort: a failure here just leaves
+     * {@link #schemaVersion} at -1 and is logged — it never blocks region loading.
+     */
+    protected final void ensureSchemaVersion() {
+        try {
+            try (Statement st = conn().createStatement()) {
+                st.executeUpdate("CREATE TABLE IF NOT EXISTS " + metaTable()
+                        + " (mkey VARCHAR(64) NOT NULL, mvalue VARCHAR(255) NOT NULL, PRIMARY KEY (mkey))");
+            }
+            Integer found = null;
+            try (PreparedStatement ps = conn().prepareStatement(
+                    "SELECT mvalue FROM " + metaTable() + " WHERE mkey = 'schema_version'");
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) { try { found = Integer.parseInt(rs.getString(1)); } catch (NumberFormatException ignored) {} }
+            }
+            if (found == null) {
+                try (PreparedStatement ps = conn().prepareStatement(
+                        "INSERT INTO " + metaTable() + " (mkey, mvalue) VALUES ('schema_version', ?)")) {
+                    ps.setString(1, String.valueOf(SCHEMA_VERSION));
+                    ps.executeUpdate();
+                }
+                schemaVersion = SCHEMA_VERSION;
+            } else {
+                schemaVersion = found;
+                // Future: if (found < SCHEMA_VERSION) { run ordered migrations; bump the stored value. }
+                if (found > SCHEMA_VERSION) {
+                    WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] {} storage schema is v{} but this build expects v{} "
+                            + "— it was written by a newer version; proceeding read-as-is.",
+                            backendName(), found, SCHEMA_VERSION);
+                }
+            }
+        } catch (SQLException ex) {
+            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] {} schema-version check failed (continuing).", backendName(), ex);
+        }
+    }
+
+    /** The schema version recorded on disk, or -1 if unknown/unusable (for diagnostics). */
+    public int schemaVersion() { return schemaVersion; }
 
     /* ---------------- dialect hooks ---------------- */
 
@@ -141,9 +196,48 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
         }
     }
 
+    // The sync methods delegate to the two-phase prepare* (serialize now, run the I/O immediately).
+    @Override public void save(String worldKey, RegionManager from) throws IOException {
+        prepareSave(worldKey, from).run();
+    }
+    @Override public void saveRegion(String worldKey, RegionManager from, String regionId) throws IOException {
+        prepareSaveRegion(worldKey, from, regionId).run();
+    }
+    @Override public void deleteRegion(String worldKey, RegionManager from, String regionId) throws IOException {
+        prepareDeleteRegion(worldKey, from, regionId).run();
+    }
+
     @Override
-    public void save(String worldKey, RegionManager from) throws IOException {
-        if (!usable) { fallback.save(worldKey, from); return; }
+    public IoTask prepareSave(String worldKey, RegionManager from) {
+        if (!usable) return fallback.prepareSave(worldKey, from);
+        // Serialize every region NOW (server thread, where the manager is safely readable).
+        List<String[]> rows = new ArrayList<>();
+        for (ProtectedRegion r : from.all()) {
+            rows.add(new String[]{ r.id(), GSON.toJson(RegionJsonCodec.regionToJson(r)) });
+        }
+        rows.add(new String[]{ GLOBAL_KEY, GSON.toJson(RegionJsonCodec.globalToJson(from.globalRegion())) });
+        return () -> writeFullReplace(worldKey, rows);
+    }
+
+    @Override
+    public IoTask prepareSaveRegion(String worldKey, RegionManager from, String regionId) {
+        if (!usable) return fallback.prepareSaveRegion(worldKey, from, regionId);
+        ProtectedRegion r = GLOBAL_KEY.equals(regionId) ? from.globalRegion() : from.get(regionId).orElse(null);
+        if (r == null) return prepareDeleteRegion(worldKey, from, regionId); // vanished → delete its row
+        String payload = GSON.toJson(GLOBAL_KEY.equals(regionId)
+                ? RegionJsonCodec.globalToJson(r) : RegionJsonCodec.regionToJson(r));
+        return () -> writeUpsert(worldKey, regionId, payload);
+    }
+
+    @Override
+    public IoTask prepareDeleteRegion(String worldKey, RegionManager from, String regionId) {
+        if (!usable) return fallback.prepareDeleteRegion(worldKey, from, regionId);
+        return () -> writeDelete(worldKey, regionId);
+    }
+
+    /* ---------------- blocking I/O (run on the write-behind worker) ---------------- */
+
+    private void writeFullReplace(String worldKey, List<String[]> rows) throws IOException {
         // Full sync in one transaction: replace all of this world's (non-quarantine) rows.
         try {
             conn().setAutoCommit(false);
@@ -156,14 +250,11 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
                 try (PreparedStatement ins = conn().prepareStatement(
                         "INSERT INTO " + table() + " (world, region_id, payload, updated_at) VALUES (?, ?, ?, ?)")) {
                     long now = System.currentTimeMillis();
-                    for (ProtectedRegion r : from.all()) {
-                        ins.setString(1, worldKey); ins.setString(2, r.id());
-                        ins.setString(3, GSON.toJson(RegionJsonCodec.regionToJson(r))); ins.setLong(4, now);
+                    for (String[] row : rows) {
+                        ins.setString(1, worldKey); ins.setString(2, row[0]);
+                        ins.setString(3, row[1]); ins.setLong(4, now);
                         ins.addBatch();
                     }
-                    ins.setString(1, worldKey); ins.setString(2, GLOBAL_KEY);
-                    ins.setString(3, GSON.toJson(RegionJsonCodec.globalToJson(from.globalRegion()))); ins.setLong(4, now);
-                    ins.addBatch();
                     ins.executeBatch();
                 }
                 conn().commit();
@@ -178,13 +269,7 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
         }
     }
 
-    @Override
-    public void saveRegion(String worldKey, RegionManager from, String regionId) throws IOException {
-        if (!usable) { fallback.saveRegion(worldKey, from, regionId); return; }
-        ProtectedRegion r = GLOBAL_KEY.equals(regionId) ? from.globalRegion() : from.get(regionId).orElse(null);
-        if (r == null) { deleteRegion(worldKey, from, regionId); return; } // vanished → delete its row
-        String payload = GSON.toJson(GLOBAL_KEY.equals(regionId)
-                ? RegionJsonCodec.globalToJson(r) : RegionJsonCodec.regionToJson(r));
+    private void writeUpsert(String worldKey, String regionId, String payload) throws IOException {
         try (PreparedStatement ps = conn().prepareStatement(upsertSql())) {
             ps.setString(1, worldKey); ps.setString(2, regionId);
             ps.setString(3, payload); ps.setLong(4, System.currentTimeMillis());
@@ -194,9 +279,7 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
         }
     }
 
-    @Override
-    public void deleteRegion(String worldKey, RegionManager from, String regionId) throws IOException {
-        if (!usable) { fallback.deleteRegion(worldKey, from, regionId); return; }
+    private void writeDelete(String worldKey, String regionId) throws IOException {
         try (PreparedStatement ps = conn().prepareStatement(
                 "DELETE FROM " + table() + " WHERE world = ? AND region_id = ?")) {
             ps.setString(1, worldKey); ps.setString(2, regionId);

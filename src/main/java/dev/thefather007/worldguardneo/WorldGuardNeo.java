@@ -188,6 +188,9 @@ public final class WorldGuardNeo {
         // the others (e.g. if saveAll throws, we still want to close the storage handle).
         try { regionContainer.saveAll(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] saveAll failed", ex); }
+        // Stop the write-behind worker (final drain) before closing the storage handle it uses.
+        try { regionContainer.shutdownWriter(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] region writer shutdown failed", ex); }
         try { regionContainer.storage().close(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] storage close failed", ex); }
         // Flush the backup executor — wait briefly for any in-flight backup to finish.

@@ -32,7 +32,7 @@ public final class H2RegionStorage extends AbstractJdbcRegionStorage {
         boolean present = driverClass != null;
         try {
             Files.createDirectories(baseDir);
-            if (present) initSchema();
+            if (present) { initSchema(); ensureSchemaVersion(); }
         } catch (Exception ex) {
             WorldGuardNeo.LOGGER.error("[WorldGuardNeo] H2 init failed — falling back to JSON storage", ex);
             present = false;

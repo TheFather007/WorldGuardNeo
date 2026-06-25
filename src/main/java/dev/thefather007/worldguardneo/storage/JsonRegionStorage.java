@@ -81,7 +81,25 @@ public final class JsonRegionStorage implements RegionStorage {
 
     @Override
     public void save(String worldKey, RegionManager from) throws IOException {
+        // Synchronous path: serialize then write. The async path uses prepare* below, which splits
+        // the (server-thread) serialize from the (worker-thread) write.
+        writeDocument(worldKey, RegionJsonCodec.toJson(from));
+    }
+
+    // JSON has no per-region rows: every incremental edit re-serializes the whole world document.
+    // Serialization happens NOW (server thread); only writeDocument runs on the worker.
+    @Override public IoTask prepareSave(String worldKey, RegionManager from) {
         JsonObject root = RegionJsonCodec.toJson(from);
+        return () -> writeDocument(worldKey, root);
+    }
+    @Override public IoTask prepareSaveRegion(String worldKey, RegionManager from, String regionId) {
+        return prepareSave(worldKey, from);
+    }
+    @Override public IoTask prepareDeleteRegion(String worldKey, RegionManager from, String regionId) {
+        return prepareSave(worldKey, from); // the document already reflects the removal
+    }
+
+    private void writeDocument(String worldKey, JsonObject root) throws IOException {
         Path target = fileFor(worldKey);
         Path tmp    = target.resolveSibling(target.getFileName() + ".tmp");
         boolean ok = false;
