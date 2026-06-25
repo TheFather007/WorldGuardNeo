@@ -2204,6 +2204,164 @@ public final class WGNGameTests {
         h.succeed();
     }
 
+    @GameTest(template = TPL)
+    public static void denySpawnCancelsListedType(GameTestHelper h) {
+        region(h, "gt_denyspawn").setFlag(Flags.DENY_SPAWN, Set.of("minecraft:cow"));
+        BlockPos c = h.absolutePos(new BlockPos(4, 1, 4));
+        Cow cow = EntityType.COW.create(h.getLevel());
+        h.assertTrue(cow != null, "cow created");
+        var e = new net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent(
+                cow, h.getLevel(), c.getX(), c.getY(), c.getZ(),
+                h.getLevel().getCurrentDifficultyAt(c),
+                net.minecraft.world.entity.MobSpawnType.NATURAL, null, null);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isSpawnCancelled(), "deny-spawn cancels the listed entity type");
+        h.succeed();
+    }
+
+    /* ---------------- per-tick region effects (real PlayerTickEvent path) ---------------- */
+
+    /** Drive the mod's per-tick handler {@code n} times for a player (heal/feed timers, entry/exit,
+     *  game-mode, speed, hunger). Posting the real event exercises the same code a live server runs. */
+    private static void tick(ServerPlayer p, int n) {
+        for (int i = 0; i < n; i++) {
+            NeoForge.EVENT_BUS.post(new net.neoforged.neoforge.event.tick.PlayerTickEvent.Post(p));
+        }
+    }
+
+    @GameTest(template = TPL)
+    public static void healFlagRestoresHealth(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_heal");
+        r.setFlag(Flags.HEAL_DELAY, 1);   // 1s = 20 ticks
+        r.setFlag(Flags.HEAL_AMOUNT, 5);
+        ServerPlayer p = strangerInRegion(h);
+        p.setHealth(1.0f);
+        tick(p, 25);
+        h.assertTrue(p.getHealth() > 1.0f, "heal flag restores health over time (got " + p.getHealth() + ")");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void feedFlagRestoresHunger(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_feed");
+        r.setFlag(Flags.FEED_DELAY, 1);
+        r.setFlag(Flags.FEED_AMOUNT, 5);
+        ServerPlayer p = strangerInRegion(h);
+        p.getFoodData().setFoodLevel(1);
+        tick(p, 25);
+        h.assertTrue(p.getFoodData().getFoodLevel() > 1, "feed flag restores hunger over time");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void gameModeFlagOverridesMode(GameTestHelper h) {
+        region(h, "gt_gm").setFlag(Flags.GAME_MODE, "adventure");
+        ServerPlayer p = strangerInRegion(h);
+        p.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);
+        tick(p, 2);
+        h.assertTrue(p.gameMode.getGameModeForPlayer() == net.minecraft.world.level.GameType.ADVENTURE,
+                "game-mode flag forces the configured mode inside the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void hungerDrainDenyZeroesExhaustion(GameTestHelper h) {
+        region(h, "gt_hunger_deny").setFlag(Flags.HUNGER_DRAIN, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h);
+        p.getFoodData().setExhaustion(5.0f);
+        tick(p, 1);
+        h.assertTrue(p.getFoodData().getExhaustionLevel() == 0.0f, "hunger-drain=deny resets exhaustion");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void maxSpeedFlagAppliesModifier(GameTestHelper h) {
+        region(h, "gt_speed").setFlag(Flags.MAX_SPEED, 0.5);
+        ServerPlayer p = strangerInRegion(h);
+        tick(p, 1);
+        double eff = p.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED);
+        h.assertTrue(Math.abs(eff - 0.5) < 1e-6, "max-speed flag caps movement speed to the value (got " + eff + ")");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void entryDenyEjectsPlayer(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_entry_deny");
+        r.setFlag(Flags.ENTRY, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h); // inside an entry-deny region
+        tick(p, 1);
+        var hereNow = mgr(h).getApplicable(p.getX(), p.getY(), p.getZ());
+        h.assertFalse(hereNow.contains(r), "entry=deny ejects a player out of the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void exitDenyBouncesPlayerBack(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_exit_deny");
+        r.setFlag(Flags.EXIT, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h);
+        tick(p, 1); // settle inside: lastRegions={r}, last-safe = here
+        BlockPos wild = h.absolutePos(new BlockPos(4, 2, 4)).offset(0, 200, 0);
+        p.setPos(wild.getX() + 0.5, wild.getY(), wild.getZ() + 0.5); // step out
+        tick(p, 1);
+        var hereNow = mgr(h).getApplicable(p.getX(), p.getY(), p.getZ());
+        h.assertTrue(hereNow.contains(r), "exit=deny bounces a leaving player back inside");
+        h.succeed();
+    }
+
+    /* ---------------- blocked commands & pistons (real event path) ---------------- */
+
+    @GameTest(template = TPL)
+    public static void blockedCmdsCancelsCommand(GameTestHelper h) {
+        region(h, "gt_cmd_deny").setFlag(Flags.BLOCKED_CMDS, Set.of("seed"));
+        ServerPlayer p = strangerInRegion(h);
+        var parse = p.getServer().getCommands().getDispatcher().parse("seed", p.createCommandSourceStack());
+        var e = new net.neoforged.neoforge.event.CommandEvent(parse);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "blocked-cmds cancels a listed command run from inside the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void pistonPushIntoForeignRegionBlocked(GameTestHelper h) {
+        // Region starts at x=3; the piston sits at x=2 (outside) and faces EAST, so its face-offset
+        // cell (x=3) lands inside the foreign region → the push must be cancelled.
+        makeRegion(h, "gt_piston", new BlockPos(3, 0, 3), new BlockPos(7, 5, 7));
+        BlockPos pistonAbs = h.absolutePos(new BlockPos(2, 2, 5));
+        var e = new net.neoforged.neoforge.event.level.PistonEvent.Pre(
+                h.getLevel(), pistonAbs, Direction.EAST,
+                net.neoforged.neoforge.event.level.PistonEvent.PistonMoveType.EXTEND);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "a piston can't push into a foreign region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void glideDenyStopsFallFlying(GameTestHelper h) {
+        region(h, "gt_glide_deny").setFlag(Flags.GLIDE, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h);
+        p.startFallFlying();
+        h.assertTrue(p.isFallFlying(), "precondition: the player is gliding");
+        tick(p, 1);
+        h.assertFalse(p.isFallFlying(), "glide=deny stops a player gliding through the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void enderpearlDenyCancelsTeleport(GameTestHelper h) {
+        region(h, "gt_enderpearl_deny").setFlag(Flags.ENDER_BUILD, StateFlag.State.DENY);
+        ServerPlayer p = stranger(h);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var pearl = new net.minecraft.world.entity.projectile.ThrownEnderpearl(h.getLevel(), p);
+        var hit = net.minecraft.world.phys.BlockHitResult.miss(
+                new Vec3(c.getX() + 0.5, c.getY(), c.getZ() + 0.5), Direction.UP, c);
+        var e = new net.neoforged.neoforge.event.entity.EntityTeleportEvent.EnderPearl(
+                p, c.getX() + 0.5, c.getY(), c.getZ() + 0.5, pearl, 0f, hit);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "enderpearl=deny cancels a pearl teleport into the region");
+        h.succeed();
+    }
+
     /* ---------------- override-API deciding region ---------------- */
 
     @GameTest(template = TPL)
