@@ -1,6 +1,6 @@
 WorldGuardNeo — per-flag test report
-generated: 2026-06-17T23:03:58.299938411Z
-flags: 95
+generated: 2026-06-25T04:50:43.665296030Z
+flags: 98
 ==============================================================================
 
 === FLAG: allowed-cmds ===
@@ -350,6 +350,26 @@ flags: 95
 
 === FLAG: enderpearl ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.enderpearl | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
+=== FLAG: entity-leash ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.entity-leash | enforced=yes | hint=allow|deny|none
   [PASS] perm node
   [PASS] desc key
   [PASS] registry round-trip
@@ -1393,6 +1413,26 @@ flags: 95
   [PASS] round-trip DENY
   -> OK
 
+=== FLAG: ride ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.ride | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
 === FLAG: send-chat ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.send-chat | enforced=yes | hint=allow|deny|none
   [PASS] perm node
@@ -1670,6 +1710,26 @@ flags: 95
   [PASS] round-trip DENY
   -> OK
 
+=== FLAG: villager-trade ===
+  type=StateFlag | default=allow | perm=worldguardneo.flag.villager-trade | enforced=yes | hint=allow|deny|none
+  [PASS] perm node
+  [PASS] desc key
+  [PASS] registry round-trip
+  [PASS] value hint non-empty
+  [PASS] default==allow
+  [PASS] wilderness=default
+  [PASS] deny→stranger blocked
+  [PASS] deny→owner blocked
+  [PASS] deny→null blocked
+  [PASS] allow→stranger allowed
+  [PASS] priority high-deny wins
+  [PASS] parent deny inherited
+  [PASS] deny -g OWNERS blocks owner
+  [PASS] deny -g OWNERS spares stranger(default)
+  [PASS] round-trip ALLOW
+  [PASS] round-trip DENY
+  -> OK
+
 === FLAG: vine-growth ===
   type=StateFlag | default=allow | perm=worldguardneo.flag.vine-growth | enforced=yes | hint=allow|deny|none
   [PASS] perm node
@@ -1725,5 +1785,5 @@ flags: 95
 
 
 ==============================================================================
-SUMMARY: 1340 passed, 0 failed across 95 flags
+SUMMARY: 1388 passed, 0 failed across 98 flags
 RESULT: ALL GREEN

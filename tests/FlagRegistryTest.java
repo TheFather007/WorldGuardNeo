@@ -20,7 +20,7 @@ public final class FlagRegistryTest {
     public static void main(String[] args) {
         Flags.bootstrap();
 
-        check("registry non-empty", Flags.all().size() == 95);
+        check("registry has all 98 flags", Flags.all().size() == 98);
 
         // Every registered flag: round-trips through get(), well-formed name/permission/descKey/hint.
         for (Flag<?> f : Flags.all()) {
