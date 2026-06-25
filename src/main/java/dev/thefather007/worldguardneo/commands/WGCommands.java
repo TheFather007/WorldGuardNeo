@@ -1345,6 +1345,7 @@ public final class WGCommands {
             // default-region-group ONLY when this flag is NEW on the region — editing an existing
             // flag's value must NOT silently wipe a previously-set group (rg=null leaves it untouched).
             boolean isNewFlag = region.getFlag(flag) == null;
+            Object oldValue = region.getFlag(flag); // snapshot before applying, for the change event
             String effectiveGroup = group != null ? group
                     : (isNewFlag ? mod.config().global().defaultRegionGroup : null);
             RegionGroup rg = (effectiveGroup != null && !effectiveGroup.isEmpty())
@@ -1352,6 +1353,10 @@ public final class WGCommands {
             Object parsed = flag.parseAndApply(region, value, rg);
             mod.regions().saveRegion(level, region.id()); // incremental: just this region
 
+            // Public API: per-flag change notification (mirroring/logging integrations).
+            net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
+                    new dev.thefather007.worldguardneo.api.events.RegionFlagChangeEvent(
+                            level, region, flag, oldValue, parsed, region.getFlagGroup(flag), src.getEntity()));
             mod.audit().record(src, "flag", id, flagName + "=" + (parsed == null ? "<unset>" : parsed));
         ok(src, mod, "msg.flag.set", "id", id, "flag", flagName, "value", parsed == null ? "<unset>" : parsed);
             return 1;
