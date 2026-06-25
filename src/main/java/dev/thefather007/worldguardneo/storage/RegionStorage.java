@@ -57,6 +57,9 @@ public interface RegionStorage extends AutoCloseable {
      */
     default void prepareForBackup() {}
 
+    /** On-disk schema version for diagnostics, or -1 if not applicable (e.g. the JSON backend). */
+    default int schemaVersion() { return -1; }
+
     /** Optional: release any resources (DB connections, file handles). Default is a no-op. */
     @Override default void close() {}
 }

@@ -78,6 +78,9 @@
   "msg.list.page": "§7第 §6%page%§7/§6%pages% §7页",
 
   "msg.flags.header": "§3§m       §r §b§l◆ 可用旗标 §8(§e%count%§8) §r§3§m       ",
+  "msg.flageditor.header": "§3§m   §r §b§l◆ %id% 的旗标 §7(点击修改) §3§m   ",
+  "msg.flageditor.empty": "§8[§3WGN§8] §7该区域尚未设置任何旗标。",
+  "msg.flageditor.add": "添加旗标",
   "msg.flag.unknown": "§8[§3WGN§8] §c✘ §7未知旗标 §6%flag%§7。",
   "msg.flag.parse-error": "§8[§3WGN§8] §c✘ §7旗标 §6%flag% §7的值无效：§f%error%",
   "msg.flag.set": "§8[§3WGN§8] §a✔ §7旗标 §e%flag% §8= §b%value% §7已设置于 §6%id%§7。",
@@ -98,6 +101,8 @@
 
   "msg.reloaded": "§8[§3WGN§8] §a✔ §7配置已重新加载。",
   "msg.saved": "§8[§3WGN§8] §a✔ §7区域已保存。",
+  "msg.audit.header": "§8[§3WGN§8] §7§6%id% §7的最近改动 §8(§e%count%§8)§7：",
+  "msg.audit.empty": "§8[§3WGN§8] §7区域 §6%id% §7没有记录的改动。",
   "msg.cleanup.done": "§8[§3WGN§8] §a✔ §7圈地过期清理移除了 §e%count% §7个区域。",
   "msg.migrate.done": "§8[§3WGN§8] §a✔ §7已将 §e%worlds% §7个已加载世界中的 §e%regions% §7个区域迁移至 §b%format%§7。§e⚠ 请立即重启服务器 §7—— 重启前对区域的编辑仍会写入旧后端。§8(§7数据库后端需要其 JDBC 驱动；仅迁移已加载的世界。§8)",
   "msg.migrate.same": "§8[§3WGN§8] §e⚠ §7存储已经是 §b%format%§7。",

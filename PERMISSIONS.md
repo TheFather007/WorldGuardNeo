@@ -33,6 +33,7 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.undo` | OP 2 | `/rg undo` — restore the most recently removed region in this world (session trash). |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — resize a region to your selection. |
 | `worldguardneo.region.rename` | OP 2 | `/rg rename` — change a region's id, keeping all its data. |
+| `worldguardneo.region.audit` | OP 2 | `/rg audit` — view a region's recent administrative changes. |
 | `worldguardneo.region.select` | OP 2 | `/rg select` — load a region's geometry into your selection. |
 | `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — hand sole ownership to another player. |
 | `worldguardneo.region.info` | OP 0 | `/rg info` — view a region you can see. |

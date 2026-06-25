@@ -62,6 +62,33 @@ public final class AuditLog {
         queue.offer(line); // never blocks the game thread; drops if saturated
     }
 
+    /**
+     * Read the most recent up-to-{@code limit} audit lines for a region, oldest-first. Streams the
+     * file with a fixed-size ring buffer so a large log stays memory-bounded. Best-effort: entries
+     * still queued (not yet flushed, &lt;1s) won't appear, and an I/O error yields an empty list.
+     */
+    public java.util.List<String> recent(String region, int limit) {
+        if (limit <= 0 || !Files.exists(file)) return java.util.List.of();
+        String needle = "region=" + region;
+        java.util.ArrayDeque<String> ring = new java.util.ArrayDeque<>(limit);
+        try (var lines = Files.lines(file, StandardCharsets.UTF_8)) {
+            lines.forEach(l -> {
+                int idx = l.indexOf(needle);
+                // Match "region=<id>" as a whole token (region ids contain no spaces).
+                if (idx >= 0) {
+                    int end = idx + needle.length();
+                    if (end == l.length() || l.charAt(end) == ' ') {
+                        if (ring.size() == limit) ring.pollFirst();
+                        ring.addLast(l);
+                    }
+                }
+            });
+        } catch (IOException e) {
+            return java.util.List.of();
+        }
+        return new java.util.ArrayList<>(ring);
+    }
+
     private void offer(String line) { if (running) queue.offer(line); }
 
     private void drainLoop() {

@@ -33,6 +33,7 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.undo` | OP 2 | `/rg undo` — восстановить последний удалённый регион в этом мире (сессионная корзина). |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — изменить размер региона под выделение. |
 | `worldguardneo.region.rename` | OP 2 | `/rg rename` — изменить id региона, сохранив все его данные. |
+| `worldguardneo.region.audit` | OP 2 | `/rg audit` — просмотр последних административных изменений региона. |
 | `worldguardneo.region.select` | OP 2 | `/rg select` — загрузить геометрию региона в своё выделение. |
 | `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — передать единоличное владение другому игроку. |
 | `worldguardneo.region.info` | OP 0 | `/rg info` — посмотреть видимый регион. |
