@@ -30,7 +30,7 @@ public final class SqliteRegionStorage extends AbstractJdbcRegionStorage {
         boolean present = driverClass != null;
         try {
             Files.createDirectories(baseDir);
-            if (present) initSchema();
+            if (present) { initSchema(); ensureSchemaVersion(); }
         } catch (Exception ex) {
             WorldGuardNeo.LOGGER.error("[WorldGuardNeo] SQLite init failed — falling back to JSON storage", ex);
             present = false; // demote to JSON; further calls go to the fallback

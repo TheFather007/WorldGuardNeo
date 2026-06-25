@@ -22,6 +22,21 @@ public final class RegionContainer {
     private final Map<String, RegionManager> managers = new HashMap<>();
     private final IdentityHashMap<Level, RegionManager> byLevel = new IdentityHashMap<>();
 
+    // Write-behind worker: the server thread serializes a snapshot (in prepare*) and submits an I/O
+    // closure here, so the blocking disk/DB write (notably a MySQL round-trip) never stalls the tick.
+    // Single-threaded → writes stay strictly ordered. The shared JDBC connection is therefore touched
+    // by only ONE thread at a time: the worker during steady state, and the server thread only after
+    // drainWrites() (saveAll / backup / reload), so they never overlap.
+    private final java.util.concurrent.ExecutorService writer =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread t = new Thread(r, "WGN-RegionWriter");
+                t.setDaemon(true);
+                return t;
+            });
+    private final java.util.concurrent.atomic.AtomicInteger pendingWrites =
+            new java.util.concurrent.atomic.AtomicInteger();
+    private MinecraftServer server; // captured at load; used to re-dirty on the server thread after a failed write
+
     /**
      * Per-world "save needed" flag. {@link #save} only marks dirty; {@link #flushDirty} does the
      * disk write from the tick hook, coalescing rapid edits into a single I/O operation.
@@ -66,6 +81,7 @@ public final class RegionContainer {
     }
 
     public void loadAllForServer(MinecraftServer server) {
+        this.server = server;
         for (ServerLevel sl : server.getAllLevels()) {
             String key = sl.dimension().location().toString();
             RegionManager m = new RegionManager(key);
@@ -81,7 +97,10 @@ public final class RegionContainer {
     }
 
     public void saveAll() {
-        // Immediate synchronous full save (/rg save, server stop); drains all dirty/incremental sets.
+        // Immediate synchronous full save (/rg save, server stop). Drain queued async writes FIRST so
+        // a stale in-flight snapshot can't land on disk after this fresh full save, then write
+        // synchronously on the server thread (the worker is now idle → no connection contention).
+        drainWrites();
         for (RegionManager m : managers.values()) {
             try { storage.save(m.world(), m); }
             catch (Exception ex) { WorldGuardNeo.LOGGER.error("Failed to save regions for {}", m.world(), ex); }
@@ -89,6 +108,55 @@ public final class RegionContainer {
         dirty.clear();
         regionDirty.clear();
         regionDeleted.clear();
+    }
+
+    /** Number of write-behind I/O tasks queued or in flight (for diagnostics / {@code /rg debug}). */
+    public int pendingWrites() { return pendingWrites.get(); }
+
+    /**
+     * Block until the write-behind worker has drained all queued tasks. Call before any server-thread
+     * use of the storage connection (saveAll, backup checkpoint, reload) so the two threads never
+     * touch the connection at once. Bounded wait so a stuck write can't hang shutdown forever.
+     */
+    public void drainWrites() {
+        try {
+            writer.submit(() -> {}).get(15, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (java.util.concurrent.TimeoutException te) {
+            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] Region write queue did not drain within 15s ({} pending).",
+                    pendingWrites.get());
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+        } catch (Exception ex) {
+            WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] Region write drain failed", ex);
+        }
+    }
+
+    /** Stop the write-behind worker after a final drain. Call on server stop, before closing storage. */
+    public void shutdownWriter() {
+        drainWrites();
+        writer.shutdown();
+        try {
+            if (!writer.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) writer.shutdownNow();
+        } catch (InterruptedException ie) {
+            writer.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    /** Serialize the task's snapshot has already happened (on the caller/server thread); here we only
+     *  queue the blocking I/O and, on failure, re-mark the work dirty back on the server thread. */
+    private void submitWrite(String desc, RegionStorage.IoTask task, Runnable onFailure) {
+        pendingWrites.incrementAndGet();
+        writer.execute(() -> {
+            try {
+                task.run();
+            } catch (Throwable t) {
+                WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Async region write failed: {}", desc, t);
+                if (server != null) server.execute(onFailure); // re-dirty on the server thread for retry
+            } finally {
+                pendingWrites.decrementAndGet();
+            }
+        });
     }
 
     /**
@@ -143,6 +211,9 @@ public final class RegionContainer {
         if (currentTick - lastFlushTick < FLUSH_INTERVAL_TICKS) return;
         lastFlushTick = currentTick;
 
+        // Each storage.prepare* call SERIALIZES the snapshot here on the server thread (safe to read
+        // the live managers) and returns an I/O closure; submitWrite runs that closure on the worker.
+
         // Full-world saves first; they subsume any pending per-region work for the same world.
         var fullSnapshot = new java.util.ArrayList<>(dirty);
         dirty.clear();
@@ -151,14 +222,8 @@ public final class RegionContainer {
             regionDeleted.remove(key);
             RegionManager m = managers.get(key);
             if (m == null) continue;
-            try {
-                storage.save(key, m);
-            } catch (Exception ex) {
-                WorldGuardNeo.LOGGER.error("Failed to save regions for {}", key, ex);
-                // Re-mark dirty so a transient failure (disk full, locked file) is retried next flush
-                // instead of silently dropping the world's unsaved edits.
-                dirty.add(key);
-            }
+            // Re-mark dirty on failure so a transient error (disk full, DB down) is retried next flush.
+            submitWrite("save world " + key, storage.prepareSave(key, m), () -> dirty.add(key));
         }
 
         // Per-region incremental deletes, then upserts.
@@ -168,11 +233,8 @@ public final class RegionContainer {
             RegionManager m = managers.get(world);
             if (m == null) return;
             for (String id : ids) {
-                try { storage.deleteRegion(world, m, id); }
-                catch (Exception ex) {
-                    WorldGuardNeo.LOGGER.error("Failed to delete region {}/{}", world, id, ex);
-                    regionDeleted.computeIfAbsent(world, k -> new java.util.HashSet<>()).add(id);
-                }
+                submitWrite("delete " + world + "/" + id, storage.prepareDeleteRegion(world, m, id),
+                        () -> regionDeleted.computeIfAbsent(world, k -> new java.util.HashSet<>()).add(id));
             }
         });
         var dirtySnapshot = new java.util.HashMap<>(regionDirty);
@@ -181,11 +243,8 @@ public final class RegionContainer {
             RegionManager m = managers.get(world);
             if (m == null) return;
             for (String id : ids) {
-                try { storage.saveRegion(world, m, id); }
-                catch (Exception ex) {
-                    WorldGuardNeo.LOGGER.error("Failed to save region {}/{}", world, id, ex);
-                    regionDirty.computeIfAbsent(world, k -> new java.util.HashSet<>()).add(id);
-                }
+                submitWrite("save " + world + "/" + id, storage.prepareSaveRegion(world, m, id),
+                        () -> regionDirty.computeIfAbsent(world, k -> new java.util.HashSet<>()).add(id));
             }
         });
     }

@@ -101,7 +101,13 @@ public final class BackupManager implements AutoCloseable {
         // It flushes the SQLite WAL / H2 MVStore into the main file so the copy is consistent.
         try {
             var mod = WorldGuardNeo.get();
-            if (mod != null && mod.regions() != null) mod.regions().storage().prepareForBackup();
+            if (mod != null && mod.regions() != null) {
+                // Land all queued write-behind I/O first, so the on-disk files we're about to copy
+                // include the latest edits (and the worker isn't using the connection during the
+                // checkpoint below).
+                mod.regions().drainWrites();
+                mod.regions().storage().prepareForBackup();
+            }
         } catch (Throwable t) {
             WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] prepareForBackup failed", t);
         }

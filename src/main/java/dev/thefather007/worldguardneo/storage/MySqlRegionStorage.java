@@ -61,6 +61,7 @@ public final class MySqlRegionStorage extends AbstractJdbcRegionStorage {
         if (driverClass != null) {
             try {
                 initSchema();
+                ensureSchemaVersion();
                 ok = true;
                 JdbcSupport.logDriver("MySQL", driverClass);
                 WorldGuardNeo.LOGGER.info("[WorldGuardNeo] MySQL region storage connected to {}:{}/{} (table '{}').",

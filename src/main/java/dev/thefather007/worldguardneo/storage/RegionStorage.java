@@ -29,6 +29,27 @@ public interface RegionStorage extends AutoCloseable {
         save(worldKey, from);
     }
 
+    /** A unit of blocking storage I/O, prepared on the server thread and run on the write-behind worker. */
+    @FunctionalInterface
+    interface IoTask { void run() throws IOException; }
+
+    /**
+     * Two-phase save: serialize the live region NOW (must be called on the server thread, where the
+     * RegionManager is safely readable) and return a closure that performs ONLY the blocking I/O,
+     * to be run on the write-behind worker. This is what makes writes async-safe — no backend touches
+     * the live manager off-thread. The default keeps the old synchronous behaviour (serialize+write
+     * together) for any backend that doesn't override it.
+     */
+    default IoTask prepareSave(String worldKey, RegionManager from) {
+        return () -> save(worldKey, from);
+    }
+    default IoTask prepareSaveRegion(String worldKey, RegionManager from, String regionId) {
+        return () -> saveRegion(worldKey, from, regionId);
+    }
+    default IoTask prepareDeleteRegion(String worldKey, RegionManager from, String regionId) {
+        return () -> deleteRegion(worldKey, from, regionId);
+    }
+
     /**
      * Flush journal state into the primary data file(s) so a file-copy backup is consistent.
      * Embedded SQL engines checkpoint the WAL; others no-op. Called on the server thread just
