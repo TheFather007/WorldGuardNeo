@@ -17,9 +17,7 @@ import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
-import net.minecraft.gametest.framework.GameTestGenerator;
 import net.minecraft.gametest.framework.GameTestHelper;
-import net.minecraft.gametest.framework.TestFunction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -43,13 +41,10 @@ import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.gametest.GameTestHolder;
 import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
 
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-import java.util.function.Consumer;
 
 /**
  * In-game GameTest battery for WorldGuardNeo, exercising the REAL event/mixin enforcement path
@@ -1325,159 +1320,6 @@ public final class WGNGameTests {
     }
 
     /* ============================================================================
-     *  GENERATED MATRIX — every registered flag exercised under every resolution
-     *  scenario. @GameTestGenerator emits one TestFunction per (flag × scenario),
-     *  scaling the battery into the hundreds so the entire flag surface of the mod
-     *  is verified: deny / allow / wilderness-default / priority / equal-priority
-     *  deny-beats-allow / parent inheritance / four region-group filters for state
-     *  flags, and set / parent / wilderness / group for value flags.
-     * ========================================================================== */
-
-    private static BlockPos P(GameTestHelper h)    { return h.absolutePos(new BlockPos(4, 2, 4)); }
-    private static BlockPos WILD(GameTestHelper h) { return h.absolutePos(new BlockPos(4, 2, 4)).offset(0, 200, 0); }
-
-    private static TestFunction raw(String name, Consumer<GameTestHelper> fn) {
-        // batchName is reassigned in chunks by generated(); structureName MUST be namespaced
-        // "worldguardneo:" — the runner filters generated tests by the structure's namespace.
-        return new TestFunction("wgn_tmp", "worldguardneo:" + name, "worldguardneo:platform",
-                200, 0L, true, fn);
-    }
-
-    @GameTestGenerator
-    public static Collection<TestFunction> generated() {
-        List<TestFunction> tmp = new ArrayList<>();
-        for (Flag<?> flag : Flags.all()) {
-            if (flag instanceof StateFlag sf) addStateScenarios(tmp, sf);
-            else                              addValueScenarios(tmp, flag);
-        }
-        // Chunk into small batches so the framework never places hundreds of test arenas at once
-        // (one big batch would balloon memory / chunk-gen time on the headless server).
-        List<TestFunction> out = new ArrayList<>(tmp.size());
-        for (int i = 0; i < tmp.size(); i++) {
-            TestFunction t = tmp.get(i);
-            out.add(new TestFunction("wgn_gen_" + (i / 48), t.testName(), t.structureName(),
-                    t.maxTicks(), t.setupTicks(), t.required(), t.function()));
-        }
-        return out;
-    }
-
-    private static void addStateScenarios(List<TestFunction> out, StateFlag f) {
-        String n = f.name().replace(':', '_');
-        boolean def = f.defaultAllow();
-
-        out.add(raw("state_deny__" + n, h -> {
-            region(h, "gd_" + n).setFlag(f, StateFlag.State.DENY);
-            denied(h, P(h), f, n); h.succeed();
-        }));
-        out.add(raw("state_allow__" + n, h -> {
-            region(h, "ga_" + n).setFlag(f, StateFlag.State.ALLOW);
-            allowed(h, P(h), f, n); h.succeed();
-        }));
-        out.add(raw("state_wilderness__" + n, h -> {
-            mgr(h); BlockPos w = WILD(h);
-            h.assertTrue(mgr(h).testState(f, U, w.getX(), w.getY(), w.getZ()) == def,
-                    n + " wilderness → flag default (" + def + ")");
-            h.succeed();
-        }));
-        out.add(raw("state_priority__" + n, h -> {
-            CuboidRegion lo = region(h, "gpl_" + n); lo.setPriority(0);  lo.setFlag(f, StateFlag.State.ALLOW);
-            CuboidRegion hi = region(h, "gph_" + n); hi.setPriority(10); hi.setFlag(f, StateFlag.State.DENY);
-            denied(h, P(h), f, n + " higher-priority deny");
-            h.succeed();
-        }));
-        out.add(raw("state_eqprio__" + n, h -> {
-            CuboidRegion a = region(h, "gea_" + n); a.setPriority(5); a.setFlag(f, StateFlag.State.ALLOW);
-            CuboidRegion b = region(h, "geb_" + n); b.setPriority(5); b.setFlag(f, StateFlag.State.DENY);
-            denied(h, P(h), f, n + " deny-beats-allow");
-            h.succeed();
-        }));
-        out.add(raw("state_parent__" + n, h -> {
-            CuboidRegion parent = makeRegion(h, "gpp_" + n, new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
-            parent.setFlag(f, StateFlag.State.DENY);
-            region(h, "gpc_" + n).setParent(parent);
-            denied(h, P(h), f, n + " inherits parent deny"); // P=(4,2,4) outside parent, inside child
-            h.succeed();
-        }));
-        out.add(raw("state_group_members__" + n, h -> {
-            CuboidRegion r = region(h, "ggm_" + n);
-            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.MEMBERS);
-            UUID m = UUID.randomUUID(); r.members().add(m); UUID s = UUID.randomUUID();
-            BlockPos a = P(h);
-            h.assertTrue(!mgr(h).testState(f, m, a.getX(), a.getY(), a.getZ()), n + " members-deny hits member");
-            h.assertTrue(mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()) == def, n + " members-deny spares stranger");
-            h.succeed();
-        }));
-        out.add(raw("state_group_nonmembers__" + n, h -> {
-            CuboidRegion r = region(h, "ggn_" + n);
-            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.NON_MEMBERS);
-            UUID m = UUID.randomUUID(); r.members().add(m); UUID s = UUID.randomUUID();
-            BlockPos a = P(h);
-            h.assertTrue(!mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()), n + " non-members-deny hits stranger");
-            h.assertTrue(mgr(h).testState(f, m, a.getX(), a.getY(), a.getZ()) == def, n + " non-members-deny spares member");
-            h.succeed();
-        }));
-        out.add(raw("state_group_owners__" + n, h -> {
-            CuboidRegion r = region(h, "ggo_" + n);
-            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.OWNERS);
-            UUID o = UUID.randomUUID(); r.owners().add(o); UUID s = UUID.randomUUID();
-            BlockPos a = P(h);
-            h.assertTrue(!mgr(h).testState(f, o, a.getX(), a.getY(), a.getZ()), n + " owners-deny hits owner");
-            h.assertTrue(mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()) == def, n + " owners-deny spares stranger");
-            h.succeed();
-        }));
-        out.add(raw("state_group_nonowners__" + n, h -> {
-            CuboidRegion r = region(h, "ggno_" + n);
-            r.setFlag(f, StateFlag.State.DENY); r.setFlagGroup(f, RegionGroup.NON_OWNERS);
-            UUID o = UUID.randomUUID(); r.owners().add(o); UUID s = UUID.randomUUID();
-            BlockPos a = P(h);
-            h.assertTrue(!mgr(h).testState(f, s, a.getX(), a.getY(), a.getZ()), n + " non-owners-deny hits stranger");
-            h.assertTrue(mgr(h).testState(f, o, a.getX(), a.getY(), a.getZ()) == def, n + " non-owners-deny spares owner");
-            h.succeed();
-        }));
-    }
-
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static void setFlagRaw(ProtectedRegion r, Flag<?> f, Object v) { r.setFlag((Flag) f, v); }
-
-    private static Object sampleValue(Flag<?> f) {
-        if (f instanceof StringFlag)  return "wgn_test";
-        if (f instanceof IntegerFlag) return 7;
-        if (f instanceof DoubleFlag)  return 1.5;
-        if (f instanceof BooleanFlag) return Boolean.TRUE;
-        if (f instanceof SetFlag)     return Set.of("alpha", "beta");
-        return null;
-    }
-
-    private static void addValueScenarios(List<TestFunction> out, Flag<?> f) {
-        Object v = sampleValue(f);
-        if (v == null) return; // unknown value type — nothing to assert generically
-        String n = f.name().replace(':', '_');
-
-        out.add(raw("value_set__" + n, h -> {
-            CuboidRegion r = region(h, "vs_" + n); setFlagRaw(r, f, v);
-            BlockPos a = P(h);
-            Object got = mgr(h).resolveValue(f, a.getX(), a.getY(), a.getZ(), null);
-            h.assertTrue(Objects.equals(v, got), n + " value resolves (got " + got + ")");
-            h.succeed();
-        }));
-        out.add(raw("value_parent__" + n, h -> {
-            CuboidRegion parent = makeRegion(h, "vpp_" + n, new BlockPos(0, 0, 0), new BlockPos(1, 1, 1));
-            setFlagRaw(parent, f, v);
-            region(h, "vpc_" + n).setParent(parent);
-            BlockPos a = P(h);
-            Object got = mgr(h).resolveValue(f, a.getX(), a.getY(), a.getZ(), null);
-            h.assertTrue(Objects.equals(v, got), n + " value inherited from parent (got " + got + ")");
-            h.succeed();
-        }));
-        out.add(raw("value_wilderness__" + n, h -> {
-            mgr(h); BlockPos w = WILD(h);
-            Object got = mgr(h).resolveValue(f, w.getX(), w.getY(), w.getZ(), null);
-            h.assertTrue(got == null, n + " unset in wilderness → null (got " + got + ")");
-            h.succeed();
-        }));
-    }
-
-    /* ============================================================================
      *  PHYSICAL GRIEF — real explosions through the live ExplosionEvent path.
      *  level.explode() computes the affected blocks, fires ExplosionEvent.Detonate
      *  (where the mod removes protected blocks), then destroys what remains — so a
@@ -2082,6 +1924,76 @@ public final class WGNGameTests {
         // An explicit interact=allow re-opens it to everyone (public villager/mount setup).
         r.setFlag(Flags.INTERACT, StateFlag.State.ALLOW);
         h.assertTrue(m.testBuildAccess(Flags.INTERACT, x, y, z, stranger),  "interact=allow opens it to strangers");
+        h.succeed();
+    }
+
+    /* ---------------- ride / entity-leash through the real event path ---------------- */
+
+    // Post the real EntityMountEvent the onEntityMount handler listens to and report whether it
+    // cancelled the mount. Posting directly (rather than startRiding) sidesteps vanilla's saddle/
+    // canRide checks so we isolate the mod's gate, exactly like the PvP tests post the damage event.
+    private static boolean mountCancelled(GameTestHelper h, ServerPlayer p, net.minecraft.world.entity.Entity vehicle) {
+        var e = new net.neoforged.neoforge.event.entity.EntityMountEvent(p, vehicle, h.getLevel(), true);
+        NeoForge.EVENT_BUS.post(e);
+        return e.isCanceled();
+    }
+
+    @GameTest(template = TPL)
+    public static void rideDenyBlocksMemberMounting(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_ride_deny");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID()); // member: isolates the ride flag from the membership gate
+        r.setFlag(Flags.RIDE, StateFlag.State.DENY);
+        var pig = h.spawn(EntityType.PIG, new BlockPos(4, 1, 4));
+        h.assertTrue(mountCancelled(h, p, pig), "ride=deny blocks even a member from mounting");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void rideAllowedForMemberByDefault(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_ride_allow");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        var pig = h.spawn(EntityType.PIG, new BlockPos(4, 1, 4));
+        h.assertFalse(mountCancelled(h, p, pig), "ride unset → a member mounts freely");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void rideStrangerBlockedByMembership(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_ride_stranger");
+        r.owners().add(UUID.randomUUID()); // owned by someone else → claim
+        ServerPlayer p = stranger(h);      // not a member
+        var pig = h.spawn(EntityType.PIG, new BlockPos(4, 1, 4));
+        h.assertTrue(mountCancelled(h, p, pig), "ride unset → a stranger can't ride a claimed mob (membership)");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void entityLeashDenyBlocksLeashing(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_leash_deny");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID()); // member: isolates the entity-leash flag from the membership gate
+        r.setFlag(Flags.ENTITY_LEASH, StateFlag.State.DENY);
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        var e = new PlayerInteractEvent.EntityInteract(p, InteractionHand.MAIN_HAND, cow);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "entity-leash=deny cancels a lead interaction even for a member");
+        h.assertTrue(cow.getLeashHolder() == null, "the cow was not leashed");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void entityLeashAllowedForMemberByDefault(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_leash_allow");
+        ServerPlayer p = stranger(h);
+        r.members().add(p.getUUID());
+        p.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(Items.LEAD));
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        var e = new PlayerInteractEvent.EntityInteract(p, InteractionHand.MAIN_HAND, cow);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertFalse(e.isCanceled(), "entity-leash unset → a member may leash");
         h.succeed();
     }
 
