@@ -2309,6 +2309,31 @@ public final class WGNGameTests {
         h.succeed();
     }
 
+    @GameTest(template = TPL)
+    public static void onEntryCommandRuns(GameTestHelper h) {
+        BlockPos t = h.absolutePos(new BlockPos(1, 1, 1));
+        region(h, "gt_onentry").setFlag(Flags.ON_ENTRY,
+                "setblock " + t.getX() + " " + t.getY() + " " + t.getZ() + " minecraft:diamond_block");
+        ServerPlayer p = strangerInRegion(h);
+        tick(p, 1); // entering the region runs the on-entry console command
+        h.assertBlockPresent(Blocks.DIAMOND_BLOCK, new BlockPos(1, 1, 1));
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void onExitCommandRuns(GameTestHelper h) {
+        BlockPos t = h.absolutePos(new BlockPos(2, 1, 1));
+        region(h, "gt_onexit").setFlag(Flags.ON_EXIT,
+                "setblock " + t.getX() + " " + t.getY() + " " + t.getZ() + " minecraft:emerald_block");
+        ServerPlayer p = strangerInRegion(h);
+        tick(p, 1); // settle inside (lastRegions = {region})
+        BlockPos wild = h.absolutePos(new BlockPos(4, 2, 4)).offset(0, 200, 0);
+        p.setPos(wild.getX() + 0.5, wild.getY(), wild.getZ() + 0.5);
+        tick(p, 1); // leaving runs the on-exit console command
+        h.assertBlockPresent(Blocks.EMERALD_BLOCK, new BlockPos(2, 1, 1));
+        h.succeed();
+    }
+
     /* ---------------- blocked commands & pistons (real event path) ---------------- */
 
     @GameTest(template = TPL)
