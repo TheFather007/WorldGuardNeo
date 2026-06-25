@@ -39,6 +39,16 @@ public final class SpatialIndex {
      */
     private List<ProtectedRegion> oversizedSnapshot = List.of();
 
+    /**
+     * Per-chunk cache of the COMBINED (bucket + oversized) candidate list, populated lazily and
+     * cleared on any mutation. Only used (and only allocates) when a chunk has BOTH bucketed regions
+     * and at least one world-spanning region — the one path {@link #candidates} would otherwise
+     * re-allocate on every lookup. Bounded by the number of region-containing chunks queried. When no
+     * oversized region exists this map stays empty and adds zero overhead (the early return fires first).
+     */
+    private final Long2ObjectOpenHashMap<List<ProtectedRegion>> combinedCache = new Long2ObjectOpenHashMap<>();
+    private long cacheHits, cacheMisses;
+
     private void refreshOversizedSnapshot() {
         oversizedSnapshot = oversized.isEmpty() ? List.of() : List.copyOf(oversized.keySet());
     }
@@ -47,9 +57,11 @@ public final class SpatialIndex {
         buckets.clear();
         oversized.clear();
         oversizedSnapshot = List.of();
+        combinedCache.clear();
     }
 
     public void add(ProtectedRegion r) {
+        combinedCache.clear(); // region set changed → drop stale combined lists
         // GlobalRegion uses Integer.MIN/MAX bounds → never index it (the manager treats it specially).
         if (r instanceof GlobalRegion) return;
         Vec3 mn = r.minimumBound(), mx = r.maximumBound();
@@ -85,6 +97,7 @@ public final class SpatialIndex {
     }
 
     public void remove(ProtectedRegion r) {
+        combinedCache.clear(); // region set changed → drop stale combined lists
         if (r instanceof GlobalRegion) return;
         if (oversized.remove(r) != null) { refreshOversizedSnapshot(); return; }
         Vec3 mn = r.minimumBound(), mx = r.maximumBound();
@@ -124,10 +137,15 @@ public final class SpatialIndex {
         // No bucketed region here but oversized ones exist (the common case on a server with a
         // world-spanning region): return the cached snapshot directly — zero allocation.
         if (bucket == null) return oversizedSnapshot;
-        // Both present (rarer): combine. Oversized is usually 1-2 entries.
+        // Both present (rarer): return the cached combined list, building it once per chunk. Valid
+        // because candidates are XZ-only (no Y dependency) and the cache is dropped on any mutation.
+        List<ProtectedRegion> cached = combinedCache.get(k);
+        if (cached != null) { cacheHits++; return cached; }
+        cacheMisses++;
         ArrayList<ProtectedRegion> out = new ArrayList<>(bucket.size() + oversizedSnapshot.size());
         out.addAll(bucket);
         out.addAll(oversizedSnapshot);
+        combinedCache.put(k, out);
         return out;
     }
 
@@ -148,6 +166,10 @@ public final class SpatialIndex {
 
     public int bucketCount()    { return buckets.size(); }
     public int oversizedCount() { return oversized.size(); }
+    /** Per-chunk combined-candidate cache stats (for {@code /rg debug}). */
+    public int  cacheEntries()  { return combinedCache.size(); }
+    public long cacheHits()     { return cacheHits; }
+    public long cacheMisses()   { return cacheMisses; }
     public int totalRefs() {
         int n = oversized.size();
         for (List<ProtectedRegion> l : buckets.values()) n += l.size();
