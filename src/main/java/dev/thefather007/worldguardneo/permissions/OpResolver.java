@@ -55,6 +55,7 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.region.delete.others", admin);   // arbitrary regions
         nodeToLevel.put("worldguardneo.region.redefine",      mod);
         nodeToLevel.put("worldguardneo.region.rename",        mod);   // /rg rename — change a region's id (OP 2)
+        nodeToLevel.put("worldguardneo.region.audit",         mod);   // /rg audit — view a region's recent changes (OP 2)
         nodeToLevel.put("worldguardneo.region.select",        mod);   // /rg select — load into selection (OP 2)
         nodeToLevel.put("worldguardneo.region.undo",          mod);   // /rg undo — restore last deleted (OP 2)
         nodeToLevel.put("worldguardneo.region.transfer",      admin); // /rg transfer — sole-ownership handoff (OP 3)

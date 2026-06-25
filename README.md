@@ -192,6 +192,8 @@ Both `/region` and `/rg` work. Region ids are single words.
 | `/rg lists [radius]` | List regions near you (default radius 50) |
 | `/rg flag <id> <flag> [-g group] [value]` | Set/clear a flag (omit value to clear) |
 | `/rg flags` | List every available flag with its value hint and description |
+| `/rg flags <id>` | Clickable per-region flag editor (allow/deny/clear/set buttons) |
+| `/rg audit <id> [limit]` | Show a region's most recent administrative changes |
 | `/rg priority <id> <n>` | Set region priority (owner or admin only) |
 | `/rg setparent <id> [parent]` | Set/clear a region's parent (owner or admin only) |
 | `/rg addmember/removemember <id> <player>` | Manage members |

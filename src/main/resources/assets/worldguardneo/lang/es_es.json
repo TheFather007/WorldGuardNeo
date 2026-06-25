@@ -78,6 +78,9 @@
   "msg.list.page": "§7página §6%page%§7/§6%pages%",
 
   "msg.flags.header": "§3§m       §r §b§l◆ Flags disponibles §8(§e%count%§8) §r§3§m       ",
+  "msg.flageditor.header": "§3§m   §r §b§l◆ Flags de %id% §7(clic para cambiar) §3§m   ",
+  "msg.flageditor.empty": "§8[§3WGN§8] §7Esta región aún no tiene flags.",
+  "msg.flageditor.add": "añadir flag",
   "msg.flag.unknown": "§8[§3WGN§8] §c✘ §7Flag desconocido §6%flag%§7.",
   "msg.flag.parse-error": "§8[§3WGN§8] §c✘ §7Valor incorrecto para el flag §6%flag%§7: §f%error%",
   "msg.flag.set": "§8[§3WGN§8] §a✔ §7Flag §e%flag% §8= §b%value% §7en §6%id%§7.",
@@ -98,6 +101,8 @@
 
   "msg.reloaded": "§8[§3WGN§8] §a✔ §7Configuración recargada.",
   "msg.saved": "§8[§3WGN§8] §a✔ §7Regiones guardadas.",
+  "msg.audit.header": "§8[§3WGN§8] §7Cambios recientes de §6%id% §8(§e%count%§8)§7:",
+  "msg.audit.empty": "§8[§3WGN§8] §7No hay cambios registrados para la región §6%id%§7.",
   "msg.cleanup.done": "§8[§3WGN§8] §a✔ §7La expiración de reclamos eliminó §e%count% §7región(es).",
   "msg.migrate.done": "§8[§3WGN§8] §a✔ §7Migradas §e%regions% §7región(es) en §e%worlds% §7mundo(s) cargado(s) a §b%format%§7. §e⚠ Reinicia el servidor AHORA §7— las ediciones de regiones hechas antes del reinicio aún van al backend antiguo. §8(§7los backends de BD necesitan su driver JDBC; solo se migran los mundos cargados.§8)",
   "msg.migrate.same": "§8[§3WGN§8] §e⚠ §7El almacenamiento ya es §b%format%§7.",

@@ -78,6 +78,9 @@
   "msg.list.page": "§7page §6%page%§7/§6%pages%",
 
   "msg.flags.header": "§3§m       §r §b§l◆ Drapeaux disponibles §8(§e%count%§8) §r§3§m       ",
+  "msg.flageditor.header": "§3§m   §r §b§l◆ Flags de %id% §7(cliquer pour changer) §3§m   ",
+  "msg.flageditor.empty": "§8[§3WGN§8] §7Aucun flag défini sur cette région.",
+  "msg.flageditor.add": "ajouter un flag",
   "msg.flag.unknown": "§8[§3WGN§8] §c✘ §7Drapeau inconnu §6%flag%§7.",
   "msg.flag.parse-error": "§8[§3WGN§8] §c✘ §7Valeur incorrecte pour le drapeau §6%flag%§7 : §f%error%",
   "msg.flag.set": "§8[§3WGN§8] §a✔ §7Drapeau §e%flag% §8= §b%value% §7sur §6%id%§7.",
@@ -98,6 +101,8 @@
 
   "msg.reloaded": "§8[§3WGN§8] §a✔ §7Configuration rechargée.",
   "msg.saved": "§8[§3WGN§8] §a✔ §7Régions sauvegardées.",
+  "msg.audit.header": "§8[§3WGN§8] §7Changements récents de §6%id% §8(§e%count%§8)§7 :",
+  "msg.audit.empty": "§8[§3WGN§8] §7Aucun changement enregistré pour la région §6%id%§7.",
   "msg.cleanup.done": "§8[§3WGN§8] §a✔ §7L'expiration des claims a supprimé §e%count% §7région(s).",
   "msg.migrate.done": "§8[§3WGN§8] §a✔ §7Migration de §e%regions% §7région(s) à travers §e%worlds% §7monde(s) chargé(s) vers §b%format%§7. §e⚠ Redémarrez le serveur MAINTENANT §7— les modifications de régions faites avant le redémarrage iront encore vers l'ancien backend. §8(§7les backends BD nécessitent leur pilote JDBC ; seuls les mondes chargés sont migrés.§8)",
   "msg.migrate.same": "§8[§3WGN§8] §e⚠ §7Le stockage est déjà §b%format%§7.",

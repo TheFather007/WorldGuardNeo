@@ -9,6 +9,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flag;
+import dev.thefather007.worldguardneo.flags.StateFlag;
 import dev.thefather007.worldguardneo.flags.Flags;
 import dev.thefather007.worldguardneo.region.*;
 import dev.thefather007.worldguardneo.config.WGConfig;
@@ -323,6 +324,15 @@ public final class WGCommands {
                 .then(Commands.literal("debug")
                         .requires(s -> mod.perms().has(s, "worldguardneo.reload"))
                         .executes(c -> debugInfo(c.getSource(), mod)))
+                .then(Commands.literal("audit")
+                        .requires(s -> mod.perms().has(s, "worldguardneo.region.audit"))
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .executes(c -> auditRegion(c.getSource(),
+                                        StringArgumentType.getString(c, "id"), 10, mod))
+                                .then(Commands.argument("limit", IntegerArgumentType.integer(1, 100))
+                                        .executes(c -> auditRegion(c.getSource(),
+                                                StringArgumentType.getString(c, "id"),
+                                                IntegerArgumentType.getInteger(c, "limit"), mod)))))
                 .then(Commands.literal("backup")
                         // Dedicated node, separate from reload — grant backup without config/lang reload.
                         .requires(s -> mod.perms().has(s, "worldguardneo.backup"))
@@ -347,7 +357,11 @@ public final class WGCommands {
                         .then(Commands.literal("mysql").executes(c -> migrateStorage(c.getSource(), mod, "mysql"))))
                 .then(Commands.literal("flags")
                         .requires(s -> mod.perms().has(s, "worldguardneo.region.flags.list"))
-                        .executes(c -> listFlags(c.getSource(), mod)));
+                        .executes(c -> listFlags(c.getSource(), mod))
+                        // /rg flags <id> — clickable per-region editor of the flags currently set.
+                        .then(Commands.argument("id", StringArgumentType.word()).suggests(RID)
+                                .executes(c -> flagEditor(c.getSource(),
+                                        StringArgumentType.getString(c, "id"), mod))));
     }
 
     /** /rg cleanup — run the claim-expiry scan now (admin). */
@@ -1517,6 +1531,67 @@ public final class WGCommands {
      * description from the lang file. Description is shown only if its key is defined;
      * otherwise the value hint is used as the only hint.
      */
+    /** A clickable chat button that RUNS a command on click, with the command shown on hover. */
+    private static Component runBtn(String label, String cmd) {
+        return Component.literal(label).withStyle(s -> s
+                .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                        net.minecraft.network.chat.ClickEvent.Action.RUN_COMMAND, cmd))
+                .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                        net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT, Component.literal("§7" + cmd))));
+    }
+
+    /** A clickable chat button that PRE-FILLS a command into the chat box (for value flags). */
+    private static Component suggestBtn(String label, String cmd) {
+        return Component.literal(label).withStyle(s -> s
+                .withClickEvent(new net.minecraft.network.chat.ClickEvent(
+                        net.minecraft.network.chat.ClickEvent.Action.SUGGEST_COMMAND, cmd))
+                .withHoverEvent(new net.minecraft.network.chat.HoverEvent(
+                        net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT, Component.literal("§7" + cmd))));
+    }
+
+    /**
+     * /rg flags &lt;id&gt; — a clickable editor of the flags currently set on a region. Each state flag
+     * shows [allow]/[deny]/[clear] buttons (run /rg flag …); value flags show [set]/[clear]. A footer
+     * button pre-fills /rg flag &lt;id&gt; to add a new one. Buttons run the normal command, so the
+     * per-flag permission and ownership checks still apply on click.
+     */
+    private static int flagEditor(CommandSourceStack src, String id, WorldGuardNeo mod) {
+        ServerPlayer p;
+        try { p = src.getPlayerOrException(); }
+        catch (CommandSyntaxException e) { err(src, mod, "msg.selection.needs-player"); return 0; }
+        var mgr = mod.regions().get(p.serverLevel());
+        var ropt = mgr.get(id);
+        if (ropt.isEmpty()) { err(src, mod, "msg.region.unknown", "id", id); return 0; }
+        ProtectedRegion r = ropt.get();
+        var i18n = mod.i18n();
+        src.sendSuccess(() -> Component.literal(i18n.format("msg.flageditor.header", "id", id)), false);
+
+        if (r.flagsRaw().isEmpty()) {
+            src.sendSuccess(() -> Component.literal(i18n.raw("msg.flageditor.empty")), false);
+        } else {
+            var entries = new java.util.ArrayList<>(r.flagsRaw().entrySet());
+            entries.sort(java.util.Comparator.comparing(e -> e.getKey().name()));
+            for (var e : entries) {
+                Flag<?> f = e.getKey();
+                String val = f.displayRaw(e.getValue());
+                String base = "/rg flag " + id + " " + f.name();
+                var line = Component.literal("§8 §7• §e" + f.name() + " §8= §b" + val + "  ");
+                if (f instanceof StateFlag) {
+                    line.append(runBtn("§a[allow]", base + " allow")).append(Component.literal(" "))
+                        .append(runBtn("§c[deny]", base + " deny")).append(Component.literal(" "))
+                        .append(runBtn("§7[clear]", base));
+                } else {
+                    line.append(suggestBtn("§6[set]", base + " ")).append(Component.literal(" "))
+                        .append(runBtn("§7[clear]", base));
+                }
+                src.sendSuccess(() -> line, false);
+            }
+        }
+        src.sendSuccess(() -> Component.literal("§8 ")
+                .append(suggestBtn("§2[+ " + i18n.raw("msg.flageditor.add") + "]", "/rg flag " + id + " ")), false);
+        return 1;
+    }
+
     private static int listFlags(CommandSourceStack src, WorldGuardNeo mod) {
         src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.flags.header",
                 "count", Flags.all().size())), false);
@@ -1534,6 +1609,21 @@ public final class WGCommands {
     }
 
     /** Diagnostic dump: spatial-index stats per world, permission backend, integrations. */
+    /** /rg audit &lt;id&gt; [limit] — show the most recent administrative changes for a region. */
+    private static int auditRegion(CommandSourceStack src, String id, int limit, WorldGuardNeo mod) {
+        java.util.List<String> lines = mod.audit().recent(id, limit);
+        if (lines.isEmpty()) {
+            ok(src, mod, "msg.audit.empty", "id", id);
+            return 1;
+        }
+        src.sendSuccess(() -> Component.literal(mod.i18n().format("msg.audit.header",
+                "id", id, "count", lines.size())), false);
+        for (String line : lines) {
+            src.sendSuccess(() -> Component.literal("§8 §7• §f" + line), false);
+        }
+        return 1;
+    }
+
     private static int debugInfo(CommandSourceStack src, WorldGuardNeo mod) {
         // Console (no player level) reports aggregate stats across all loaded levels.
         ServerPlayer p = src.getPlayer();
@@ -1552,6 +1642,15 @@ public final class WGCommands {
                             + " §7luckperms: §f" + net.neoforged.fml.ModList.get().isLoaded("luckperms")
                             + " §7bluemap: §f" + net.neoforged.fml.ModList.get().isLoaded("bluemap")
                             + " §7squaremap: §f" + net.neoforged.fml.ModList.get().isLoaded("squaremap")), false);
+            var st = mod.regions().storage();
+            int schema = st.schemaVersion();
+            src.sendSuccess(() -> Component.literal(
+                    "§7storage: §f" + st.getClass().getSimpleName()
+                            + (schema >= 0 ? " §7schema: §fv" + schema : "")
+                            + " §7write-queue: §f" + mod.regions().pendingWrites()), false);
+            src.sendSuccess(() -> Component.literal(
+                    "§7candidate-cache: §f" + idx.cacheEntries() + " entries §7hits/miss: §f"
+                            + idx.cacheHits() + "/" + idx.cacheMisses()), false);
             var here = mgr.getApplicable(p.getX(), p.getY(), p.getZ());
             src.sendSuccess(() -> Component.literal(
                     "§7applicable here (§f" + here.size() + "§7): §f"
@@ -1565,6 +1664,12 @@ public final class WGCommands {
                             + " §7luckperms: §f" + net.neoforged.fml.ModList.get().isLoaded("luckperms")
                             + " §7bluemap: §f" + net.neoforged.fml.ModList.get().isLoaded("bluemap")
                             + " §7squaremap: §f" + net.neoforged.fml.ModList.get().isLoaded("squaremap")), false);
+            var st = mod.regions().storage();
+            int schema = st.schemaVersion();
+            src.sendSuccess(() -> Component.literal(
+                    "§7storage: §f" + st.getClass().getSimpleName()
+                            + (schema >= 0 ? " §7schema: §fv" + schema : "")
+                            + " §7write-queue: §f" + mod.regions().pendingWrites()), false);
         }
         return 1;
     }
