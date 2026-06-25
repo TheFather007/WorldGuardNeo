@@ -46,6 +46,15 @@ public final class WGConfig {
                 cfg.save();
             } else {
                 cfg.global = readGlobal(main);
+                // Versioned migration: an older (or unversioned) file is upgraded in place and
+                // re-stamped, so renamed/added keys are applied once instead of silently lost.
+                if (cfg.global.configVersion < CONFIG_VERSION) {
+                    WorldGuardNeo.LOGGER.info("[WorldGuardNeo] Migrating config.toml v{} → v{}.",
+                            cfg.global.configVersion, CONFIG_VERSION);
+                    migrateGlobal(cfg.global, cfg.global.configVersion);
+                    cfg.global.configVersion = CONFIG_VERSION;
+                    cfg.save(); // re-write with the new version stamp + any keys added since
+                }
             }
 
             try (var stream = Files.list(configDir.resolve("worlds"))) {
@@ -65,6 +74,16 @@ public final class WGConfig {
         return cfg;
     }
 
+    /**
+     * Upgrade an older config section in place. Keep each step idempotent and ordered by version, e.g.
+     * {@code if (from < 2) { g.newKey = g.oldKey; }}. Called once when the file's {@code config-version}
+     * is below {@link #CONFIG_VERSION}; the caller re-saves afterwards. No renames exist yet, so this
+     * currently only carries unversioned (v0) files forward to the current schema.
+     */
+    private static void migrateGlobal(GlobalSection g, int from) {
+        // if (from < 2) { ... apply v1→v2 key renames here ... }
+    }
+
     /** Delete config.json / CONFIG_HELP.md left over from the pre-TOML format. */
     private static void cleanupLegacyFiles(Path configDir) {
         for (String legacy : new String[]{"config.json", "CONFIG_HELP.md"}) {
@@ -80,6 +99,8 @@ public final class WGConfig {
             try (var reader = Files.newBufferedReader(file)) {
                 toml = TomlFormat.instance().createParser().parse(reader);
             }
+            // 0 = a file written before config versioning existed (triggers a one-time migration).
+            g.configVersion           = intOf(toml, "config-version", 0);
             g.locale                  = str(toml, "locale", g.locale);
             g.storageFormat           = str(toml, "storage-format", g.storageFormat);
             g.useLuckPerms            = bool(toml, "use-luckperms", g.useLuckPerms);
@@ -233,6 +254,12 @@ public final class WGConfig {
 
         // night-config writes keys in insertion order, so the order below IS the file layout;
         // each section's first key carries a banner comment.
+
+        /* ───────────────────────── META ───────────────────────── */
+        c.setComment("config-version",
+                " Config schema version — managed by WorldGuardNeo. Do not edit; it lets the mod\n" +
+                " migrate older config files automatically when keys are renamed or added.");
+        c.set("config-version", CONFIG_VERSION);
 
         /* ───────────────────────── GENERAL ───────────────────────── */
         c.setComment("locale",
@@ -547,7 +574,12 @@ public final class WGConfig {
 
     /* ------------------------------- sections ------------------------------ */
 
+    /** Bump when config keys are renamed/restructured, and add the rename in {@link #migrateGlobal}. */
+    public static final int CONFIG_VERSION = 1;
+
     public static final class GlobalSection {
+        /** Version stamp of the loaded file; 0 means a legacy unversioned file (pre-versioning). */
+        public int     configVersion         = CONFIG_VERSION;
         public String  locale                = "en_us";
         public String  storageFormat         = "json";          // json | sqlite (sqlite reserved)
         public boolean useLuckPerms          = true;
