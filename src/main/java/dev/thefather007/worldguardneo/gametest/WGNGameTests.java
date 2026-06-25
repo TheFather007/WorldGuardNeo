@@ -1997,6 +1997,213 @@ public final class WGNGameTests {
         h.succeed();
     }
 
+    /* ---------------- real event-path coverage for the remaining flags ---------------- */
+
+    /** A mock player physically standing at the platform centre, so position-based flag checks
+     *  (item-drop, item-pickup, chat, …) resolve against the region covering the platform. */
+    private static ServerPlayer strangerInRegion(GameTestHelper h) {
+        ServerPlayer p = stranger(h);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        p.setPos(c.getX() + 0.5, c.getY(), c.getZ() + 0.5);
+        return p;
+    }
+
+    @GameTest(template = TPL)
+    public static void itemDropDenyCancelsToss(GameTestHelper h) {
+        region(h, "gt_drop_deny").setFlag(Flags.ITEM_DROP, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var item = new net.minecraft.world.entity.item.ItemEntity(h.getLevel(),
+                c.getX() + 0.5, c.getY(), c.getZ() + 0.5, new ItemStack(Items.DIAMOND));
+        var e = new net.neoforged.neoforge.event.entity.item.ItemTossEvent(item, p);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "item-drop=deny cancels the toss");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void itemPickupDenyBlocksPickup(GameTestHelper h) {
+        region(h, "gt_pickup_deny").setFlag(Flags.ITEM_PICKUP, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var item = new net.minecraft.world.entity.item.ItemEntity(h.getLevel(),
+                c.getX() + 0.5, c.getY(), c.getZ() + 0.5, new ItemStack(Items.DIAMOND));
+        var e = new net.neoforged.neoforge.event.entity.player.ItemEntityPickupEvent.Pre(p, item);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.canPickup() == net.neoforged.neoforge.common.util.TriState.FALSE,
+                "item-pickup=deny blocks the pickup");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void expDropsDenyZeroesMobXp(GameTestHelper h) {
+        region(h, "gt_exp_deny").setFlag(Flags.EXP_DROPS, StateFlag.State.DENY);
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        var e = new net.neoforged.neoforge.event.entity.living.LivingExperienceDropEvent(cow, null, 10);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.getDroppedExperience() == 0, "exp-drops=deny zeroes a mob's XP drop");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void blockedEffectsDenyApplication(GameTestHelper h) {
+        region(h, "gt_effect_deny").setFlag(Flags.BLOCKED_EFFECTS, Set.of("minecraft:poison"));
+        ServerPlayer p = strangerInRegion(h);
+        var inst = new net.minecraft.world.effect.MobEffectInstance(net.minecraft.world.effect.MobEffects.POISON, 100);
+        var e = new net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable(p, inst, null);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.getResult() == net.neoforged.neoforge.event.entity.living.MobEffectEvent.Applicable.Result.DO_NOT_APPLY,
+                "blocked-effects blocks the listed effect");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void chorusTeleportDenyCancels(GameTestHelper h) {
+        region(h, "gt_chorus_deny").setFlag(Flags.CHORUS_FRUIT, StateFlag.State.DENY);
+        ServerPlayer p = stranger(h);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var e = new net.neoforged.neoforge.event.entity.EntityTeleportEvent.ChorusFruit(
+                p, c.getX() + 0.5, c.getY(), c.getZ() + 0.5);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "chorus-teleport=deny cancels a teleport into the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void mobTeleportDenyCancels(GameTestHelper h) {
+        region(h, "gt_mobtp_deny").setFlag(Flags.MOB_TELEPORT, StateFlag.State.DENY);
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var e = new net.neoforged.neoforge.event.entity.EntityTeleportEvent.EnderEntity(
+                cow, c.getX() + 0.5, c.getY(), c.getZ() + 0.5);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "mob-teleport=deny cancels a mob's natural teleport into the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void farmlandTrampleDeniedForStranger(GameTestHelper h) {
+        CuboidRegion r = region(h, "gt_trample");
+        r.owners().add(UUID.randomUUID()); // claim owned by someone else
+        ServerPlayer p = strangerInRegion(h);
+        BlockPos c = h.absolutePos(new BlockPos(4, 1, 4));
+        var e = new net.neoforged.neoforge.event.level.BlockEvent.FarmlandTrampleEvent(
+                h.getLevel(), c, Blocks.FARMLAND.defaultBlockState(), 1.0f, p);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "a stranger can't trample farmland in a claim");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void waterFlowDenyCancelsFluidPlace(GameTestHelper h) {
+        region(h, "gt_waterflow_deny").setFlag(Flags.WATER_FLOW, StateFlag.State.DENY);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var e = new net.neoforged.neoforge.event.level.BlockEvent.FluidPlaceBlockEvent(
+                h.getLevel(), c, c.above(), Blocks.WATER.defaultBlockState());
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "water-flow=deny stops fluid spreading into the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void sleepDenySetsProblem(GameTestHelper h) {
+        region(h, "gt_sleep_deny").setFlag(Flags.SLEEP, StateFlag.State.DENY);
+        ServerPlayer p = stranger(h);
+        BlockPos bed = h.absolutePos(new BlockPos(4, 2, 4));
+        var e = new net.neoforged.neoforge.event.entity.player.CanPlayerSleepEvent(p, bed, null);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.getProblem() == net.minecraft.world.entity.player.Player.BedSleepingProblem.NOT_SAFE,
+                "sleep=deny reports the bed as not safe");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void sendChatDenyCancels(GameTestHelper h) {
+        region(h, "gt_chat_deny").setFlag(Flags.SEND_CHAT, StateFlag.State.DENY);
+        ServerPlayer p = strangerInRegion(h);
+        var e = new net.neoforged.neoforge.event.ServerChatEvent(p, "hello",
+                net.minecraft.network.chat.Component.literal("hello"));
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "send-chat=deny cancels chat from inside the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void mobGriefDenyStopsGriefing(GameTestHelper h) {
+        region(h, "gt_grief_deny").setFlag(Flags.MOB_GRIEF, StateFlag.State.DENY);
+        Cow cow = h.spawn(EntityType.COW, new BlockPos(4, 1, 4));
+        var e = new net.neoforged.neoforge.event.entity.EntityMobGriefingEvent(h.getLevel(), cow);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertFalse(e.canGrief(), "mob-grief=deny stops mob block-changes in the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void cropGrowthDenyStopsGrowth(GameTestHelper h) {
+        region(h, "gt_crop_deny").setFlag(Flags.CROP_GROWTH, StateFlag.State.DENY);
+        BlockPos c = h.absolutePos(new BlockPos(4, 1, 4));
+        var e = new net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre(
+                h.getLevel(), c, Blocks.WHEAT.defaultBlockState());
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.getResult() == net.neoforged.neoforge.event.level.block.CropGrowEvent.Pre.Result.DO_NOT_GROW,
+                "crop-growth=deny prevents the crop from advancing");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void lavaFlowDenyCancelsFluidPlace(GameTestHelper h) {
+        region(h, "gt_lavaflow_deny").setFlag(Flags.LAVA_FLOW, StateFlag.State.DENY);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        // Fluid solidification products (here obsidian) gate under lava-flow — this is the cobble/
+        // obsidian-generator case the handler keys off e.getNewState().
+        var e = new net.neoforged.neoforge.event.level.BlockEvent.FluidPlaceBlockEvent(
+                h.getLevel(), c, c.above(), Blocks.OBSIDIAN.defaultBlockState());
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "lava-flow=deny stops a lava-product (obsidian) forming in the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void redstoneDenyCancelsSignalNotify(GameTestHelper h) {
+        region(h, "gt_redstone_deny").setFlag(Flags.REDSTONE, StateFlag.State.DENY);
+        BlockPos c = h.absolutePos(new BlockPos(4, 2, 4));
+        var e = new net.neoforged.neoforge.event.level.BlockEvent.NeighborNotifyEvent(
+                h.getLevel(), c, Blocks.REDSTONE_BLOCK.defaultBlockState(),
+                java.util.EnumSet.allOf(Direction.class), false);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "redstone=deny blocks signal propagation in the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void keepInventoryAllowCancelsDrops(GameTestHelper h) {
+        region(h, "gt_keepinv_allow").setFlag(Flags.KEEP_INVENTORY, StateFlag.State.ALLOW);
+        ServerPlayer p = strangerInRegion(h);
+        var e = new net.neoforged.neoforge.event.entity.living.LivingDropsEvent(
+                p, h.getLevel().damageSources().generic(), java.util.List.of(), false);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isCanceled(), "keep-inventory=allow cancels the death-drop in the region");
+        h.succeed();
+    }
+
+    @GameTest(template = TPL)
+    public static void mobSpawningDenyCancelsSpawn(GameTestHelper h) {
+        region(h, "gt_spawn_deny").setFlag(Flags.MOB_SPAWNING, StateFlag.State.DENY);
+        BlockPos c = h.absolutePos(new BlockPos(4, 1, 4));
+        // Create (but DON'T add) the mob: setSpawnCancelled is only legal pre-finalize, so an
+        // already-spawned entity would throw "late invocation". FinalizeSpawn carries its own coords,
+        // which is what the handler resolves the region against.
+        Cow cow = EntityType.COW.create(h.getLevel());
+        h.assertTrue(cow != null, "cow created");
+        var e = new net.neoforged.neoforge.event.entity.living.FinalizeSpawnEvent(
+                cow, h.getLevel(), c.getX(), c.getY(), c.getZ(),
+                h.getLevel().getCurrentDifficultyAt(c),
+                net.minecraft.world.entity.MobSpawnType.NATURAL, null, null);
+        NeoForge.EVENT_BUS.post(e);
+        h.assertTrue(e.isSpawnCancelled(), "mob-spawning=deny cancels a natural spawn in the region");
+        h.succeed();
+    }
+
     /* ---------------- override-API deciding region ---------------- */
 
     @GameTest(template = TPL)

@@ -34,7 +34,7 @@ jobs:
 
   # In-game GameTests — exercise the real event/mixin enforcement path in a live ServerLevel.
   # Heavier (downloads NeoForge/Minecraft and boots a dedicated gametest server). This is a
-  # BLOCKING gate: the full battery (~135 real enforcement tests) must pass for the workflow to go green. The
+  # BLOCKING gate: the full battery (~150 real enforcement tests) must pass for the workflow to go green. The
   # NeoForge gametest runner exits non-zero on any failure, so a red mark here means a real
   # regression in the enforcement path — fix it. Reproduce locally with:
   #   ./gradlew runGameTestServer
