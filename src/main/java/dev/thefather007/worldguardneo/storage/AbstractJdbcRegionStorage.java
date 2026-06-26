@@ -240,14 +240,17 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
     private void writeFullReplace(String worldKey, List<String[]> rows) throws IOException {
         // Full sync in one transaction: replace all of this world's (non-quarantine) rows.
         try {
-            conn().setAutoCommit(false);
+            // Resolve the connection ONCE and reuse it for the whole transaction — re-calling conn()
+            // could reopen a different handle mid-txn (e.g. MySQL validity reconnect).
+            Connection c = conn();
+            c.setAutoCommit(false);
             try {
-                try (PreparedStatement del = conn().prepareStatement(
+                try (PreparedStatement del = c.prepareStatement(
                         "DELETE FROM " + table() + " WHERE world = ? AND region_id NOT LIKE '%.corrupt-%'")) {
                     del.setString(1, worldKey);
                     del.executeUpdate();
                 }
-                try (PreparedStatement ins = conn().prepareStatement(
+                try (PreparedStatement ins = c.prepareStatement(
                         "INSERT INTO " + table() + " (world, region_id, payload, updated_at) VALUES (?, ?, ?, ?)")) {
                     long now = System.currentTimeMillis();
                     for (String[] row : rows) {
@@ -257,12 +260,16 @@ abstract class AbstractJdbcRegionStorage implements RegionStorage, AutoCloseable
                     }
                     ins.executeBatch();
                 }
-                conn().commit();
+                c.commit();
             } catch (SQLException ex) {
-                conn().rollback();
+                try { c.rollback(); } catch (SQLException re) { ex.addSuppressed(re); }
                 throw ex;
             } finally {
-                conn().setAutoCommit(true);
+                // Never let restoring autoCommit throw out of finally and mask the real failure.
+                try { c.setAutoCommit(true); }
+                catch (SQLException re) {
+                    WorldGuardNeo.LOGGER.debug("{} setAutoCommit(true) after save txn failed", backendName(), re);
+                }
             }
         } catch (SQLException ex) {
             throw new IOException(backendName() + " save failed for " + worldKey, ex);

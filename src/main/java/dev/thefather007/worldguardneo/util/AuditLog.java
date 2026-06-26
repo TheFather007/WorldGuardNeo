@@ -74,8 +74,8 @@ public final class AuditLog {
         try (var lines = Files.lines(file, StandardCharsets.UTF_8)) {
             lines.forEach(l -> {
                 int idx = l.indexOf(needle);
-                // Match "region=<id>" as a whole token (region ids contain no spaces).
-                if (idx >= 0) {
+                // Match "region=<id>" as a whole token: space (or start) on the left, space/EOL on the right.
+                if (idx >= 0 && (idx == 0 || l.charAt(idx - 1) == ' ')) {
                     int end = idx + needle.length();
                     if (end == l.length() || l.charAt(end) == ' ') {
                         if (ring.size() == limit) ring.pollFirst();

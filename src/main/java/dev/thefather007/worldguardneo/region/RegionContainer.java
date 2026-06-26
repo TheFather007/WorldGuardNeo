@@ -35,7 +35,8 @@ public final class RegionContainer {
             });
     private final java.util.concurrent.atomic.AtomicInteger pendingWrites =
             new java.util.concurrent.atomic.AtomicInteger();
-    private MinecraftServer server; // captured at load; used to re-dirty on the server thread after a failed write
+    // volatile: written on the server thread (load), read on the writer thread (failure re-dirty hop).
+    private volatile MinecraftServer server;
 
     /**
      * Per-world "save needed" flag. {@link #save} only marks dirty; {@link #flushDirty} does the
@@ -119,6 +120,9 @@ public final class RegionContainer {
      * touch the connection at once. Bounded wait so a stuck write can't hang shutdown forever.
      */
     public void drainWrites() {
+        // Calling this from the writer thread itself would self-deadlock (waiting on a task only it
+        // can run). No current caller does, but guard the invariant defensively.
+        if (Thread.currentThread().getName().equals("WGN-RegionWriter")) return;
         try {
             writer.submit(() -> {}).get(15, java.util.concurrent.TimeUnit.SECONDS);
         } catch (java.util.concurrent.TimeoutException te) {
