@@ -42,7 +42,7 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.list` | OP 0 | `/rg list` — list your regions. |
 | `worldguardneo.region.list.others` | OP 2 | List another player's regions. |
 | `worldguardneo.region.lists.radius` | OP 2 | `/rg lists <radius>` — list nearby regions. |
-| `worldguardneo.region.teleport` | OP 0 | `/rg teleport` — TP to a region's `teleport` flag. |
+| `worldguardneo.region.teleport` | OP 2 | `/rg teleport` — TP to a region's `teleport` flag. |
 
 ## Membership nodes
 

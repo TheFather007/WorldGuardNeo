@@ -46,7 +46,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 **Обязательно**
 
 - Minecraft **1.21.1**
-- NeoForge **21.1.x**
+- NeoForge **21.1.x** — принимается любая `21.1.0`+ (диапазон загрузчика `[21.1.0,)`). Собрано на **21.1.234**; CI проверяет **21.1.209**, **21.1.221** и **21.1.234**. Рекомендуется свежая сборка 21.1.x.
 
 **Опционально**
 
@@ -218,7 +218,7 @@ vertical-expand-up = 0     # для режима "fixed"
 | `worldguardneo.region.claim` | OP 0 | Регистрация регионов |
 | `worldguardneo.region.delete` | OP 0 | Удаление своих регионов |
 | `worldguardneo.region.info` / `.list` | OP 0 | Просмотр / список своих регионов |
-| `worldguardneo.region.teleport` | OP 0 | Телепорт к регионам |
+| `worldguardneo.region.teleport` | OP 2 | Телепорт к регионам |
 | `worldguardneo.selection.*` | OP 0 | Выделение: `use` (клики палочкой), `wand`, `mode`, `pos1`, `pos2`, `point` — каждое выдаётся отдельно |
 | `worldguardneo.region.redefine` | OP 2 | Изменение размера |
 | `worldguardneo.region.flag` | OP 2 | Установка флагов |
