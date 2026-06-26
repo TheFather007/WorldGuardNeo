@@ -42,7 +42,7 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.list` | OP 0 | `/rg list` — список своих регионов. |
 | `worldguardneo.region.list.others` | OP 2 | Список регионов другого игрока. |
 | `worldguardneo.region.lists.radius` | OP 2 | `/rg lists <радиус>` — список регионов рядом. |
-| `worldguardneo.region.teleport` | OP 0 | `/rg teleport` — телепорт к флагу `teleport` региона. |
+| `worldguardneo.region.teleport` | OP 2 | `/rg teleport` — телепорт к флагу `teleport` региона. |
 
 ## Узлы членства
 

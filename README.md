@@ -46,7 +46,7 @@ WorldGuardNeo brings WorldGuard-style land protection to NeoForge. You select an
 **Required**
 
 - Minecraft **1.21.1**
-- NeoForge **21.1.x**
+- NeoForge **21.1.x** — accepts any `21.1.0`+ (loader range `[21.1.0,)`). Built against **21.1.234**; CI verifies **21.1.209**, **21.1.221** and **21.1.234**. A recent 21.1.x build is recommended.
 
 **Optional**
 
@@ -218,7 +218,7 @@ With LuckPerms installed it is the sole authority (OP levels are ignored once a 
 | `worldguardneo.region.claim` | OP 0 | Claim regions |
 | `worldguardneo.region.delete` | OP 0 | Delete your own regions |
 | `worldguardneo.region.info` / `.list` | OP 0 | View / list your regions |
-| `worldguardneo.region.teleport` | OP 0 | Teleport to regions |
+| `worldguardneo.region.teleport` | OP 2 | Teleport to regions |
 | `worldguardneo.selection.*` | OP 0 | Selection: `use` (wand clicks), `wand`, `mode`, `pos1`, `pos2`, `point` — each granted separately |
 | `worldguardneo.region.redefine` | OP 2 | Resize regions |
 | `worldguardneo.region.flag` | OP 2 | Set flags |

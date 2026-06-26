@@ -63,7 +63,7 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.region.addmember",     mod);
         nodeToLevel.put("worldguardneo.region.removeowner",   mod);
         nodeToLevel.put("worldguardneo.region.removemember",  mod);
-        nodeToLevel.put("worldguardneo.region.teleport",      0);
+        nodeToLevel.put("worldguardneo.region.teleport",      mod);  // /rg teleport — OP 2+ or the node (was OP 0)
 
         // Flag-editing nodes.
         nodeToLevel.put("worldguardneo.region.flag.others",   mod);   // edit foreign regions
