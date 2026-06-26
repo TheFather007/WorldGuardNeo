@@ -48,11 +48,12 @@ public final class BlockEventHandler {
             denyMessage(p, mgr, bp, "break-blocked", blockId(e.getState().getBlock()));
             return;
         }
-        // Build-access = explicit flags first, else implicit membership protection.
-        if (mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, id)
-         && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
-        if (canBypass(p)) return;
+        // One spatial lookup shared by both build-flag tests and the override/denier resolution.
         var applicable = mgr.getApplicable(x, y, z);
+        // Build-access = explicit flags first, else implicit membership protection.
+        if (mgr.testBuildAccess(Flags.BLOCK_BREAK, applicable, id)
+         && mgr.testBuildAccess(Flags.BUILD,       applicable, id)) return;
+        if (canBypass(p)) return;
         if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
                 .isOverridden(mgr.denyingRegion(applicable, id, Flags.BLOCK_BREAK, Flags.BUILD),
                         Flags.BUILD, p, "block-break")) return;
@@ -77,11 +78,12 @@ public final class BlockEventHandler {
             denyMessage(p, mgr, bp, "place-blocked", blockId(e.getPlacedBlock().getBlock()));
             return;
         }
-        if (mgr.testBuildAccess(Flags.BLOCK_PLACE, x, y, z, id)
-         && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
+        // One spatial lookup shared by both build-flag tests and the override/denier resolution.
+        var applicable = mgr.getApplicable(x, y, z);
+        if (mgr.testBuildAccess(Flags.BLOCK_PLACE, applicable, id)
+         && mgr.testBuildAccess(Flags.BUILD,       applicable, id)) return;
         if (canBypass(p)) return;
         // Public API override hook (see RegionFlagDeniedEvent) — a listener may cancel to permit.
-        var applicable = mgr.getApplicable(x, y, z);
         if (!applicable.isEmpty() && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent
                 .isOverridden(mgr.denyingRegion(applicable, id, Flags.BLOCK_PLACE, Flags.BUILD),
                         Flags.BUILD, p, "block-place")) return;
@@ -107,8 +109,9 @@ public final class BlockEventHandler {
         BlockPos bp = e.getPos();
         int x = bp.getX(), y = bp.getY(), z = bp.getZ();
         UUID id = p.getUUID();
-        if (mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, id)
-         && mgr.testBuildAccess(Flags.BUILD,       x, y, z, id)) return;
+        var applicable = mgr.getApplicable(x, y, z); // one lookup for both build-flag tests
+        if (mgr.testBuildAccess(Flags.BLOCK_BREAK, applicable, id)
+         && mgr.testBuildAccess(Flags.BUILD,       applicable, id)) return;
         if (canBypass(p)) return;
         e.setCanceled(true);
     }
@@ -148,6 +151,9 @@ public final class BlockEventHandler {
             return;
         }
         UUID id = p.getUUID();
+        // One spatial lookup reused by the dedicated toggle, the interact/use/chest gates, and the
+        // override/denier resolution below (was up to 4–5 separate getApplicable probes per click).
+        var applicable = mgr.getApplicable(x, y, z);
         // Dedicated right-click toggles (all default ALLOW): an explicit deny blocks that specific
         // action even for members, independent of the generic interact/use gate below. Resolve and
         // test the toggle FIRST; only consult region.bypass when it denies (lazy-bypass pattern, so
@@ -169,7 +175,7 @@ public final class BlockEventHandler {
                 ded = Flags.SIGN_EDIT; dmsg = "msg.sign.edit-denied";
             }
         }
-        if (ded != null && !mgr.testState(ded, id, x, y, z) && !canBypass(p)) {
+        if (ded != null && !mgr.testState(ded, applicable, id) && !canBypass(p)) {
             e.setCanceled(true);
             syncInventory(p);
             p.displayClientMessage(Component.literal(mod.i18n().raw(dmsg)), true);
@@ -177,15 +183,15 @@ public final class BlockEventHandler {
         }
         // INTERACT/USE use build-access semantics (members interact freely, strangers are
         // blocked unless a flag explicitly opens it). Containers additionally require chest-access.
-        boolean allowed = mgr.testBuildAccess(Flags.INTERACT, x, y, z, id)
-                       && mgr.testBuildAccess(Flags.USE,      x, y, z, id);
+        boolean allowed = mgr.testBuildAccess(Flags.INTERACT, applicable, id)
+                       && mgr.testBuildAccess(Flags.USE,      applicable, id);
         boolean isContainer = false;
         if (allowed) {
             try {
                 var be = sl.getBlockEntity(bp);
                 if (be instanceof net.minecraft.world.Container) {
                     isContainer = true;
-                    allowed = mgr.testBuildAccess(Flags.CHEST_ACCESS, x, y, z, id);
+                    allowed = mgr.testBuildAccess(Flags.CHEST_ACCESS, applicable, id);
                 }
             } catch (Throwable t) {
                 // Fail safe: if container detection throws (e.g. chunk-unload race), treat it as a
@@ -198,7 +204,6 @@ public final class BlockEventHandler {
         if (allowed) return;
         if (canBypass(p)) return;
         // Public API override hook for interact/container denials (see RegionFlagDeniedEvent).
-        var applicable = mgr.getApplicable(x, y, z);
         if (!applicable.isEmpty()) {
             var denier = isContainer
                     ? mgr.denyingRegion(applicable, id, Flags.CHEST_ACCESS, Flags.INTERACT, Flags.USE)

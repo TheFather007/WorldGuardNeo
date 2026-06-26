@@ -195,7 +195,15 @@ public final class RegionManager {
      * @return true if the action is permitted
      */
     public boolean testBuildAccess(StateFlag flag, double x, double y, double z, UUID playerId) {
-        List<ProtectedRegion> applicable = getApplicable(x, y, z);
+        return testBuildAccess(flag, getApplicable(x, y, z), playerId);
+    }
+
+    /**
+     * Variant accepting a precomputed applicable list (from {@link #getApplicable}) — lets a handler
+     * that gates on several build-flags at the same block compute the spatial lookup ONCE and reuse
+     * it, instead of re-probing per flag. Semantics are identical to the point-based overload.
+     */
+    public boolean testBuildAccess(StateFlag flag, List<ProtectedRegion> applicable, UUID playerId) {
         if (applicable.isEmpty()) {
             // Wilderness — honour the global/default flag value (ALLOW unless admin set deny).
             return flag.test(globalRegion.getFlag(flag));

@@ -200,8 +200,8 @@ public final class EntityEventHandler {
         boolean isDecoration = target instanceof net.minecraft.world.entity.decoration.HangingEntity
                             || target instanceof net.minecraft.world.entity.decoration.ArmorStand;
         if (isDecoration) {
-            if ((!mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)
-                    || !mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, actor)) && !canBypass(attacker)) {
+            if ((!mgr.testBuildAccess(Flags.BUILD, applicable, actor)
+                    || !mgr.testBuildAccess(Flags.BLOCK_BREAK, applicable, actor)) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.build-denied")), true);
@@ -311,17 +311,18 @@ public final class EntityEventHandler {
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
+        var applicable = mgr.getApplicable(x, y, z); // one lookup (only reached for decoration targets)
         // Dedicated armor-stand-use toggle (default ALLOW): an explicit deny blocks even members,
         // layered on top of the build-access gate below.
         if (target instanceof net.minecraft.world.entity.decoration.ArmorStand
-                && !mgr.testState(Flags.ARMOR_STAND_USE, actor, x, y, z)) {
+                && !mgr.testState(Flags.ARMOR_STAND_USE, applicable, actor)) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
             return;
         }
-        if (!mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor)
-                || !mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)) {
+        if (!mgr.testBuildAccess(Flags.INTERACT, applicable, actor)
+                || !mgr.testBuildAccess(Flags.BUILD, applicable, actor)) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
