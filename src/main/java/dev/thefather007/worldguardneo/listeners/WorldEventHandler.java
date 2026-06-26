@@ -83,6 +83,9 @@ public final class WorldEventHandler {
         if (lvl == null) return;
         if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
+        // Fast path: no regions in this world → a piston can't push across a region border. Bail
+        // before allocating the touched-cells list or probing the index (redstone farms fire this a lot).
+        if (mgr.size() == 0) return;
         net.minecraft.core.Direction dir = e.getDirection();
         BlockPos piston = e.getPos();
         // getDirection() is the piston's FACING; retraction (sticky pull) moves blocks the
