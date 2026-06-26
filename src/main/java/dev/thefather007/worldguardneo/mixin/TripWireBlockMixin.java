@@ -2,6 +2,7 @@ package dev.thefather007.worldguardneo.mixin;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flags;
+import dev.thefather007.worldguardneo.flags.StateFlag;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -16,22 +17,13 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Stops a tripwire inside a protected region from being tripped by non-members, mobs, or thrown
- * items — the same grief class as a pressure plate, which {@link PressurePlateBlockMixin} already
- * covers. Tripwires fire on entity collision (not a right-click), so the interact/use command
- * handlers never see them.
+ * Stops a tripwire inside a region from being tripped by non-members, mobs, or thrown items — same
+ * grief class as a pressure plate ({@link PressurePlateBlockMixin}). Fires on entity collision, so
+ * interact handlers never see it. We cancel {@link TripWireBlock#entityInside} at HEAD unless the
+ * triggering entity is an authorised member, so the wire never powers its hooks for that entity.
  *
- * <p>Vanilla calls {@link TripWireBlock#entityInside} whenever an entity is inside the wire; that
- * is what kicks off {@code checkPressed} and powers the connected hooks. We inject at HEAD and
- * cancel it when the triggering entity isn't an authorised member of the controlling region —
- * the wire then never updates its powered state for that entity.
- *
- * <p>Note: a tripwire's redstone OUTPUT is also independently governed by the {@code redstone}
- * flag (the neighbour-notify handler), but that is opt-in; this membership gate matches the
- * "strangers can't operate my claim's mechanisms" default that pressure plates already enforce.
- *
- * <p>{@code require = 0}: if a future remap changes {@code entityInside}, the injector simply
- * doesn't apply rather than crashing — protection silently turns off, never a hard failure.
+ * <p>{@code require = 0}: a future remap of {@code entityInside} skips the injector rather than
+ * crashing — protection silently turns off.
  */
 @Mixin(TripWireBlock.class)
 public abstract class TripWireBlockMixin {
@@ -46,8 +38,9 @@ public abstract class TripWireBlockMixin {
             if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-            // Fast path: no region here AND no global USE opinion → vanilla, no allocation.
-            if (!mgr.hasAnyAt(x, y, z) && mgr.globalRegion().getFlag(Flags.USE) == null) return;
+            // Fast path: no region here AND global USE isn't an explicit DENY → vanilla, no scan.
+            // (A global USE=allow must NOT cancel wilderness trips for mobs/items, so bail here too.)
+            if (!mgr.hasAnyAt(x, y, z) && mgr.globalRegion().getFlag(Flags.USE) != StateFlag.State.DENY) return;
             // An authorised member (USE build-access) trips it normally.
             if (entity instanceof Player pl && mgr.testBuildAccess(Flags.USE, x, y, z, pl.getUUID())) return;
             // Stranger, mob, item, or projectile → don't let it trip the wire.

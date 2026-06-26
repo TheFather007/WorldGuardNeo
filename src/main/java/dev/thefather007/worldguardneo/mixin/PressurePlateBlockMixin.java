@@ -2,6 +2,7 @@ package dev.thefather007.worldguardneo.mixin;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
 import dev.thefather007.worldguardneo.flags.Flags;
+import dev.thefather007.worldguardneo.flags.StateFlag;
 import dev.thefather007.worldguardneo.region.RegionManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -18,24 +19,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.List;
 
 /**
- * Stops a wooden/stone pressure plate inside a protected region from firing for non-members.
+ * Stops a pressure plate inside a region from firing for non-members. Plates fire on entity
+ * collision (not a right-click), so interact handlers can't catch a stranger stepping on one or a
+ * thrown item landing on it. Rule: outputs signal only if a controlling-region MEMBER is on it.
  *
- * <p>Targets the CONCRETE {@link PressurePlateBlock} (covers wooden and stone plates), not the
- * abstract {@code BasePressurePlateBlock} — the signal method is abstract there, so a mixin on
- * the base class has no method body to inject into and crashes at load (insnNode null). The
- * concrete subclass provides the real {@code getSignalStrength(Level, BlockPos)} body.
- *
- * <p>Covers two grief vectors that click/interact handlers can't catch (plates fire on entity
- * collision, not a right-click):
- * <ul>
- *   <li><b>Стоя на плите</b> (задача 1): a stranger steps on a plate in a claim and powers it.</li>
- *   <li><b>Брошенный предмет</b> (задача 2): a wooden plate detects all entities, so a thrown
- *       item lands on it and triggers it.</li>
- * </ul>
- *
- * <p>Rule: a plate inside a region outputs signal only if at least one MEMBER of the controlling
- * region is standing on it. Strangers, mobs, and items never authorise it. Wilderness plates are
- * untouched (fast {@code hasAnyAt} probe returns immediately).
+ * <p>Targets the CONCRETE {@link PressurePlateBlock}, not abstract {@code BasePressurePlateBlock} —
+ * the signal method is abstract there, so a mixin on the base class has no body to inject and
+ * crashes at load (insnNode null).
  */
 @Mixin(PressurePlateBlock.class)
 public abstract class PressurePlateBlockMixin {
@@ -51,32 +41,28 @@ public abstract class PressurePlateBlockMixin {
             if (!mod.isProtectionActive(sl)) return;
             RegionManager mgr = mod.regions().get(sl);
             int x = pos.getX(), y = pos.getY(), z = pos.getZ();
-            // Fast path: no region here AND the global region has no USE opinion → vanilla,
-            // no allocation. The global check keeps a world-wide "use deny" effective on
-            // wilderness plates (testBuildAccess below falls back to the global value).
+            // Fast path: no region here AND global USE isn't an explicit DENY → vanilla, no entity
+            // scan. Only a world-wide "use deny" needs enforcing on wilderness plates; a global
+            // ALLOW (or unset) means the plate just fires normally, so skip the allocation/scan.
             if (!mgr.hasAnyAt(x, y, z)
-                    && mgr.globalRegion().getFlag(Flags.USE) == null) return;
+                    && mgr.globalRegion().getFlag(Flags.USE) != StateFlag.State.DENY) return;
 
-            // Inside a region: allow only if a member of the controlling region stands on it.
+            // Allow only if a member of the controlling region is standing on it.
             AABB box = TOUCH_AABB.move(pos);
             List<Entity> on = level.getEntities((Entity) null, box);
             for (Entity e : on) {
                 if (e instanceof Player pl
                         && mgr.testBuildAccess(Flags.USE, x, y, z, pl.getUUID())) {
-                    return; // authorised presser present → let vanilla compute normally
+                    return; // authorised presser → vanilla computes normally
                 }
             }
-            // No authorised presser → force zero so the plate stays unpressed.
-            cir.setReturnValue(0);
+            cir.setReturnValue(0); // no authorised presser → plate stays unpressed
         } catch (Throwable t) {
             WorldGuardNeo.LOGGER.debug("pressure-plate gate failed", t);
         }
     }
 
-    /**
-     * Vanilla's pressure-plate touch box: full footprint inset 1/8 on horizontal edges, 1/4 tall.
-     * Matches what the plate itself scans so our membership check sees the same entities.
-     */
+    /** Vanilla's pressure-plate touch box, so our membership scan sees the same entities. */
     private static final AABB TOUCH_AABB =
             new AABB(0.0625, 0.0, 0.0625, 0.9375, 0.25, 0.9375);
 }

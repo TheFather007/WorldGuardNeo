@@ -17,32 +17,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Public, stable API for other mods to query and interact with WorldGuardNeo.
+ * Public, stable API for other mods to query WorldGuardNeo. Static facade, no instance.
  *
- * <p>This is a static facade — no instance to construct. Methods are null-safe; if
- * WorldGuardNeo isn't fully loaded yet (e.g. mod init order issue), they return safe
- * defaults (true / empty / Optional.empty).
- *
- * <p>Method stability guarantee: methods declared here will not have their signatures
- * changed between minor versions. New methods may be added. Existing methods may have
- * their behavior refined, with breaking changes only in major version bumps.
- *
- * <p>Thread safety: ALL methods must be called from the server thread. The underlying
- * region storage uses identity-mapped caches that aren't thread-safe.
- *
- * <h2>Common use cases</h2>
- * <pre>{@code
- * // Check if a player can build at a position:
- * if (!WorldGuardNeoAPI.canBuild(player, pos)) {
- *     return; // skip the action
- * }
- *
- * // Find what region a player is standing in:
- * Optional<ProtectedRegion> r = WorldGuardNeoAPI.getRegionAt(level, player.blockPosition());
- *
- * // List all regions owned by a player:
- * List<ProtectedRegion> owned = WorldGuardNeoAPI.getOwnedRegions(level, player.getUUID());
- * }</pre>
+ * <p>Null-safe: if WGN isn't loaded yet, methods return safe defaults (true / empty).
+ * Signatures are stable across minor versions. Call only from the server thread — the
+ * region caches are not thread-safe.
  *
  * @see dev.thefather007.worldguardneo.api.events.RegionEnterEvent
  * @see dev.thefather007.worldguardneo.api.events.RegionLeaveEvent
@@ -53,10 +32,7 @@ public final class WorldGuardNeoAPI {
 
     private WorldGuardNeoAPI() {}
 
-    /**
-     * Returns whether WorldGuardNeo is loaded and ready to answer queries. Always check
-     * this before relying on API output if your mod loads earlier than WGN.
-     */
+    /** Whether WorldGuardNeo is loaded and ready to answer queries. */
     public static boolean isAvailable() {
         return WorldGuardNeo.get() != null;
     }
@@ -64,10 +40,8 @@ public final class WorldGuardNeoAPI {
     /* ====================== Region lookup ====================== */
 
     /**
-     * Get the highest-priority region at the given position. Returns {@code Optional.empty()}
-     * if the position is in wilderness (no user-defined region covers it). The global region
-     * is never returned here — it's the implicit fallback in resolution, accessed via
-     * {@code regions().get(level).globalRegion()} if needed.
+     * Highest-priority region at the position, or empty for wilderness. The global region is
+     * never returned (it's the implicit resolution fallback).
      */
     public static Optional<ProtectedRegion> getRegionAt(ServerLevel level, BlockPos pos) {
         WorldGuardNeo mod = WorldGuardNeo.get();
@@ -77,14 +51,19 @@ public final class WorldGuardNeoAPI {
         return applicable.isEmpty() ? Optional.empty() : Optional.of(applicable.get(0));
     }
 
-    /**
-     * Get ALL regions covering the given position, ordered by descending priority.
-     * Useful when you need to walk through every layer (e.g. for compound queries).
-     */
+    /** All regions covering the position, ordered by descending priority. */
     public static List<ProtectedRegion> getRegionsAt(ServerLevel level, BlockPos pos) {
         WorldGuardNeo mod = WorldGuardNeo.get();
         if (mod == null) return List.of();
         return mod.regions().get(level).getApplicable(pos.getX(), pos.getY(), pos.getZ());
+    }
+
+    /** Int-coords overload of {@link #getRegionAt(ServerLevel, BlockPos)} (script-friendly). */
+    public static Optional<ProtectedRegion> getRegionAt(ServerLevel level, int x, int y, int z) {
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return Optional.empty();
+        List<ProtectedRegion> applicable = mod.regions().get(level).getApplicable(x, y, z);
+        return applicable.isEmpty() ? Optional.empty() : Optional.of(applicable.get(0));
     }
 
     /** Get a region by id. */
@@ -111,15 +90,8 @@ public final class WorldGuardNeoAPI {
     /* ====================== Permission queries ====================== */
 
     /**
-     * Whether the player can build (break or place) at the given position.
-     *
-     * <p>This is the canonical "can the player modify the world here" check. It takes
-     * into account: build flag, block-break flag, owner/member status, bypass permissions,
-     * and the world-level useRegions kill switch.
-     *
-     * <p>Equivalent to what {@code BlockEvent.BreakEvent} listeners check internally —
-     * checks BOTH the general {@code build} flag and the specific {@code block-break} flag.
-     * Both must permit the action.
+     * Canonical "can the player break here" check: build + block-break flags, owner/member
+     * status, bypass and the per-world kill switch. Mirrors what BlockEvent.BreakEvent enforces.
      */
     public static boolean canBuild(ServerPlayer player, BlockPos pos) {
         WorldGuardNeo mod = WorldGuardNeo.get();
@@ -127,18 +99,13 @@ public final class WorldGuardNeoAPI {
         if (mod.perms().has(player, "worldguardneo.region.bypass")) return true;
         RegionManager mgr = mod.regions().get(player.serverLevel());
         UUID uid = player.getUUID();
-        // testBuildAccess (NOT plain testState) — the break handler grants strangers no access
-        // to a claimed region even when no flag is explicitly set (implicit membership
-        // protection). A testState here answered "true" for foreign claims with unset flags,
-        // so API consumers disagreed with what the actual event handlers enforce.
+        // testBuildAccess (not testState): honours implicit membership protection on claims with
+        // no explicit flag, matching what the event handlers enforce.
         return mgr.testBuildAccess(Flags.BLOCK_BREAK, pos.getX(), pos.getY(), pos.getZ(), uid)
             && mgr.testBuildAccess(Flags.BUILD,       pos.getX(), pos.getY(), pos.getZ(), uid);
     }
 
-    /**
-     * Whether the player can place a block at the position. Like {@link #canBuild} but
-     * checks the specific {@code block-place} flag instead of {@code block-break}.
-     */
+    /** Like {@link #canBuild} but checks {@code block-place} instead of {@code block-break}. */
     public static boolean canPlace(ServerPlayer player, BlockPos pos) {
         WorldGuardNeo mod = WorldGuardNeo.get();
         if (mod == null || !mod.isProtectionActive(player.serverLevel())) return true;
@@ -150,10 +117,7 @@ public final class WorldGuardNeoAPI {
             && mgr.testBuildAccess(Flags.BUILD,       pos.getX(), pos.getY(), pos.getZ(), uid);
     }
 
-    /**
-     * Whether the player can interact (right-click) at the position. Covers buttons,
-     * levers, doors, signs, chests (also see {@link #canAccessChests}).
-     */
+    /** Whether the player can right-click here (buttons, levers, doors…; see {@link #canAccessChests}). */
     public static boolean canInteract(ServerPlayer player, BlockPos pos) {
         WorldGuardNeo mod = WorldGuardNeo.get();
         if (mod == null || !mod.isProtectionActive(player.serverLevel())) return true;
@@ -186,12 +150,8 @@ public final class WorldGuardNeoAPI {
     }
 
     /**
-     * Generic state-flag query — for custom or non-listed flags. Returns the resolved
-     * boolean according to priority+parent+owner-group rules. {@code playerUuid} may be
-     * null for non-player contexts.
-     *
-     * <p>If the flag has no setting on any region at the position, the flag's
-     * {@code defaultAllow} value is returned.
+     * Generic state-flag query (priority+parent+group rules); {@code playerUuid} may be null.
+     * Falls back to the flag's {@code defaultAllow} when unset at the position.
      */
     public static boolean queryFlag(ServerLevel level, StateFlag flag,
                                      @Nullable UUID playerUuid, BlockPos pos) {
@@ -201,19 +161,37 @@ public final class WorldGuardNeoAPI {
         return mgr.testState(flag, playerUuid, pos.getX(), pos.getY(), pos.getZ());
     }
 
-    /**
-     * Generic value-flag query for any flag type (int, string, set). Returns Optional.empty()
-     * if no region at the position has the flag set.
-     */
+    /** Generic value-flag query (int/string/set); empty if unset at the position. */
     @SuppressWarnings("unchecked")
     public static <T> Optional<T> queryValue(ServerLevel level, Flag<T> flag,
                                               @Nullable UUID playerUuid, BlockPos pos) {
         WorldGuardNeo mod = WorldGuardNeo.get();
         if (mod == null) return Optional.empty();
         RegionManager mgr = mod.regions().get(level);
-        // resolveValue takes coords first, actor last
         Object v = mgr.resolveValue(flag, pos.getX(), pos.getY(), pos.getZ(), playerUuid);
         return Optional.ofNullable((T) v);
+    }
+
+    /**
+     * State-flag query by NAME (e.g. {@code "pvp"}) for scripting. Unknown/non-state names resolve
+     * to {@code true} so a typo never hard-blocks an action; {@code playerUuid} may be null.
+     */
+    public static boolean queryFlag(ServerLevel level, String flagName,
+                                    @Nullable UUID playerUuid, int x, int y, int z) {
+        Flag<?> f = Flags.get(flagName);
+        if (!(f instanceof StateFlag sf)) return true;
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return sf.defaultAllow();
+        return mod.regions().get(level).testState(sf, playerUuid, x, y, z);
+    }
+
+    /** Value-flag query by NAME for scripting; empty if unset or unknown. */
+    public static Optional<Object> queryValue(ServerLevel level, String flagName, int x, int y, int z) {
+        Flag<?> f = Flags.get(flagName);
+        if (f == null) return Optional.empty();
+        WorldGuardNeo mod = WorldGuardNeo.get();
+        if (mod == null) return Optional.empty();
+        return Optional.ofNullable(mod.regions().get(level).resolveValue(f, x, y, z, null));
     }
 
     /* ====================== Ownership checks ====================== */
@@ -228,11 +206,7 @@ public final class WorldGuardNeoAPI {
         return region.isMember(playerUuid);
     }
 
-    /**
-     * Does the player hold the global {@code worldguardneo.region.bypass} permission?
-     * Useful for mods that want to skip their own protections when the player is
-     * a WGN admin.
-     */
+    /** Does the player hold the global {@code worldguardneo.region.bypass} permission? */
     public static boolean hasBypass(ServerPlayer player) {
         WorldGuardNeo mod = WorldGuardNeo.get();
         if (mod == null) return false;
@@ -242,17 +216,21 @@ public final class WorldGuardNeoAPI {
     /* ====================== Custom flag registration ====================== */
 
     /**
-     * Register a custom flag from your mod. Should be called during mod initialization,
-     * BEFORE the server starts. Flag identifiers are global and must match
-     * {@code [a-z][a-z0-9-]*} (no dots) — prefix with your mod name dash-style
-     * (e.g. {@code "mymod-feature"}) to avoid collisions.
+     * Register a custom flag during mod init (before the server starts). Names are global and must
+     * match {@code [a-z][a-z0-9-]*}; prefix with your mod id to avoid collisions. Once registered the
+     * flag is first-class (settable via {@code /rg flag}, persisted). Idempotent: re-registering the
+     * same name+type returns the existing instance, so it's safe in a {@code static final} field.
      *
-     * <p>Returns the registered flag instance — keep a reference to it for later
-     * {@code queryFlag()} / {@code queryValue()} calls.
-     *
-     * @throws IllegalStateException if a flag with the same name is already registered
+     * @throws IllegalStateException if a flag with the same name but a DIFFERENT type exists
      */
+    @SuppressWarnings("unchecked")
     public static <F extends Flag<?>> F registerFlag(F flag) {
+        Flag<?> existing = Flags.get(flag.name());
+        if (existing != null) {
+            if (existing.getClass() == flag.getClass()) return (F) existing;
+            throw new IllegalStateException("Flag '" + flag.name()
+                    + "' is already registered with a different type (" + existing.getClass().getSimpleName() + ")");
+        }
         Flags.register(flag);
         return flag;
     }

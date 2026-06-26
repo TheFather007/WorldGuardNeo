@@ -8,16 +8,17 @@ import dev.thefather007.worldguardneo.lang.Localization;
 import dev.thefather007.worldguardneo.listeners.BlockEventHandler;
 import dev.thefather007.worldguardneo.listeners.EntityEventHandler;
 import dev.thefather007.worldguardneo.listeners.PlayerEventHandler;
-import dev.thefather007.worldguardneo.listeners.WandCommandHandler;
+import dev.thefather007.worldguardneo.listeners.SelectionWandHandler;
 import dev.thefather007.worldguardneo.listeners.WorldEventHandler;
 import dev.thefather007.worldguardneo.permissions.PermissionService;
 import dev.thefather007.worldguardneo.region.RegionContainer;
+import dev.thefather007.worldguardneo.selection.CuiPayload;
+import dev.thefather007.worldguardneo.selection.SelectionStore;
 import dev.thefather007.worldguardneo.storage.JsonRegionStorage;
 import dev.thefather007.worldguardneo.storage.RegionStorage;
 import dev.thefather007.worldguardneo.storage.SqliteRegionStorage;
 import dev.thefather007.worldguardneo.storage.H2RegionStorage;
 import dev.thefather007.worldguardneo.storage.MySqlRegionStorage;
-import dev.thefather007.worldguardneo.worldedit.WorldEditAdapter;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
@@ -25,6 +26,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.neoforged.fml.loading.FMLPaths;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
+import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -36,7 +39,7 @@ import java.nio.file.Path;
 
 /**
  * WorldGuardNeo — region protection system for NeoForge 1.21.1.
- * Author: TheFather007. Version 1.2.
+ * Author: TheFather007. Version 1.3.
  */
 @Mod(WorldGuardNeo.MOD_ID)
 public final class WorldGuardNeo {
@@ -50,23 +53,23 @@ public final class WorldGuardNeo {
     private final Localization localization;
     private final PermissionService permissions;
     private final RegionContainer regionContainer;
-    private final WorldEditAdapter worldEditAdapter;
+    private final SelectionStore selectionStore;
     private final dev.thefather007.worldguardneo.backup.BackupManager backupManager;
     private final dev.thefather007.worldguardneo.util.ViolationLog violationLog;
+    private final dev.thefather007.worldguardneo.util.AuditLog auditLog;
+    private final dev.thefather007.worldguardneo.region.RegionTrash regionTrash = new dev.thefather007.worldguardneo.region.RegionTrash();
+    private final dev.thefather007.worldguardneo.expiry.ClaimExpiry claimExpiry;
     private WorldEventHandler worldEvents;
 
     public WorldGuardNeo(IEventBus modBus, ModContainer container) {
         INSTANCE = this;
-        LOGGER.info("[WorldGuardNeo] Bootstrapping v1.2 for NeoForge 1.21.1");
+        LOGGER.info("[WorldGuardNeo] Bootstrapping v1.3 for NeoForge 1.21.1");
 
-        // Pre-register all built-in flags FIRST so that storage and config can resolve them
-        // by name without races. None of the subsequent constructors take a flag identity,
-        // but moving this up keeps the invariant cheap to verify.
+        // Register built-in flags first so storage and config can resolve them by name.
         Flags.bootstrap();
 
         Path configDir = FMLPaths.CONFIGDIR.get().resolve(MOD_ID);
-        // Regions now live under config/worldguardneo/regions (was gameDir/worldguardneo/regions)
-        // so all of the mod's persistent data sits in one place next to config.toml.
+        // All persistent data lives under config/worldguardneo, next to config.toml.
         Path dataDir   = configDir;
 
         this.config           = WGConfig.loadOrCreate(configDir);
@@ -74,16 +77,21 @@ public final class WorldGuardNeo {
         this.permissions      = PermissionService.detect(this.config.global().useLuckPerms);
         RegionStorage storage = createStorage(this.config.global(), dataDir);
         this.regionContainer  = new RegionContainer(storage);
-        this.worldEditAdapter = WorldEditAdapter.detect();
-        // Backups also go under config/worldguardneo (passing dataDir, the mod's data root).
+        // Built-in selection (replaces WorldEdit): per-player state rendered over the WE-CUI channel.
+        this.selectionStore   = new SelectionStore();
         this.backupManager    = new dev.thefather007.worldguardneo.backup.BackupManager(dataDir);
-        // Violations go to logs/worldguardneo-violations.log, separate from the main console,
-        // so routine "player tried to grief a claim" events don't bury real errors.
+        // Violations log separately so routine grief attempts don't bury real errors.
         this.violationLog     = new dev.thefather007.worldguardneo.util.ViolationLog(
                 FMLPaths.GAMEDIR.get().resolve("logs"));
+        // Admin audit trail (region create/delete/redefine/transfer, flag/member edits).
+        this.auditLog         = new dev.thefather007.worldguardneo.util.AuditLog(
+                FMLPaths.GAMEDIR.get().resolve("logs"));
+        // Claim-expiry tracker; cleanup only runs if enabled in config.
+        this.claimExpiry      = new dev.thefather007.worldguardneo.expiry.ClaimExpiry(dataDir);
 
         // Lifecycle.
         modBus.addListener(this::onCommonSetup);
+        modBus.addListener(this::onRegisterPayloads);
 
         // Game events.
         IEventBus forge = NeoForge.EVENT_BUS;
@@ -99,7 +107,7 @@ public final class WorldGuardNeo {
         this.worldEvents = new WorldEventHandler(this);
         forge.register(this.worldEvents);
         forge.register(new PlayerEventHandler(this));
-        forge.register(new WandCommandHandler(this));
+        forge.register(new SelectionWandHandler(this));
 
         // Report only the optional integrations that are actually present, instead of printing
         // a "detected: false" line for every soft-dep. Cleaner console, and it makes it obvious
@@ -107,7 +115,6 @@ public final class WorldGuardNeo {
         // sqlite-jdbc library (detected by classpath, not ModList, since it's a library mod).
         String[][] softDeps = {
                 {"luckperms", "LuckPerms"},
-                {"worldedit", "WorldEdit"},
                 {"bluemap",   "BlueMap"},
                 {"squaremap", "squaremap"},
                 {"sqlite_jdbc", "SQLite JDBC"},
@@ -135,6 +142,18 @@ public final class WorldGuardNeo {
         event.enqueueWork(() -> LOGGER.info("[WorldGuardNeo] Common setup complete."));
     }
 
+    /**
+     * Register the WorldEdit-CUI plugin channel so the built-in selection can be drawn on clients
+     * running WorldEditCUI. Registered {@code optional()} and send-only ({@code playToClient}) so
+     * vanilla clients (and clients without WorldEditCUI) connect fine — the channel simply isn't
+     * negotiated and the selection packets are dropped. The handler is a no-op: we never read CUI
+     * messages from the client, we only push the current selection out.
+     */
+    private void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        PayloadRegistrar registrar = event.registrar("1").optional();
+        registrar.playToClient(CuiPayload.TYPE, CuiPayload.CODEC, (payload, context) -> { /* send-only */ });
+    }
+
     private void onRegisterCommands(RegisterCommandsEvent event) {
         WGCommands.register(event.getDispatcher(), this);
         LOGGER.info("[WorldGuardNeo] Registered /region and /rg commands.");
@@ -153,6 +172,10 @@ public final class WorldGuardNeo {
 
     private void onServerStarted(ServerStartedEvent event) {
         LOGGER.info("[WorldGuardNeo] Ready.");
+        // Run an expiry scan at startup (no-op unless claim-expiry.enabled). The player list now
+        // exists so currently-online owners are correctly treated as active.
+        try { claimExpiry.runCleanup(this); }
+        catch (Throwable t) { LOGGER.warn("[WorldGuardNeo] startup claim-expiry scan failed", t); }
         // Initial sync for any active map integrations. Idempotent — runs once at start.
         var bm = dev.thefather007.worldguardneo.integrations.BluemapIntegration.get();
         if (bm != null && bm.isActive()) bm.publishAll();
@@ -165,6 +188,9 @@ public final class WorldGuardNeo {
         // the others (e.g. if saveAll throws, we still want to close the storage handle).
         try { regionContainer.saveAll(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] saveAll failed", ex); }
+        // Stop the write-behind worker (final drain) before closing the storage handle it uses.
+        try { regionContainer.shutdownWriter(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] region writer shutdown failed", ex); }
         try { regionContainer.storage().close(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] storage close failed", ex); }
         // Flush the backup executor — wait briefly for any in-flight backup to finish.
@@ -172,6 +198,10 @@ public final class WorldGuardNeo {
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] backup manager close failed", ex); }
         try { violationLog.close(); }
         catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] violation log close failed", ex); }
+        try { auditLog.close(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] audit log close failed", ex); }
+        try { claimExpiry.save(); }
+        catch (Exception ex) { LOGGER.warn("[WorldGuardNeo] activity save failed", ex); }
         LOGGER.info("[WorldGuardNeo] All regions saved.");
     }
 
@@ -185,6 +215,7 @@ public final class WorldGuardNeo {
         if (config.global().backupEnabled) {
             backupManager.tick(t, config.global().backupIntervalMinutes);
         }
+        claimExpiry.tick(this, t);
     }
 
     /**
@@ -192,7 +223,16 @@ public final class WorldGuardNeo {
      * JSON internally if its driver/connection is unavailable, so this never fails hard.
      */
     private static RegionStorage createStorage(WGConfig.GlobalSection g, java.nio.file.Path dataDir) {
-        String fmt = g.storageFormat == null ? "json" : g.storageFormat.trim().toLowerCase(java.util.Locale.ROOT);
+        return createStorage(g.storageFormat, g, dataDir);
+    }
+
+    /**
+     * Build a storage backend for an explicit format string (used by {@code /rg migrate} to
+     * construct the target backend without touching the live one). MySQL still reads its
+     * connection settings from {@code g}.
+     */
+    public static RegionStorage createStorage(String format, WGConfig.GlobalSection g, java.nio.file.Path dataDir) {
+        String fmt = format == null ? "json" : format.trim().toLowerCase(java.util.Locale.ROOT);
         switch (fmt) {
             case "sqlite":
                 return new SqliteRegionStorage(dataDir);
@@ -222,14 +262,18 @@ public final class WorldGuardNeo {
     public Localization        i18n()           { return localization; }
     public PermissionService   perms()          { return permissions; }
     public RegionContainer     regions()        { return regionContainer; }
-    public WorldEditAdapter    worldEdit()      { return worldEditAdapter; }
+    public SelectionStore      selections()     { return selectionStore; }
     public dev.thefather007.worldguardneo.util.ViolationLog violations() { return violationLog; }
+    public dev.thefather007.worldguardneo.util.AuditLog       audit()    { return auditLog; }
+    public dev.thefather007.worldguardneo.region.RegionTrash  trash()    { return regionTrash; }
     public WorldEventHandler   worldEvents()    { return worldEvents; }
     public dev.thefather007.worldguardneo.backup.BackupManager backups() { return backupManager; }
+    public dev.thefather007.worldguardneo.expiry.ClaimExpiry    expiry()  { return claimExpiry; }
 
     /**
      * Returns the current tick of the running MinecraftServer's overworld, or 0 if no
-     * server is currently active. Used by the selection-store TTL.
+     * server is currently active. Drives the per-tick region-save flush, backup scheduling
+     * and the claim-expiry scan (see {@link #onServerTick}).
      */
     public long currentServerTick() {
         try {

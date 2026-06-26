@@ -22,19 +22,10 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.GZIPOutputStream;
 
 /**
- * Async, rotating backups of the region files.
- *
- * <p>Backups are full copies of {@code worldguardneo/regions/}, written into
- * {@code worldguardneo/backups/<timestamp>/} as gzipped region files. Rotation
- * keeps only the newest N directories; older ones are removed.
- *
- * <p>All disk I/O runs on a single-threaded executor — never on the server tick
- * thread. The server tick only flips a "is it time?" check via {@link #tick}.
- * Concurrent backup attempts are guarded by an {@code in-flight} atomic flag;
- * if a previous backup is still running when the next one is due, the new one
- * is dropped (logged at info-level) rather than corrupting the snapshot.
- *
- * <p>The executor is a daemon thread so it doesn't prevent JVM shutdown.
+ * Async, rotating backups of the region files: full gzipped copies of {@code regions/} into
+ * {@code backups/<timestamp>/}, keeping only the newest N. All I/O runs on a single daemon
+ * executor (never the tick thread); an in-flight flag drops overlapping runs rather than
+ * corrupting a snapshot.
  */
 public final class BackupManager implements AutoCloseable {
 
@@ -73,12 +64,10 @@ public final class BackupManager implements AutoCloseable {
     }
 
     /**
-     * Server-tick scheduler. Submits an async backup task if the configured interval
-     * has elapsed since the last run. Cheap — the common case (interval not yet up,
-     * or already running) is a single AtomicLong read.
+     * Server-tick scheduler: submits an async backup once the interval has elapsed. The first
+     * backup runs ~one interval after start (not at boot, to avoid racing world load).
      *
-     * @param currentTick current server tick
-     * @param intervalMinutes minutes between backups; if {@code <= 0}, scheduling is disabled
+     * @param intervalMinutes minutes between backups; {@code <= 0} disables scheduling
      */
     public void tick(long currentTick, int intervalMinutes) {
         if (intervalMinutes <= 0) return;
@@ -106,16 +95,41 @@ public final class BackupManager implements AutoCloseable {
             WorldGuardNeo.LOGGER.info("[WorldGuardNeo] Backup already in progress; skipping new request.");
             return false;
         }
-        executor.submit(() -> {
-            try {
-                doBackup(label);
-            } catch (Throwable t) {
-                // Catch Throwable so a single bad backup doesn't take down the executor.
-                WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Backup failed", t);
-            } finally {
-                inFlight.set(false);
+        // Checkpoint embedded DBs NOW, on the calling (server) thread, before the async file copy.
+        // runAsync is only ever invoked from the server tick or the /rg backup command, both on the
+        // server thread — the same thread that owns the single DB connection — so this is safe.
+        // It flushes the SQLite WAL / H2 MVStore into the main file so the copy is consistent.
+        try {
+            var mod = WorldGuardNeo.get();
+            if (mod != null && mod.regions() != null) {
+                // Land all queued write-behind I/O first, so the on-disk files we're about to copy
+                // include the latest edits (and the worker isn't using the connection during the
+                // checkpoint below).
+                mod.regions().drainWrites();
+                mod.regions().storage().prepareForBackup();
             }
-        });
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] prepareForBackup failed", t);
+        }
+        try {
+            executor.submit(() -> {
+                try {
+                    doBackup(label);
+                } catch (Throwable t) {
+                    // Catch Throwable so a single bad backup doesn't take down the executor.
+                    WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Backup failed", t);
+                } finally {
+                    inFlight.set(false);
+                }
+            });
+        } catch (RuntimeException ex) {
+            // submit() can throw (e.g. RejectedExecutionException if the executor is shutting down).
+            // Without resetting the flag here, inFlight would stay true forever and block every
+            // future backup with a misleading "already in progress".
+            inFlight.set(false);
+            WorldGuardNeo.LOGGER.error("[WorldGuardNeo] Could not schedule backup task", ex);
+            return false;
+        }
         return true;
     }
 
@@ -195,10 +209,19 @@ public final class BackupManager implements AutoCloseable {
         rotate(retain);
     }
 
-    /** Embedded-database files living at the data root (sqlite / h2), present ones only. */
+    /**
+     * Embedded-database files living at the data root (sqlite / h2), present ones only.
+     *
+     * <p>The SQLite {@code -wal} and {@code -shm} sidecars are included: although the backup
+     * checkpoints with {@code wal_checkpoint(TRUNCATE)} on the server thread before the copy, the
+     * copy itself runs asynchronously, so a server tick between the checkpoint and the copy can
+     * commit fresh frames into a new {@code -wal}. Copying the sidecars alongside the main file
+     * makes the snapshot a complete, recoverable WAL set rather than one missing the latest commits.
+     */
     private List<Path> collectDbFiles() {
-        List<Path> out = new ArrayList<>(2);
-        for (String name : new String[]{"regions.sqlite", "regions_h2.mv.db"}) {
+        List<Path> out = new ArrayList<>(4);
+        for (String name : new String[]{
+                "regions.sqlite", "regions.sqlite-wal", "regions.sqlite-shm", "regions_h2.mv.db"}) {
             Path p = dataDir.resolve(name);
             if (Files.isRegularFile(p)) out.add(p);
         }

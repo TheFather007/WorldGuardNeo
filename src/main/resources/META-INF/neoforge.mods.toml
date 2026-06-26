@@ -30,18 +30,6 @@ versionRange="${minecraft_version_range}"
 ordering="NONE"
 side="SERVER"
 
-# WorldEdit — OPTIONAL for loading, REQUIRED only for creating regions: /rg claim and /rg
-# redefine read the player's WorldEdit selection. Without WorldEdit the mod still loads and ALL
-# other commands + protection work; only claim/redefine are unavailable. Made optional so a
-# missing WorldEdit can never silently disable the whole mod (which "required" did — NeoForge
-# refuses to load the mod, so NO commands register at all).
-[[dependencies.${mod_id}]]
-modId="worldedit"
-type="optional"
-versionRange="[7.3,)"
-ordering="AFTER"
-side="SERVER"
-
 # LuckPerms — optional permission backend; falls back to OP levels if missing.
 [[dependencies.${mod_id}]]
 modId="luckperms"

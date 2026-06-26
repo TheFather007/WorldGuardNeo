@@ -6,7 +6,7 @@
 
 **English** · [Русский](PERMISSIONS_RU.md)
 
-[🏠 Home](README.md) · [🔨 Building](BUILD.md) · **🔑 Permissions** · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · **🔑 Permissions** · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [🧩 KubeJS](KUBEJS.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -30,14 +30,19 @@ The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` 
 | `worldguardneo.region.claim` | OP 0 | `/rg claim` — create a region. All limits apply (per-player/group counts, volume, area, overlap). |
 | `worldguardneo.region.delete` | OP 0 | `/rg remove` — delete **your own** region. |
 | `worldguardneo.region.delete.others` | OP 3 | Delete **anyone's** region. |
+| `worldguardneo.region.undo` | OP 2 | `/rg undo` — restore the most recently removed region in this world (session trash). |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — resize a region to your selection. |
+| `worldguardneo.region.rename` | OP 2 | `/rg rename` — change a region's id, keeping all its data. |
+| `worldguardneo.region.audit` | OP 2 | `/rg audit` — view a region's recent administrative changes. |
+| `worldguardneo.region.select` | OP 2 | `/rg select` — load a region's geometry into your selection. |
+| `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — hand sole ownership to another player. |
 | `worldguardneo.region.info` | OP 0 | `/rg info` — view a region you can see. |
 | `worldguardneo.region.info.others` | OP 2 | View regions owned by others. |
 | `worldguardneo.region.info.global` | OP 4 | View the global (`__global__`) region. |
 | `worldguardneo.region.list` | OP 0 | `/rg list` — list your regions. |
 | `worldguardneo.region.list.others` | OP 2 | List another player's regions. |
 | `worldguardneo.region.lists.radius` | OP 2 | `/rg lists <radius>` — list nearby regions. |
-| `worldguardneo.region.teleport` | OP 0 | `/rg teleport` — TP to a region's `teleport` flag. |
+| `worldguardneo.region.teleport` | OP 2 | `/rg teleport` — TP to a region's `teleport` flag. |
 
 ## Membership nodes
 
@@ -66,11 +71,18 @@ In addition, **each individual flag** has its own node `worldguardneo.flag.<name
 
 | Node | Default | Controls |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | Receiving the custom WorldGuardNeo `//wand`. |
+| `worldguardneo.selection.use` | OP 0 | Using the wand item itself (clicking blocks to pick corners/points). |
+| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — receive the built-in selection wand item (one per player). |
+| `worldguardneo.selection.mode` | OP 0 | `/rg sel <cuboid\|poly\|clear>` — switch selection mode / clear. |
+| `worldguardneo.selection.pos1` | OP 0 | `/rg pos1` — set cuboid corner 1 at your position. |
+| `worldguardneo.selection.pos2` | OP 0 | `/rg pos2` — set cuboid corner 2 at your position. |
+| `worldguardneo.selection.point` | OP 0 | `/rg point` — add a polygon vertex at your position. |
+| `worldguardneo.selection.pos.coords` | OP 4 | `/rg pos1 <x y z>` / `pos2 <x y z>` — explicit coords (console-capable via `/execute as`). |
 | `worldguardneo.region.admin` | OP 3 | Administrative region operations. |
 | `worldguardneo.region.bypass` | **OP 5** | Bypass region protection entirely. Never granted by OP — LuckPerms only. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — manual backup. |
-| `worldguardneo.reload` | OP 4 | `/rg reload` — reload config & language. |
+| `worldguardneo.migrate` | OP 4 | `/rg migrate <json\|sqlite\|h2\|mysql>` — convert region data to another storage backend (activates on restart). |
+| `worldguardneo.reload` | OP 4 | `/rg reload` — reload config & language. Also gates `/rg cleanup` (run the claim-expiry scan now). |
 | `worldguardneo.notify` | OP 2 | Receive broadcast messages when players cross regions flagged `notify-enter` / `notify-leave`. |
 
 ## LuckPerms examples
@@ -95,10 +107,11 @@ Grant trusted staff full bypass (the only way to get `region.bypass`):
 /lp group admin permission set worldguardneo.region.bypass true
 ```
 
-Lock the WorldEdit wand away from normal players (see [Permissions FAQ in README](README.md#permissions)):
+Lock the selection wand away from normal players (see [Permissions FAQ in README](README.md#permissions)):
 
 ```
 /lp group default permission set worldguardneo.selection.use false
+/lp group default permission set worldguardneo.selection.wand false
 ```
 
 ## License

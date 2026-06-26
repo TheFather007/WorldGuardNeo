@@ -48,14 +48,9 @@ public abstract class Flag<T> {
     public abstract T parse(String input) throws FlagParseException;
 
     /**
-     * Parse {@code input} and store the result on {@code region} (plus group if given), all
-     * within this flag's own generic context so callers don't need raw {@code Flag} types.
-     *
-     * <p>WGCommands works with {@code Flag<?>} obtained from {@link Flags#get}, where the
-     * wildcard prevents calling {@code region.setFlag(flag, parse(input))} directly — the
-     * compiler can't prove the parsed value matches the region's expected {@code T}. Doing the
-     * parse-and-set HERE, where {@code T} is bound, keeps the whole operation type-safe and
-     * eliminates the unchecked-cast the command layer would otherwise need.
+     * Parse {@code input} and store the result on {@code region} (plus group if given). Done HERE,
+     * where {@code T} is bound, so the command layer working with {@code Flag<?>} stays type-safe
+     * and avoids an unchecked cast.
      *
      * @param input the raw value, or null/empty to UNSET the flag
      * @param group optional region-group to attach (null to leave group untouched)
@@ -83,10 +78,8 @@ public abstract class Flag<T> {
     public String display(T value) { return String.valueOf(value); }
 
     /**
-     * Display a value pulled from a region's raw {@code Map<Flag<?>, Object>} store. The
-     * value is guaranteed to be this flag's {@code T} (it was put there via the typed
-     * {@link dev.thefather007.worldguardneo.region.ProtectedRegion#setFlag}), so the cast is safe;
-     * doing it here keeps {@code /rg info}'s flag-dump loop free of raw {@code Flag} types.
+     * Display a value from a region's raw {@code Map<Flag<?>, Object>} store. The cast is safe: the
+     * value was stored via the typed {@code setFlag}, so it's guaranteed to be this flag's {@code T}.
      */
     @SuppressWarnings("unchecked")
     public final String displayRaw(Object rawValue) {

@@ -13,10 +13,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
  * Cancels snow-layer melt (random tick) inside regions flagged {@code snow-melt = DENY}.
- *
- * The complementary {@code snow-fall} flag is enforced by the precipitation
- * pipeline rather than random tick — see {@link BiomeMixin} (precipitation route).
- * Here we only handle the "high light level melts snow" case.
+ * Only the light-level melt path; the complementary {@code snow-fall} flag runs through the
+ * precipitation pipeline ({@link BiomeMixin}), not random tick.
  */
 @Mixin(SnowLayerBlock.class)
 public abstract class SnowLayerBlockMixin {

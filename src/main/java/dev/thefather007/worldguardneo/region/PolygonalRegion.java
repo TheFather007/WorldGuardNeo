@@ -60,22 +60,15 @@ public final class PolygonalRegion extends ProtectedRegion {
     public int maxY() { return maxY; }
 
     @Override public boolean contains(double x, double y, double z) {
-        // Y range is block-inclusive like CuboidRegion: block maxY spans [maxY, maxY+1), so a
-        // position is inside when y < maxY+1 (exclusive upper). Using ">= maxY+1" here keeps
-        // the two region types consistent at the boundary (a player at exactly y=maxY+1 is in
-        // the block ABOVE the region and must be excluded).
+        // Block-inclusive Y like CuboidRegion: [minY, maxY+1) so y=maxY+1 is the block above (excluded).
         if (y < minY || y >= maxY + 1.0) return false;
-        // Quick AABB reject before the more expensive ray-cast. Same exclusive-upper rule.
+        // Quick AABB reject before the ray-cast. Same exclusive-upper rule.
         if (x < minBound.x() || x >= maxBound.x() + 1.0
          || z < minBound.z() || z >= maxBound.z() + 1.0) return false;
-        // Ray casting in XZ plane. Test the BLOCK the position sits in (floor to block coords)
-        // rather than the raw continuous coordinate. The polygon's vertices are block coordinates
-        // (as produced by WorldEdit), so a raw entity position on the max +X/+Z block row — e.g.
-        // x=10.5 against a max vertex at x=10 — was classified OUTSIDE, leaving that block row of a
-        // polygonal claim unprotected against players (block-edits already pass integer coords, so
-        // only continuous entity positions were affected). Flooring makes the test block-inclusive,
-        // consistent with CuboidRegion's [min, max+1) bounds and WorldEdit's own block-based
-        // Polygonal2DRegion.contains. Math.floor (not an int cast) is required for negative coords.
+        // Ray-cast in XZ, but test the BLOCK the position sits in (floor), not the raw coordinate:
+        // vertices are block coords, so a continuous position on the max +X/+Z block row (e.g. x=10.5
+        // vs vertex 10) would otherwise read OUTSIDE and leave that row unprotected. Flooring matches
+        // CuboidRegion's [min, max+1) and WorldEdit's block-based contains. Math.floor needed for negatives.
         double bx = Math.floor(x), bz = Math.floor(z);
         boolean inside = false;
         int n = points.size();
@@ -93,4 +86,8 @@ public final class PolygonalRegion extends ProtectedRegion {
     @Override public Vec3   maximumBound() { return maxBound; }
     @Override public String type()         { return "polygonal"; }
     @Override public long   volume()       { return volume; }
+
+    @Override public ProtectedRegion withId(String newId) {
+        return new PolygonalRegion(newId, points, minY, maxY);
+    }
 }

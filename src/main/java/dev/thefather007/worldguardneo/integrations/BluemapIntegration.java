@@ -16,30 +16,13 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * Soft-dependency Bluemap integration.
+ * Soft-dependency Bluemap integration. Publishes one {@code ShapeMarker} per region (XZ footprint)
+ * into a per-world {@code MarkerSet} named "WorldGuardNeo". Uses reflection so we don't compile-link
+ * {@code bluemap-api}: when Bluemap is absent every method no-ops and {@code isActive()} is false.
  *
- * <p>Connects to Bluemap via reflection if {@code bluemap} mod is loaded. Publishes one
- * marker per WorldGuardNeo region, grouped in a {@code MarkerSet} called "WorldGuardNeo".
- * The set is created per Bluemap-world; markers are {@code ShapeMarker}s (cuboid /
- * polygon footprint on the XZ plane).
- *
- * <p>Why reflection: we don't want to compile-link {@code bluemap-api} (would force
- * users to install it). Reflection lets us no-op gracefully when Bluemap is absent.
- *
- * <p>Lifecycle:
- * <ul>
- *   <li>{@link #init} — called once at server-start. Detects Bluemap, registers
- *       {@code onEnable}/{@code onDisable} callbacks via the API.</li>
- *   <li>{@link #publishAll} — called from the onEnable callback and from /rg reload.
- *       Walks every region in every world and creates/updates markers.</li>
- *   <li>{@link #updateRegion} / {@link #removeRegion} — called by command handlers
- *       after /rg claim, /rg flag, /rg remove etc. Incremental sync.</li>
- * </ul>
- *
- * <p>If Bluemap is absent, all methods become no-ops and {@code isActive()} returns false.
- *
- * <p>This class lives on the server thread. Bluemap's API is thread-safe per their docs,
- * but we still avoid background-thread mutation to keep things simple.
+ * <p>Lifecycle: {@link #init} registers the API onEnable/onDisable callbacks; {@link #publishAll}
+ * does a full re-sync; {@link #updateRegion}/{@link #removeRegion} do incremental sync. All access
+ * is on the server thread.
  */
 public final class BluemapIntegration {
 
@@ -66,23 +49,20 @@ public final class BluemapIntegration {
     /** Marker setters. */
     private Method markerSetMarkers; // MarkerSet.getMarkers() -> Map<String,Marker>
     private Method markerSetFillColor, markerSetLineColor, markerSetLineWidth;
+    /** Popup: label (title) + detail (HTML shown on click). */
+    private Method markerSetLabel, markerSetDetail;
     /** Color(int r,int g,int b,float a). */
     private java.lang.reflect.Constructor<?> colorCtor;
 
     private final Map<String, Object> serverLevelToBmWorld = new HashMap<>();
 
-    /** Set this to true if the {@code bluemap} mod is loaded. */
     public boolean isActive() { return active; }
 
-    /**
-     * One-time init. Resolves reflective handles, registers the onEnable/onDisable hooks.
-     * Safe to call multiple times — subsequent calls are no-ops.
-     */
+    /** One-time init: resolve reflective handles, register onEnable/onDisable. Safe to repeat. */
     public static synchronized void init() {
         if (INSTANCE != null) return;
         INSTANCE = new BluemapIntegration();
-        // Silent unless reflection fails — the "Detected integrations: ..." line in WorldGuardNeo
-        // already reports presence. Avoids the per-integration "not present" console spam.
+        // Silent unless reflection fails — presence is reported by WGN's "Detected integrations" line.
         if (!ModList.get().isLoaded("bluemap")) {
             return;
         }
@@ -109,7 +89,6 @@ public final class BluemapIntegration {
         getInstance        = apiCls.getMethod("getInstance");
         optionalGet        = java.util.Optional.class.getMethod("get");
         optionalIsPresent  = java.util.Optional.class.getMethod("isPresent");
-        // getWorld accepts the platform world object (ServerLevel) and returns Optional.
         apiGetWorld        = apiCls.getMethod("getWorld", Object.class);
         apiOnEnable        = apiCls.getMethod("onEnable", Consumer.class);
         apiOnDisable       = apiCls.getMethod("onDisable", Consumer.class);
@@ -125,6 +104,8 @@ public final class BluemapIntegration {
         markerSetFillColor = smCls.getMethod("setFillColor", colorCls);
         markerSetLineColor = smCls.getMethod("setLineColor", colorCls);
         markerSetLineWidth = smCls.getMethod("setLineWidth", int.class);
+        markerSetLabel     = smCls.getMethod("setLabel", String.class);
+        markerSetDetail    = smCls.getMethod("setDetail", String.class);
     }
 
     private void registerCallbacks() throws Exception {
@@ -132,8 +113,7 @@ public final class BluemapIntegration {
             try {
                 WorldGuardNeo mod = WorldGuardNeo.get();
                 if (mod == null) return;
-                // Schedule a full republish — runs on whichever thread Bluemap invoked us;
-                // we route through ServerLifecycleHooks to get back on the server thread.
+                // Route back onto the server thread — Bluemap may invoke us from any thread.
                 MinecraftServer srv = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
                 if (srv != null) srv.execute(this::publishAll);
             } catch (Throwable t) {
@@ -160,7 +140,7 @@ public final class BluemapIntegration {
                 RegionManager mgr = mod.regions().get(lvl);
                 Object markerSet = ensureMarkerSet(lvl);
                 if (markerSet == null) continue;
-                // Wipe old markers — easier than diff'ing.
+                // Wipe and rebuild — simpler than diffing.
                 @SuppressWarnings("unchecked")
                 Map<String,Object> markers = (Map<String,Object>) markerSetMarkers.invoke(markerSet);
                 markers.clear();
@@ -181,7 +161,7 @@ public final class BluemapIntegration {
             if (markerSet == null) return;
             @SuppressWarnings("unchecked")
             Map<String,Object> markers = (Map<String,Object>) markerSetMarkers.invoke(markerSet);
-            // remove old then add new — id stays same so this just replaces
+            // Same id, so remove+add just replaces.
             markers.remove(r.id());
             addMarker(markers, r);
         } catch (Throwable t) {
@@ -214,18 +194,14 @@ public final class BluemapIntegration {
         if (!(boolean) optionalIsPresent.invoke(worldOpt)) return null;
         Object bmWorld = optionalGet.invoke(worldOpt);
 
-        // We re-use the same MarkerSet across all maps of a world (Bluemap docs explicitly
-        // suggest this). Cache by dimension key to avoid recreating the set; the same key is
-        // stable across the server-runtime for a given world.
+        // One MarkerSet re-used across all maps of a world, cached by dimension key.
         String key = lvl.dimension().location().toString();
         Object markerSet = serverLevelToBmWorld.get(key);
         if (markerSet == null) {
             markerSet = markerSetCtor.newInstance("WorldGuardNeo");
             serverLevelToBmWorld.put(key, markerSet);
         }
-        // Ensure the set is registered in every map of the world. Idempotent put() — if a
-        // new map was loaded via Bluemap reload, this picks it up. Safe to repeat: Map.put
-        // with the same key+value is a no-op write.
+        // Idempotent register into every map — picks up maps added by a Bluemap reload.
         Iterable<?> maps = (Iterable<?>) bmWorldGetMaps.invoke(bmWorld);
         for (Object map : maps) {
             @SuppressWarnings("unchecked")
@@ -240,8 +216,7 @@ public final class BluemapIntegration {
         Object shape;
         float displayY;
         if (r instanceof CuboidRegion c) {
-            // Use minBound.y as the display height. Bluemap renders the shape on a flat plane,
-            // so we pick the lower bound to make the marker hug the terrain rather than float.
+            // Display at the lower Y bound so the flat marker hugs the terrain rather than floats.
             Vec3 min = c.minimumBound();
             Vec3 max = c.maximumBound();
             displayY = min.y();
@@ -251,7 +226,7 @@ public final class BluemapIntegration {
                 vec2dCtor.newInstance((double) max.x() + 1.0, (double) max.z() + 1.0),
                 vec2dCtor.newInstance((double) min.x(), (double) max.z() + 1.0)
             };
-            // Reflective array — Bluemap's Shape constructor takes a Vector2d[].
+            // Shape constructor takes a Vector2d[].
             Object arr = java.lang.reflect.Array.newInstance(
                     Class.forName("com.flowpowered.math.vector.Vector2d"), corners.length);
             for (int i = 0; i < corners.length; i++) java.lang.reflect.Array.set(arr, i, corners[i]);
@@ -277,6 +252,9 @@ public final class BluemapIntegration {
         markerSetFillColor.invoke(marker, fillColor);
         markerSetLineColor.invoke(marker, lineColor);
         markerSetLineWidth.invoke(marker, 2);
+        // Click-popup: region id as the title, owners + flags as the detail body.
+        markerSetLabel.invoke(marker, r.id());
+        markerSetDetail.invoke(marker, MarkerPopup.html(r));
         markers.put(r.id(), marker);
     }
 }

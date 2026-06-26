@@ -9,7 +9,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.GameType;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.util.TriState;
@@ -29,12 +28,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Player-side protections: region entry/exit announcements, blocked commands,
- * game-mode lock, heal / feed flags, time- and weather-locks, chat guards,
- * item pickup / drop guards.
+ * Player-side protections: region entry/exit announcements, blocked commands, game-mode lock,
+ * heal/feed flags, time/weather locks, chat guards, item pickup/drop guards.
  *
- * Per-player tick state is kept in tiny POD objects keyed by UUID so that
- * iteration during ticking is allocation-light.
+ * <p>Per-player tick state lives in small POD objects keyed by UUID so ticking stays allocation-light.
  */
 public final class PlayerEventHandler {
 
@@ -64,29 +61,23 @@ public final class PlayerEventHandler {
          */
         GameType origGameMode   = null;
         /**
-         * Snapshot of the player's position at the moment of death. Used by the respawn
-         * handler to look up region-scoped {@code spawn} flags from the death point, not
-         * from the post-respawn position (which is already at vanilla bed/world-spawn).
+         * Player position at the moment of death, so the respawn handler can read region {@code spawn}
+         * flags from the death point (the respawn position is already at vanilla bed/world-spawn).
          * NaN = no death recorded since last respawn.
          */
         double  deathX = Double.NaN, deathY = Double.NaN, deathZ = Double.NaN;
         net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level> deathDim = null;
         /**
-         * Keep-inventory / keep-xp decision snapshotted at the moment of death. The clone
-         * handler reads THESE instead of re-resolving the flag — otherwise an admin toggling
-         * the flag while the player is on the death screen could cause items to be neither
-         * dropped (LivingDropsEvent already cancelled) nor restored (clone re-resolve denies),
-         * losing them entirely. Snapshotting makes death-drop handling atomic.
+         * Keep-inventory/keep-xp decision snapshotted at death; the clone handler reads these instead
+         * of re-resolving, so an admin toggling the flag mid-death-screen can't lose items (neither
+         * dropped nor restored). Makes death-drop handling atomic.
          */
         boolean deathKeepInv = false;
         boolean deathKeepXp  = false;
         /**
-         * Tick-flag relevance cache. {@code tickFlagsRelevant} answers "does any region in the
-         * current applicable chain (incl. parents) or the global region set ANY flag values?".
-         * When false, the whole per-tick flag cascade (entry/exit tests, game-mode, heal, feed,
-         * hunger, speed, time/weather — a dozen resolutions) is provably a no-op and is skipped.
-         * Recomputed when the region set changes or {@link ProtectedRegion#flagEpoch()} moves
-         * (any flag/parent/priority edit anywhere), so admin changes apply on the next tick.
+         * Cache of "does any region in the applicable chain (incl. parents) or the global region set
+         * any flag values?". When false the whole per-tick flag cascade is provably a no-op and is
+         * skipped. Recomputed on region-set change or when {@link ProtectedRegion#flagEpoch()} moves.
          */
         long    flagEpochSeen    = -1L;
         boolean tickFlagsRelevant = true;
@@ -100,18 +91,14 @@ public final class PlayerEventHandler {
     public void onPlayerTick(PlayerTickEvent.Post e) {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         ServerLevel lvl = p.serverLevel();
-        // World-level kill-switch: when regions are disabled for this world (useRegions=false),
-        // none of the per-tick protections (entry/exit, heal/feed, game-mode, speed, time/weather)
-        // should run — matches the block/entity handlers that already honour this flag.
+        // World kill-switch (useRegions=false): skip all per-tick protections, like the other handlers.
         if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
-        // mgr is never null — get(Level) uses computeIfAbsent.
 
         double x = p.getX(), y = p.getY(), z = p.getZ();
 
-        // Cheapest possible fast path: no spatial-index entry under us AND we have never
-        // entered a region (no state yet). Skips all allocations including PlayerState itself.
-        // This is the case for ~99 % of player-ticks on a wilderness-heavy server.
+        // Cheapest fast path: nothing under us AND no prior state — skips all allocations including
+        // PlayerState. ~99% of player-ticks on a wilderness-heavy server.
         UUID id = p.getUUID();
         PlayerState st = states.get(id);
         List<ProtectedRegion> here = mgr.getApplicable(x, y, z);
@@ -126,10 +113,8 @@ public final class PlayerEventHandler {
             return;
         }
 
-        // Hot-path optimisation: if the applicable list matches lastRegions exactly (same
-        // ids, same count) then no transitions happened this tick — skip the HashSet
-        // allocation and all entry/exit logic. This is the common case once a player
-        // settles inside a region.
+        // Hot path: if the applicable set matches lastRegions exactly, no transitions happened — skip
+        // the HashSet allocation and all entry/exit logic. Common once a player settles in a region.
         boolean unchanged = here.size() == st.lastRegions.size();
         if (unchanged) {
             for (int i = 0, n = here.size(); i < n; i++) {
@@ -137,21 +122,17 @@ public final class PlayerEventHandler {
             }
         }
 
-        // Steady-state shortcut: most regions are membership-only claims with no flag values at
-        // all. For a player standing inside one, every per-tick resolution below (entry/exit,
-        // game-mode, heal, feed, hunger, speed, time/weather — ~12 flag walks) provably yields
-        // the defaults. Cache "any flags anywhere in the chain?" per player and skip the whole
-        // cascade while it stays false. Invalidation: region-set change (transition) or the
-        // global flag epoch moving (any flag/parent/priority edit on any region).
+        // Steady-state shortcut: most claims set no flags, so every per-tick resolution below yields
+        // defaults. Cache "any flags in the chain?" and skip the whole cascade while false.
+        // Invalidated by a region-set change or the global flag epoch moving.
         long epoch = ProtectedRegion.flagEpoch();
         if (!unchanged || st.flagEpochSeen != epoch) {
             st.flagEpochSeen = epoch;
             st.tickFlagsRelevant = anyFlagsInChain(here, mgr);
         }
         if (unchanged && !st.tickFlagsRelevant
-                // Live overrides must be unwound before we may go dormant: a previously applied
-                // time/weather lock, speed override, or game-mode override still needs its restore
-                // path below to run until it has reset.
+                // Don't go dormant while a time/weather/speed/game-mode override is still active —
+                // its restore path below must run first.
                 && !st.timeLockActive && !st.weatherLockActive
                 && !st.speedModified
                 && st.origGameMode == null) {
@@ -161,31 +142,24 @@ public final class PlayerEventHandler {
 
         Set<String> current;
         if (unchanged) {
-            // No greeting/farewell work needed. Still update lastSafe and check live flags
-            // (entry/exit guards already ran last tick when state changed).
+            // No greeting/farewell work needed; live-flag handling below still runs.
             current = st.lastRegions;
         } else if (here.isEmpty()) {
             current = Set.of();
         } else if (here.size() == 1) {
-            // Single-region case is so common we hand-roll a Set.of(id) to skip the HashSet.
+            // Single-region case is common — hand-roll Set.of(id) to skip the HashSet.
             current = Set.of(here.get(0).id());
         } else {
             current = new HashSet<>(here.size() * 2);
             for (int i = 0, n = here.size(); i < n; i++) current.add(here.get(i).id());
         }
 
-        // IMPORTANT: do NOT call canBypass() unconditionally here. onPlayerTick runs 20×/sec,
-        // and canBypass() queries the permission backend for region.bypass. With LuckPerms
-        // verbose on, that produced a permission check EVERY tick → console spam (and needless
-        // work). bypass only matters when an ENTRY/EXIT flag would actually deny passage, which
-        // is rare (both default to allow). So we resolve it lazily: the first time a deny is hit
-        // we compute it once and cache it for the rest of this tick.
-        // bypassState: 0 = not yet computed, 1 = true, 2 = false.
+        // Resolve canBypass() lazily, not every tick: it queries the permission backend (LuckPerms
+        // verbose → per-tick console spam), but bypass only matters when an ENTRY/EXIT deny is hit
+        // (rare). Computed once on first deny and cached for the tick. 0 = unset, 1 = true, 2 = false.
         int[] bypassState = {0};
 
-        // Single ENTRY test for the whole tick: it considers all applicable regions
-        // with priority + group resolution.
-        // Plain entry guard — only consult bypass if ENTRY would deny.
+        // Single ENTRY test for the whole tick (priority + group resolution); bypass only on deny.
         if (!mgr.testState(Flags.ENTRY, here, id) && !resolveBypassCached(p, bypassState)) {
             String denyMsg = null;
             for (int i = 0, n = here.size(); i < n; i++) {
@@ -198,25 +172,21 @@ public final class PlayerEventHandler {
             bounceFromEntry(p, st, lvl, mgr, id);
             return;
         }
-        // Entry-vehicle: a stricter guard that only triggers when the player is mounted
-        // on something (boat, minecart, mob, etc.). Useful for spawn regions that should
-        // allow walking in but not riding. Again, bypass is only consulted on a deny.
+        // Entry-vehicle: stricter guard, only when the player is mounted (allow walking in, not riding).
         if (p.isPassenger() && !mgr.testState(Flags.ENTRY_VEHICLE, here, id)
                 && !resolveBypassCached(p, bypassState)) {
             bounceFromEntry(p, st, lvl, mgr, id);
             return;
         }
 
-        // entry: greetings + notify-enter for newly-entered regions
-        // Skip entirely when the region set is unchanged — there are no newly-entered
-        // regions to greet. The heal/feed/time/weather flag handling below still runs.
+        // entry: greetings + notify-enter for newly-entered regions (skipped when set unchanged).
         if (!unchanged) for (int i = 0, n = here.size(); i < n; i++) {
             ProtectedRegion r = here.get(i);
             if (st.lastRegions.contains(r.id())) continue;
-            // Public API event — fired BEFORE greeting so listeners can suppress it
-            // by reading flags themselves. Posted on the server thread synchronously.
+            // Public API event — fired BEFORE greeting so listeners can suppress it.
             net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                     new dev.thefather007.worldguardneo.api.events.RegionEnterEvent(p, r));
+            runRegionCommand(p, r, r.getFlag(Flags.ON_ENTRY)); // on-entry command flag
             if (mod.config().global().announceGreetings) {
                 String g = r.getFlag(Flags.GREETING);
                 if (g != null) p.displayClientMessage(Component.literal(g), false);
@@ -241,13 +211,10 @@ public final class PlayerEventHandler {
             }
         }
 
-        // exit: farewells + exit-deny test.
-        //
-        // EXIT semantics: a region the player just left (was in lastRegions, not in current)
-        // is checked individually. We walk that region's parents up to 32 hops looking for
-        // an EXIT flag value. RegionGroup matching is done against the leaving region.
-        // We can't use RegionManager.testState because the player's current position is
-        // already outside the region, so resolution there would always return the default.
+        // exit: farewells + exit-deny test. A region just left (in lastRegions, not in current) is
+        // checked individually via mgr.resolveStateForRegion, which walks the region's parents for an
+        // EXIT value and matches the group against the flag's SOURCE region. We can't use testState
+        // here: the player is already outside the region, so it would always return the default.
         if (!unchanged && !st.lastRegions.isEmpty()) {
             String denyMsg = null;
             boolean denyExit = false;
@@ -260,18 +227,19 @@ public final class PlayerEventHandler {
                 if (current.contains(oldId)) continue;
                 var or = mgr.get(oldId).orElse(null);
                 if (or == null) continue;
-                StateFlag.State resolved = resolveStateWithParents(or, Flags.EXIT);
-                if (resolved == StateFlag.State.DENY
-                        && RegionManager.groupMatches(or.getFlagGroup(Flags.EXIT), or, id)) {
+                // resolveStateForRegion walks the leaving region's parents AND applies the SOURCE
+                // region's group filter — so an inherited group-scoped EXIT deny is honoured
+                // correctly (the old code read the child's group for an inherited flag).
+                StateFlag.State resolved = mgr.resolveStateForRegion(Flags.EXIT, or, id);
+                if (resolved == StateFlag.State.DENY) {
                     denyExit = true;
                     String m = or.getFlag(Flags.EXIT_DENY_MESSAGE);
                     if (m != null) { denyMsg = m; break; }
                 }
                 // Stricter exit-vehicle: only triggers if the player is mounted.
                 if (passenger) {
-                    StateFlag.State rv = resolveStateWithParents(or, Flags.EXIT_VEHICLE);
-                    if (rv == StateFlag.State.DENY
-                            && RegionManager.groupMatches(or.getFlagGroup(Flags.EXIT_VEHICLE), or, id)) {
+                    StateFlag.State rv = mgr.resolveStateForRegion(Flags.EXIT_VEHICLE, or, id);
+                    if (rv == StateFlag.State.DENY) {
                         denyExit = true;
                         if (denyMsg == null) {
                             String m = or.getFlag(Flags.EXIT_DENY_MESSAGE);
@@ -293,6 +261,7 @@ public final class PlayerEventHandler {
                     // the message by reading flags themselves.
                     net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
                             new dev.thefather007.worldguardneo.api.events.RegionLeaveEvent(p, r));
+                    runRegionCommand(p, r, r.getFlag(Flags.ON_EXIT)); // on-exit command flag
                     if (mod.config().global().announceFarewells) {
                         String f = r.getFlag(Flags.FAREWELL);
                         if (f != null) p.displayClientMessage(Component.literal(f), false);
@@ -450,6 +419,17 @@ public final class PlayerEventHandler {
             }
         } catch (Throwable ignored) {}
 
+        // glide (elytra): when denied, force-stop fall-flying so a player can't soar across the
+        // region. stopFallFlying clears the gliding flag; the player simply falls/walks. Only
+        // touched while actually gliding, so it costs nothing for grounded players. Bypass holders
+        // are exempt — dropping an admin out of the air mid-flight (possible fall death) would be a
+        // nasty surprise, and bypass means "ignore region protection". Bypass is resolved lazily
+        // (only when glide actually denies), reusing the per-tick cache.
+        if (p.isFallFlying() && !mgr.testState(Flags.GLIDE, applicable, id)
+                && !resolveBypassCached(p, bypassState)) {
+            p.stopFallFlying();
+        }
+
         // per-player time / weather lock — sent every 40 ticks (2 s) while active,
         // and a one-shot restore packet when the player leaves a locked region.
         if ((lvl.getGameTime() - st.lastTimePacket) >= 40) {
@@ -472,6 +452,33 @@ public final class PlayerEventHandler {
 
     private boolean canBypass(ServerPlayer p) {
         return mod.perms().has(p, "worldguardneo.region.bypass");
+    }
+
+    /**
+     * Run a region's {@code on-entry}/{@code on-exit} command from the server console (elevated),
+     * substituting {@code %player%}, {@code %region%}, {@code %world%}. No-op for null/blank. The
+     * flag is settable only via its per-flag permission, so only admins can attach a command.
+     * Best-effort: a bad command never breaks the tick.
+     */
+    private void runRegionCommand(ServerPlayer p, ProtectedRegion r, String cmd) {
+        if (cmd == null || cmd.isBlank()) return;
+        try {
+            String c = cmd.trim();
+            if (c.startsWith("/")) c = c.substring(1);
+            c = c.replace("%player%", p.getGameProfile().getName())
+                 .replace("%region%", r.id())
+                 .replace("%world%",  p.serverLevel().dimension().location().toString());
+            var server = p.getServer();
+            if (server == null) return;
+            // Console source positioned at the player, silent (no command feedback spam).
+            var source = server.createCommandSourceStack()
+                    .withPosition(p.position())
+                    .withLevel(p.serverLevel())
+                    .withSuppressedOutput();
+            server.getCommands().performPrefixedCommand(source, c);
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("region command '{}' for {} failed", cmd, r.id(), t);
+        }
     }
 
     /**
@@ -663,13 +670,15 @@ public final class PlayerEventHandler {
         }
 
         UUID uid = p.getUUID();
-        Set<String> allowed = mgr.resolveValue(Flags.ALLOWED_CMDS, x, y, z, uid);
+        // One spatial lookup shared by both flag resolutions (was two separate getApplicable calls).
+        var applicable = mgr.getApplicable(x, y, z);
+        Set<String> allowed = mgr.resolveValue(Flags.ALLOWED_CMDS, applicable, uid);
         if (allowed != null && !allowed.isEmpty() && !containsCmd(allowed, head)) {
             e.setCanceled(true);
             p.displayClientMessage(Component.literal(mod.i18n().raw("msg.protection.cmd-blocked")), true);
             return;
         }
-        Set<String> blocked = mgr.resolveValue(Flags.BLOCKED_CMDS, x, y, z, uid);
+        Set<String> blocked = mgr.resolveValue(Flags.BLOCKED_CMDS, applicable, uid);
         if (blocked != null && containsCmd(blocked, head)) {
             e.setCanceled(true);
             p.displayClientMessage(Component.literal(mod.i18n().raw("msg.protection.cmd-blocked")), true);
@@ -977,7 +986,7 @@ public final class PlayerEventHandler {
                 String[] parts = spawnTarget.trim().split("[,\\s]+");
                 if (parts.length >= 3) {
                     double tx = Double.parseDouble(parts[0]);
-                    double ty = Double.parseDouble(parts[1]);
+                    double ty = dev.thefather007.worldguardneo.util.Locations.clampY(p.serverLevel(), Double.parseDouble(parts[1]));
                     double tz = Double.parseDouble(parts[2]);
                     p.teleportTo(tx, ty, tz);
                 }
@@ -1081,9 +1090,16 @@ public final class PlayerEventHandler {
     /* ---------------- Cleanup ---------------- */
 
     @SubscribeEvent
+    public void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
+        mod.expiry().record(e.getEntity().getUUID()); // claim-expiry activity tracking
+    }
+
+    @SubscribeEvent
     public void onLogout(PlayerEvent.PlayerLoggedOutEvent e) {
+        mod.expiry().record(e.getEntity().getUUID()); // mark active at the moment of leaving
         states.remove(e.getEntity().getUUID());
         lastPickupDenyMsg.remove(e.getEntity().getUUID());
+        mod.selections().clear(e.getEntity().getUUID()); // drop the player's pending selection
     }
 
     @SubscribeEvent
@@ -1091,5 +1107,8 @@ public final class PlayerEventHandler {
         // Wipe region snapshot so greetings fire again in the new world.
         PlayerState st = states.get(e.getEntity().getUUID());
         if (st != null) { st.lastRegions = Set.of(); st.lastSafeValid = false; }
+        // Drop the pending selection — its corners belong to the old world, and clearing here
+        // also removes any lingering CUI outline on the client after the dimension hop.
+        mod.selections().clear(e.getEntity().getUUID());
     }
 }

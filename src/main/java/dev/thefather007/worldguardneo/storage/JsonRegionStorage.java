@@ -24,9 +24,7 @@ import java.nio.file.StandardOpenOption;
 /** Stores each world's regions in a JSON file under {@code config/worldguardneo/regions/<safeKey>.json}. */
 public final class JsonRegionStorage implements RegionStorage {
 
-    // Compact (NOT pretty-printed) JSON is roughly 30-50% smaller and faster to serialise.
-    // The regions file is for the mod's own use; admins normally edit via /rg commands,
-    // not by hand. If you must hand-edit, run the file through `jq .` for readable form.
+    // Compact (not pretty-printed) JSON: ~30-50% smaller/faster. Hand-edit via `jq .` if needed.
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
 
     private final Path baseDir;
@@ -38,8 +36,7 @@ public final class JsonRegionStorage implements RegionStorage {
     }
 
     private Path fileFor(String key) {
-        // Replace all characters that are illegal or risky on common filesystems.
-        // The set is intentionally broad — modded dimensions can use almost any chars.
+        // Replace chars illegal/risky on common filesystems (broad set — modded dimensions vary).
         StringBuilder sb = new StringBuilder(key.length());
         for (int i = 0; i < key.length(); i++) {
             char c = key.charAt(i);
@@ -61,11 +58,8 @@ public final class JsonRegionStorage implements RegionStorage {
             JsonObject root = JsonParser.parseReader(r).getAsJsonObject();
             RegionJsonCodec.applyJson(root, into);
         } catch (com.google.gson.JsonParseException | IllegalStateException ex) {
-            // A corrupt/truncated file would otherwise leave the world with an EMPTY manager,
-            // and the next dirty-flush save would overwrite the (recoverable) file with empty
-            // data — permanent data loss. Quarantine the bad file by renaming it so a later
-            // save writes a fresh file instead of destroying the original. The quarantined copy
-            // can be hand-repaired or restored from backup.
+            // Quarantine the bad file by renaming it. Otherwise the empty manager would be saved
+            // back over the recoverable file on the next dirty-flush — permanent data loss.
             Path quarantine = p.resolveSibling(p.getFileName() + ".corrupt-" + System.currentTimeMillis());
             try {
                 Files.move(p, quarantine, StandardCopyOption.REPLACE_EXISTING);
@@ -74,8 +68,8 @@ public final class JsonRegionStorage implements RegionStorage {
                       + "Repair the quarantined file or restore from a backup, then /rg reload.",
                         p, quarantine, worldKey, ex);
             } catch (IOException moveFail) {
-                // Could not move it out of the way — surface as IOException so the caller logs the
-                // failure loudly rather than silently emptying (and later overwriting) the world.
+                // Couldn't quarantine — surface as IOException so the caller logs loudly instead of
+                // silently emptying (and later overwriting) the world.
                 WorldGuardNeo.LOGGER.error(
                         "Region file {} is malformed AND could not be quarantined for world '{}'. "
                       + "The original is still on disk; back it up before the next save.",
@@ -87,14 +81,30 @@ public final class JsonRegionStorage implements RegionStorage {
 
     @Override
     public void save(String worldKey, RegionManager from) throws IOException {
+        // Synchronous path: serialize then write. The async path uses prepare* below, which splits
+        // the (server-thread) serialize from the (worker-thread) write.
+        writeDocument(worldKey, RegionJsonCodec.toJson(from));
+    }
+
+    // JSON has no per-region rows: every incremental edit re-serializes the whole world document.
+    // Serialization happens NOW (server thread); only writeDocument runs on the worker.
+    @Override public IoTask prepareSave(String worldKey, RegionManager from) {
         JsonObject root = RegionJsonCodec.toJson(from);
+        return () -> writeDocument(worldKey, root);
+    }
+    @Override public IoTask prepareSaveRegion(String worldKey, RegionManager from, String regionId) {
+        return prepareSave(worldKey, from);
+    }
+    @Override public IoTask prepareDeleteRegion(String worldKey, RegionManager from, String regionId) {
+        return prepareSave(worldKey, from); // the document already reflects the removal
+    }
+
+    private void writeDocument(String worldKey, JsonObject root) throws IOException {
         Path target = fileFor(worldKey);
         Path tmp    = target.resolveSibling(target.getFileName() + ".tmp");
         boolean ok = false;
-        // Write through a FileChannel so we can fsync (force) the data to stable storage BEFORE
-        // the atomic rename. Without the fsync, a power loss can persist the rename while the
-        // file's data blocks are still in the OS cache, yielding a truncated/empty file on reboot
-        // (which then trips the corrupt-file path above). Charset is pinned to UTF-8 explicitly.
+        // fsync (force) the data to disk BEFORE the atomic rename: without it, a power loss can
+        // persist the rename while data blocks are still cached, yielding a truncated file on reboot.
         try (FileChannel ch = FileChannel.open(tmp,
                         StandardOpenOption.CREATE, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
              Writer w = new BufferedWriter(new OutputStreamWriter(Channels.newOutputStream(ch), StandardCharsets.UTF_8))) {

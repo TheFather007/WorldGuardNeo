@@ -15,16 +15,9 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Mod configuration, stored as a human-editable TOML file with inline comments — the same
- * format other NeoForge mods use. A single global config plus per-world overrides.
- *
- * <p>On first run {@code config/worldguardneo/config.toml} is written with every key documented
- * by a comment. Admins edit it directly and run {@code /rg reload}. Per-world overrides live in
- * {@code config/worldguardneo/worlds/<dimension>.toml} and inherit from the global {@code
- * [defaults]} section.
- *
- * <p>Comments live in the file itself (TOML supports them natively), so there is no separate
- * help document — the previous {@code CONFIG_HELP.md} has been removed.
+ * Mod configuration: a human-editable TOML file (config.toml) with inline comments, plus per-world
+ * overrides in worlds/&lt;dimension&gt;.toml that inherit from the global [defaults] section. On first
+ * run every key is written with a documenting comment; admins edit it and run {@code /rg reload}.
  */
 public final class WGConfig {
 
@@ -53,6 +46,15 @@ public final class WGConfig {
                 cfg.save();
             } else {
                 cfg.global = readGlobal(main);
+                // Versioned migration: an older (or unversioned) file is upgraded in place and
+                // re-stamped, so renamed/added keys are applied once instead of silently lost.
+                if (cfg.global.configVersion < CONFIG_VERSION) {
+                    WorldGuardNeo.LOGGER.info("[WorldGuardNeo] Migrating config.toml v{} → v{}.",
+                            cfg.global.configVersion, CONFIG_VERSION);
+                    migrateGlobal(cfg.global, cfg.global.configVersion);
+                    cfg.global.configVersion = CONFIG_VERSION;
+                    cfg.save(); // re-write with the new version stamp + any keys added since
+                }
             }
 
             try (var stream = Files.list(configDir.resolve("worlds"))) {
@@ -72,6 +74,16 @@ public final class WGConfig {
         return cfg;
     }
 
+    /**
+     * Upgrade an older config section in place. Keep each step idempotent and ordered by version, e.g.
+     * {@code if (from < 2) { g.newKey = g.oldKey; }}. Called once when the file's {@code config-version}
+     * is below {@link #CONFIG_VERSION}; the caller re-saves afterwards. No renames exist yet, so this
+     * currently only carries unversioned (v0) files forward to the current schema.
+     */
+    private static void migrateGlobal(GlobalSection g, int from) {
+        // if (from < 2) { ... apply v1→v2 key renames here ... }
+    }
+
     /** Delete config.json / CONFIG_HELP.md left over from the pre-TOML format. */
     private static void cleanupLegacyFiles(Path configDir) {
         for (String legacy : new String[]{"config.json", "CONFIG_HELP.md"}) {
@@ -87,6 +99,8 @@ public final class WGConfig {
             try (var reader = Files.newBufferedReader(file)) {
                 toml = TomlFormat.instance().createParser().parse(reader);
             }
+            // 0 = a file written before config versioning existed (triggers a one-time migration).
+            g.configVersion           = intOf(toml, "config-version", 0);
             g.locale                  = str(toml, "locale", g.locale);
             g.storageFormat           = str(toml, "storage-format", g.storageFormat);
             g.useLuckPerms            = bool(toml, "use-luckperms", g.useLuckPerms);
@@ -107,6 +121,12 @@ public final class WGConfig {
             g.backupIntervalMinutes   = intOf(toml, "backup.interval-minutes", g.backupIntervalMinutes);
             g.backupRetainCount       = intOf(toml, "backup.retain-count", g.backupRetainCount);
             g.backupCompress          = bool(toml, "backup.compress", g.backupCompress);
+
+            g.claimExpiryEnabled      = bool(toml, "claim-expiry.enabled", g.claimExpiryEnabled);
+            g.claimExpiryDays         = intOf(toml, "claim-expiry.days", g.claimExpiryDays);
+            g.claimExpiryCheckHours   = intOf(toml, "claim-expiry.check-hours", g.claimExpiryCheckHours);
+
+            g.wandItem                = str(toml, "selection.wand-item", g.wandItem);
 
             g.mysqlHost              = str(toml, "mysql.host", g.mysqlHost);
             g.mysqlPort              = intOf(toml, "mysql.port", g.mysqlPort);
@@ -137,9 +157,11 @@ public final class WGConfig {
             g.defaults.verticalExpandUp   = intOf(toml, "defaults.vertical-expand-up", g.defaults.verticalExpandUp);
         } catch (Exception ex) {
             WorldGuardNeo.LOGGER.error(
-                    "config.toml is malformed — falling back to defaults. " +
+                    "config.toml is malformed — keeping values parsed so far, defaults for the rest. " +
                     "Fix the file or delete it to regenerate.", ex);
-            return GlobalSection.defaults();
+            // Return the partially-parsed section, NOT a fresh defaults() — otherwise one bad key
+            // deep in the file would discard every admin setting parsed before it.
+            return g;
         }
         return g;
     }
@@ -171,7 +193,9 @@ public final class WGConfig {
     /* ---- typed readers tolerant of missing keys / wrong types ---- */
     private static String str(Config c, String path, String def) {
         Object v = c.get(path);
-        return v != null ? String.valueOf(v) : def;
+        // Type-guard: a non-string value (e.g. storage-format = true) falls back to the default
+        // rather than being coerced to garbage via String.valueOf.
+        return v instanceof String s ? s : def;
     }
     private static boolean bool(Config c, String path, boolean def) {
         Object v = c.get(path);
@@ -182,6 +206,7 @@ public final class WGConfig {
         if (v instanceof Number n) return n.intValue();
         return def;
     }
+
     private static Map<String, Integer> readIntMap(Config c, String path, Map<String, Integer> def) {
         Object v = c.get(path);
         if (!(v instanceof Config sub)) return def;
@@ -227,9 +252,14 @@ public final class WGConfig {
         CommentedConfig c = CommentedConfig.inMemory();
         GlobalSection g = global;
 
-        // night-config writes keys in insertion order, so the order below IS the file layout.
-        // Keys are grouped into labelled sections; each section's first key carries a banner
-        // comment so the generated config.toml reads top-to-bottom in a logical order.
+        // night-config writes keys in insertion order, so the order below IS the file layout;
+        // each section's first key carries a banner comment.
+
+        /* ───────────────────────── META ───────────────────────── */
+        c.setComment("config-version",
+                " Config schema version — managed by WorldGuardNeo. Do not edit; it lets the mod\n" +
+                " migrate older config files automatically when keys are renamed or added.");
+        c.set("config-version", CONFIG_VERSION);
 
         /* ───────────────────────── GENERAL ───────────────────────── */
         c.setComment("locale",
@@ -378,6 +408,29 @@ public final class WGConfig {
                 " Gzip each region file inside a backup (typically 6-12x smaller). false = no compression.");
         c.set("backup.compress", g.backupCompress);
 
+        /* ───────────────────────── CLAIM EXPIRY ───────────────────────── */
+        c.setComment("claim-expiry",
+                " ======================= CLAIM EXPIRY =======================\n" +
+                " Auto-delete player regions whose owners have ALL been offline too long.\n" +
+                " Admin/unowned regions are never touched. Scan runs at start + every check-hours.");
+        c.setComment("claim-expiry.enabled", " Master switch (default false).");
+        c.set("claim-expiry.enabled", g.claimExpiryEnabled);
+        c.setComment("claim-expiry.days", " Days all owners must be offline before a region expires.");
+        c.set("claim-expiry.days", g.claimExpiryDays);
+        c.setComment("claim-expiry.check-hours", " Hours between expiry scans.");
+        c.set("claim-expiry.check-hours", g.claimExpiryCheckHours);
+
+        /* ───────────────────────── SELECTION ───────────────────────── */
+        c.setComment("selection",
+                " ======================= REGION SELECTION =======================\n" +
+                " Built-in selection wand (no WorldEdit required). Give it with /rg wand.\n" +
+                " Left-click sets position 1 (cuboid) or adds a polygon point; right-click sets\n" +
+                " position 2. The selection is drawn client-side via WorldEdit-CUI if installed.");
+        c.setComment("selection.wand-item",
+                " Item id handed out by /rg wand (default minecraft:stick). The wand can only be\n" +
+                " obtained once per player and is consumed for selection only.");
+        c.set("selection.wand-item", g.wandItem);
+
         /* ───────────────────────── PER-WORLD DEFAULTS ───────────────────────── */
         c.setComment("defaults",
                 " ======================= PER-WORLD DEFAULTS =======================\n" +
@@ -440,7 +493,7 @@ public final class WGConfig {
         c.setComment("vertical-expansion",
                 " Automatically expand a region vertically when it is claimed, so players are\n" +
                 " protected from tunnelling in from below and bridging in from above:\n" +
-                "   \"none\"  — keep the WorldEdit selection's height (default).\n" +
+                "   \"none\"  — keep the selection's height (default).\n" +
                 "   \"full\"  — expand to the world's full build height (bedrock-to-sky). Best\n" +
                 "             protection: no digging under or building over the claim.\n" +
                 "   \"fixed\" — expand vertical-expand-down blocks down and vertical-expand-up\n" +
@@ -521,7 +574,12 @@ public final class WGConfig {
 
     /* ------------------------------- sections ------------------------------ */
 
+    /** Bump when config keys are renamed/restructured, and add the rename in {@link #migrateGlobal}. */
+    public static final int CONFIG_VERSION = 1;
+
     public static final class GlobalSection {
+        /** Version stamp of the loaded file; 0 means a legacy unversioned file (pre-versioning). */
+        public int     configVersion         = CONFIG_VERSION;
         public String  locale                = "en_us";
         public String  storageFormat         = "json";          // json | sqlite (sqlite reserved)
         public boolean useLuckPerms          = true;
@@ -543,6 +601,15 @@ public final class WGConfig {
         public int     backupIntervalMinutes = 60;
         public int     backupRetainCount     = 10;
         public boolean backupCompress        = true;
+
+        // Claim expiry — auto-delete player regions whose owners have all been offline past
+        // claimExpiryDays. Admin/unowned regions untouched; disabled by default.
+        public boolean claimExpiryEnabled    = false;
+        public int     claimExpiryDays       = 60;
+        public int     claimExpiryCheckHours = 6;
+
+        // Item handed out by /rg wand for picking region corners/points (no WorldEdit needed).
+        public String  wandItem             = "minecraft:stick";
 
         // MySQL connection settings — used only when storage-format = "mysql".
         public String  mysqlHost     = "localhost";
@@ -600,15 +667,10 @@ public final class WGConfig {
         public Map<String, String> blockedItems     = new LinkedHashMap<>();
         public Map<String, String> blockedBlocks    = new LinkedHashMap<>();
         public Map<String, String> blockedEntities  = new LinkedHashMap<>();
-        // Flags auto-applied to every newly claimed region in this world. Each entry is
-        // "flag-name=value" (e.g. "pvp=deny"). Empty list = none.
+        // Flags auto-applied to newly claimed regions, each "flag-name=value" (e.g. "pvp=deny").
         public java.util.List<String> autoFlags     = new java.util.ArrayList<>();
-        // Automatic vertical expansion on claim: "none" | "full" | "fixed".
-        //   none  — keep the WorldEdit selection's Y span.
-        //   full  — expand to the world's full build height (protects against tunnelling from
-        //           below and bridging in from above).
-        //   fixed — expand vertical-expand-down blocks down and vertical-expand-up blocks up
-        //           from the selection (each clamped to the world's build limits).
+        // Auto vertical expansion on claim: "none" (keep Y span) | "full" (full build height) |
+        // "fixed" (expand by verticalExpandDown/Up, clamped to build limits).
         public String  verticalExpansion             = "none";
         public int     verticalExpandDown            = 0;
         public int     verticalExpandUp              = 0;

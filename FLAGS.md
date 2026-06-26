@@ -6,7 +6,7 @@
 
 **English** · [Русский](FLAGS_RU.md)
 
-[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · [🔨 Building](BUILD.md) · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [🧩 KubeJS](KUBEJS.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -21,14 +21,15 @@ Set a flag with `/rg flag <region> <flag> [value]`; omit the value to clear it. 
 - Each flag is gated by its own permission node `worldguardneo.flag.<name>` (default OP 2). `region.flag.bypass` or `region.bypass` skips the per-flag check.
 - Add `-g <group>` before the value to scope a flag to `OWNERS` / `MEMBERS` / `NON_OWNERS` / `NON_MEMBERS` / `ALL` (requires `region.flag.group`).
 
-Two flags are **declared but not yet enforced** (kept for save-format stability): `receive-chat` and `allowed-enchants`.
+The `on-entry` / `on-exit` flags run a console command (placeholders `%player%`, `%region%`, `%world%`) when a player crosses the border — settable by admins only, since the command runs with console authority.
 
 ## All flags
 
 | Flag | Type | Default | Permission | Description |
 | --- | --- | --- | --- | --- |
 | `allowed-cmds` | list | — | `worldguardneo.flag.allowed-cmds` | Whitelist of allowed commands (overrides blocked). |
-| `allowed-enchants` | list | — | `worldguardneo.flag.allowed-enchants` | Whitelist of permitted enchantments (DECLARED — not yet enforced). |
+| `on-entry` | text | — | `worldguardneo.flag.on-entry` | Console command run when a player enters (`%player%`/`%region%`/`%world%`). |
+| `on-exit` | text | — | `worldguardneo.flag.on-exit` | Console command run when a player leaves (`%player%`/`%region%`/`%world%`). |
 | `block-break` | state (allow/deny) | allow | `worldguardneo.flag.block-break` | Allow or deny block breaking specifically. |
 | `block-place` | state (allow/deny) | allow | `worldguardneo.flag.block-place` | Allow or deny block placement specifically. |
 | `blocked-cmds` | list | — | `worldguardneo.flag.blocked-cmds` | Commands forbidden inside the region. |
@@ -40,10 +41,12 @@ Two flags are **declared but not yet enforced** (kept for save-format stability)
 | `crop-growth` | state (allow/deny) | allow | `worldguardneo.flag.crop-growth` | Allow or deny crop growth (wheat, beets, etc). |
 | `deny-message` | text | — | `worldguardneo.flag.deny-message` | Custom message shown on protection denial. |
 | `deny-spawn` | list | — | `worldguardneo.flag.deny-spawn` | Entity IDs whose spawn is denied. |
+| `spawn-limit` | list | — | `worldguardneo.flag.spawn-limit` | Per-type spawn caps as `entity-id:max` (e.g. `minecraft:zombie:5`); spawns of that type are denied once the region holds `max` of them. |
 | `dispenser-output` | state (allow/deny) | allow | `worldguardneo.flag.dispenser-output` | Allow or deny dispenser/dropper output (items, fluids, projectiles). Also blocks firing across a region border. |
 | `drown-damage` | state (allow/deny) | allow | `worldguardneo.flag.drown-damage` | Allow or deny drowning damage. |
 | `enderdragon` | state (allow/deny) | allow | `worldguardneo.flag.enderdragon` | Allow or deny ender-dragon block destruction. |
 | `enderpearl` | state (allow/deny) | allow | `worldguardneo.flag.enderpearl` | Allow or deny ender-pearl teleports. |
+| `entity-leash` | state (allow/deny) | allow | `worldguardneo.flag.entity-leash` | Allow or deny attaching a lead to a mob. Inside a claim non-members are blocked via `interact` access; an explicit `deny` blocks everyone. |
 | `entry` | state (allow/deny) | allow | `worldguardneo.flag.entry` | Allow or deny entering the region (non-bypass players). |
 | `entry-deny-message` | text | — | `worldguardneo.flag.entry-deny-message` | Custom message shown when entry is denied. |
 | `entry-vehicle` | state (allow/deny) | allow | `worldguardneo.flag.entry-vehicle` | Allow or deny entering the region while riding a vehicle. |
@@ -95,8 +98,9 @@ Two flags are **declared but not yet enforced** (kept for save-format stability)
 | `pistons` | state (allow/deny) | allow | `worldguardneo.flag.pistons` | Allow or deny pistons pushing/pulling blocks across the region border. |
 | `player-damage` | state (allow/deny) | allow | `worldguardneo.flag.player-damage` | Allow or deny generic damage to players from non-player sources. |
 | `pvp` | state (allow/deny) | allow | `worldguardneo.flag.pvp` | Allow or deny player-vs-player damage. |
-| `receive-chat` | state (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Allow or deny receiving chat while inside the region (DECLARED — not yet enforced). |
+| `receive-chat` | state (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Allow or deny receiving other players' chat while inside the region. |
 | `redstone` | state (allow/deny) | allow | `worldguardneo.flag.redstone` | Allow or deny redstone signal propagation within the region. |
+| `ride` | state (allow/deny) | allow | `worldguardneo.flag.ride` | Allow or deny mounting rideable mobs (horse, pig, strider). Inside a claim non-members are blocked via `interact` access; an explicit `deny` blocks everyone. Minecarts/boats use `vehicle-enter`. |
 | `send-chat` | state (allow/deny) | allow | `worldguardneo.flag.send-chat` | Allow or deny sending chat from within the region. |
 | `sleep` | state (allow/deny) | allow | `worldguardneo.flag.sleep` | Allow or deny sleeping in beds. |
 | `snow-fall` | state (allow/deny) | allow | `worldguardneo.flag.snow-fall` | Allow or deny snow accumulating. |
@@ -108,6 +112,16 @@ Two flags are **declared but not yet enforced** (kept for save-format stability)
 | `tnt` | state (allow/deny) | allow | `worldguardneo.flag.tnt` | Allow or deny TNT explosion damage to blocks. |
 | `use` | state (allow/deny) | allow | `worldguardneo.flag.use` | Allow or deny using items (food, potions, doors). |
 | `vehicle-destroy` | state (allow/deny) | allow | `worldguardneo.flag.vehicle-destroy` | Allow or deny destroying minecarts and boats. |
+| `vehicle-place` | state (allow/deny) | allow | `worldguardneo.flag.vehicle-place` | Allow or deny placing minecarts and boats. |
+| `vehicle-enter` | state (allow/deny) | allow | `worldguardneo.flag.vehicle-enter` | Allow or deny players boarding minecarts and boats. |
+| `item-frame-rotate` | state (allow/deny) | allow | `worldguardneo.flag.item-frame-rotate` | Allow or deny rotating the item in a filled item frame (placing/removing still uses build access). |
+| `sign-edit` | state (allow/deny) | allow | `worldguardneo.flag.sign-edit` | Allow or deny editing signs. |
+| `lectern-take` | state (allow/deny) | allow | `worldguardneo.flag.lectern-take` | Allow or deny using a lectern that holds a book. |
+| `armor-stand-use` | state (allow/deny) | allow | `worldguardneo.flag.armor-stand-use` | Allow or deny using (swapping gear on) armor stands. |
+| `glide` | state (allow/deny) | allow | `worldguardneo.flag.glide` | Allow or deny elytra gliding; denying force-stops fall-flight in the region. |
+| `bucket-fill` | state (allow/deny) | allow | `worldguardneo.flag.bucket-fill` | Allow or deny filling buckets (water, lava, powder snow). |
+| `bucket-empty` | state (allow/deny) | allow | `worldguardneo.flag.bucket-empty` | Allow or deny emptying buckets (placing fluids). |
+| `villager-trade` | state (allow/deny) | allow | `worldguardneo.flag.villager-trade` | Allow or deny opening villager / wandering-trader trade menus. Inside a claim non-members are blocked via `interact` access; an explicit `deny` blocks everyone. |
 | `vine-growth` | state (allow/deny) | allow | `worldguardneo.flag.vine-growth` | Allow or deny vines growing. |
 | `water-flow` | state (allow/deny) | allow | `worldguardneo.flag.water-flow` | Allow or deny water flowing. |
 | `weather-lock` | text | — | `worldguardneo.flag.weather-lock` | Lock client-side weather (clear, rain, thunder). |

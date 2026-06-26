@@ -15,8 +15,16 @@ public enum RegionGroup {
 
     public static RegionGroup parse(String s) {
         if (s == null) return ALL;
+        RegionGroup g = parseStrict(s);
+        return g == null ? ALL : g;
+    }
+
+    /** Like {@link #parse} but returns {@code null} for an unrecognized name instead of silently
+     *  falling back to {@link #ALL} — used by the command layer to reject typo'd {@code -g} groups. */
+    public static RegionGroup parseStrict(String s) {
+        if (s == null) return null;
         // Locale-safe — Turkish locale lowercases I → ı which would break "MEMBERS"/"OWNERS" matching.
         try { return RegionGroup.valueOf(s.toUpperCase(java.util.Locale.ROOT).replace('-','_')); }
-        catch (IllegalArgumentException e) { return ALL; }
+        catch (IllegalArgumentException e) { return null; }
     }
 }

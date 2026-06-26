@@ -35,11 +35,8 @@ public final class EntityEventHandler {
     /* ---------------- Mob block griefing ---------------- */
 
     /**
-     * Gate vanilla "mob griefing" (Endermen picking up/placing blocks, sheep eating grass,
-     * zombies breaking doors, villagers farming, silverfish, …) by the per-region {@code mob-grief}
-     * flag. Vanilla funnels all of these through {@code EntityMobGriefingEvent}; denying it here
-     * stops a mob from altering blocks inside a claim without touching the world-wide
-     * {@code mobGriefing} game rule. Default ALLOW — admins opt in with {@code mob-grief deny}.
+     * Gate vanilla mob griefing by the per-region {@code mob-grief} flag without touching the
+     * world-wide {@code mobGriefing} game rule. Default ALLOW — admins opt in with deny.
      */
     @SubscribeEvent
     public void onMobGriefing(net.neoforged.neoforge.event.entity.EntityMobGriefingEvent e) {
@@ -48,7 +45,10 @@ public final class EntityEventHandler {
         if (!(entity.level() instanceof ServerLevel sl)) return;
         if (!mod.isProtectionActive(sl)) return;
         RegionManager mgr = mod.regions().get(sl);
-        if (!mgr.testState(Flags.MOB_GRIEF, null, entity.getX(), entity.getY(), entity.getZ())) {
+        double gx = entity.getX(), gy = entity.getY(), gz = entity.getZ();
+        // Fast path: no region here and no global default → nothing to do (endermen/etc. fire this a lot).
+        if (!mgr.hasAnyAt(gx, gy, gz) && mgr.globalRegion().getFlag(Flags.MOB_GRIEF) == null) return;
+        if (!mgr.testState(Flags.MOB_GRIEF, null, gx, gy, gz)) {
             e.setCanGrief(false);
         }
     }
@@ -62,23 +62,19 @@ public final class EntityEventHandler {
         RegionManager mgr = mod.regions().get(sl);
         String entityId = null;  // lazily resolved — many spawns don't need it
 
-        // World-config blocked-entities: cancel spawn entirely for listed entity types.
-        // Applied per-world; covers both vanilla and modded mobs by ResourceLocation.
-        // Accepts both forms in config: "minecraft:zombie" OR plain "zombie" (for vanilla
-        // entities only — modded entities must use the full namespaced id).
+        // World-config blocked-entities: cancel spawn for listed types (per-world, vanilla + modded
+        // by ResourceLocation). Accepts "minecraft:zombie" or bare "zombie" (vanilla only).
         try {
             var ws = mod.config().worldOrGlobal(sl);
             if (ws != null && ws.blockedEntities != null && !ws.blockedEntities.isEmpty()) {
-                // getKey can return null for entities without a registry mapping (some modded
-                // mobs). Guard it: a null key here previously threw an NPE that the surrounding
-                // catch swallowed, silently skipping the hostile-mob suppressor below too.
+                // getKey is null for keyless modded mobs — guard it, else an NPE here gets
+                // swallowed by the catch and silently skips the hostile-mob suppressor below.
                 var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
                         .getKey(e.getEntity().getType());
                 if (key != null) {
                     entityId = key.toString();
                     String action = ws.blockedEntities.get(entityId);
                     if (action == null && entityId.startsWith("minecraft:")) {
-                        // Try the bare form too — admins often write just "zombie" in config.
                         action = ws.blockedEntities.get(entityId.substring("minecraft:".length()));
                     }
                     if ("deny".equalsIgnoreCase(action)) {
@@ -87,10 +83,8 @@ public final class EntityEventHandler {
                     }
                 }
             }
-            // Global hostile-mob suppressor: any monster gets cancelled if config wants it.
-            // Useful for peaceful-mode subworlds without disabling difficulty globally. Runs
-            // independently of the registry-key lookup above so a keyless modded mob can't
-            // slip past it.
+            // Global hostile-mob suppressor: cancel any Monster when config wants it. Runs
+            // independently of the registry-key lookup so a keyless modded mob can't slip past.
             if (mod.config().global().blockedEntityHostile
                     && e.getEntity() instanceof net.minecraft.world.entity.monster.Monster) {
                 e.setSpawnCancelled(true);
@@ -99,7 +93,7 @@ public final class EntityEventHandler {
         } catch (Throwable ignored) {}
 
         double x = e.getX(), y = e.getY(), z = e.getZ();
-        // Share the applicable list across both flag checks — one spatial lookup, not two.
+        // Share the applicable list across both flag checks — one spatial lookup.
         var applicable = mgr.getApplicable(x, y, z);
         if (!mgr.testState(Flags.MOB_SPAWNING, applicable, null)) {
             e.setSpawnCancelled(true);
@@ -108,7 +102,6 @@ public final class EntityEventHandler {
         var denied = mgr.resolveValue(Flags.DENY_SPAWN, applicable, null);
         if (denied != null && !denied.isEmpty()) {
             try {
-                // Reuse entityId if we already resolved it above.
                 if (entityId == null) {
                     var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
                             .getKey(e.getEntity().getType());
@@ -117,17 +110,71 @@ public final class EntityEventHandler {
                 }
                 if (denied.contains(entityId)) {
                     e.setSpawnCancelled(true);
+                    return;
                 } else if (entityId.startsWith("minecraft:")
                         && denied.contains(entityId.substring("minecraft:".length()))) {
-                    // Support short form "zombie" as well as full "minecraft:zombie" in the
-                    // deny-spawn set. substring() only allocates when the full form didn't
-                    // match — saves a string per spawn in the typical "full id matches" case.
+                    // Bare short form ("zombie"); substring only allocates when the full id missed.
                     e.setSpawnCancelled(true);
+                    return;
                 }
             } catch (Throwable t) {
                 WorldGuardNeo.LOGGER.debug("DENY_SPAWN match failed", t);
             }
         }
+
+        // Per-type spawn caps (spawn-limit): for each region declaring a cap for this type, count
+        // live entities of that type in its bounds and cancel once the cap is reached. Uses each
+        // region's OWN value (not inherited); the count scan only runs when a cap matches.
+        try {
+            for (int i = 0, n = applicable.size(); i < n; i++) {
+                var reg = applicable.get(i);
+                var caps = reg.getFlag(Flags.SPAWN_LIMIT);
+                if (caps == null || caps.isEmpty()) continue;
+                if (entityId == null) {
+                    var key = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE
+                            .getKey(e.getEntity().getType());
+                    if (key == null) break; // unregistered type — can't match a cap
+                    entityId = key.toString();
+                }
+                int max = matchSpawnCap(caps, entityId);
+                if (max < 0) continue;
+                if (countOfTypeIn(sl, reg, e.getEntity().getType()) >= max) {
+                    e.setSpawnCancelled(true);
+                    return;
+                }
+            }
+        } catch (Throwable t) {
+            WorldGuardNeo.LOGGER.debug("SPAWN_LIMIT check failed", t);
+        }
+    }
+
+    /**
+     * Parse a {@code spawn-limit} set for a cap on {@code entityId} ("type:max" entries, full or
+     * short {@code minecraft:} form). Returns the max, or -1 if no entry matches this type.
+     */
+    private static int matchSpawnCap(java.util.Set<String> caps, String entityId) {
+        String shortId = entityId.startsWith("minecraft:") ? entityId.substring("minecraft:".length()) : null;
+        for (String entry : caps) {
+            int colon = entry.lastIndexOf(':');
+            if (colon <= 0 || colon == entry.length() - 1) continue; // malformed "type:max"
+            String type = entry.substring(0, colon);
+            if (type.equals(entityId) || (shortId != null && type.equals(shortId))) {
+                try { return Math.max(0, Integer.parseInt(entry.substring(colon + 1).trim())); }
+                catch (NumberFormatException ignored) { return -1; }
+            }
+        }
+        return -1;
+    }
+
+    /** Count live entities of {@code type} whose position lies within {@code reg}'s bounding box. */
+    private static int countOfTypeIn(ServerLevel sl,
+                                     dev.thefather007.worldguardneo.region.ProtectedRegion reg,
+                                     net.minecraft.world.entity.EntityType<?> type) {
+        var mn = reg.minimumBound();
+        var mx = reg.maximumBound();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(
+                mn.x(), mn.y(), mn.z(), mx.x() + 1.0, mx.y() + 1.0, mx.z() + 1.0);
+        return sl.getEntitiesOfClass(Entity.class, box, ent -> ent.getType() == type).size();
     }
 
     /* ---------------- Player-attacks-entity (covers PVP, mob-damage, vehicle-destroy) ---------------- */
@@ -135,27 +182,26 @@ public final class EntityEventHandler {
     @SubscribeEvent
     public void onPlayerAttack(AttackEntityEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer attacker)) return;
-        if (mod.perms().has(attacker, "worldguardneo.region.bypass")) return;
         Entity target = e.getTarget();
         if (target == null) return;
         ServerLevel lvl = attacker.serverLevel();
         if (!mod.isProtectionActive(lvl)) return;
         RegionManager mgr = mod.regions().get(lvl);
         double x = target.getX(), y = target.getY(), z = target.getZ();
-        // Single spatial-index lookup reused across all three state-flag tests below.
+        // Single spatial lookup reused across the three state-flag tests below.
         var applicable = mgr.getApplicable(x, y, z);
         UUID actor = attacker.getUUID();
+        // Lazy bypass: resolve flags first and only query the permission backend when an action would
+        // be denied. Keeps wilderness combat (the common case) off the LuckPerms path entirely.
 
-        // Order matters: HangingEntity and ArmorStand are checked FIRST, before the generic
-        // LivingEntity branch. ArmorStand is technically a LivingEntity in vanilla but
-        // behaves as decoration (cannot move, cannot attack) — routing it through MOB_DAMAGE
-        // would conflate "kill an aggressive mob" with "vandalize decoration". Treat both
-        // hanging entities and armor stands the same way: BUILD + BLOCK_BREAK both required.
+        // Decoration (HangingEntity/ArmorStand) checked FIRST. ArmorStand is a LivingEntity but
+        // is decoration, so MOB_DAMAGE would conflate killing a mob with vandalizing decoration;
+        // both gate on BUILD + BLOCK_BREAK instead.
         boolean isDecoration = target instanceof net.minecraft.world.entity.decoration.HangingEntity
                             || target instanceof net.minecraft.world.entity.decoration.ArmorStand;
         if (isDecoration) {
-            if (!mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)
-                    || !mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, actor)) {
+            if ((!mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)
+                    || !mgr.testBuildAccess(Flags.BLOCK_BREAK, x, y, z, actor)) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.build-denied")), true);
@@ -164,15 +210,15 @@ public final class EntityEventHandler {
         }
 
         if (target instanceof Player) {
-            if (!mgr.testState(Flags.PVP, applicable, actor)) {
+            if (!mgr.testState(Flags.PVP, applicable, actor) && !canBypass(attacker)) {
                 e.setCanceled(true);
-                // Show attacker WHY their attack didn't land — silent cancel feels broken.
+                // Tell the attacker why — a silent cancel feels broken.
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.pvp-denied")), true);
                 return;
             }
         } else if (target instanceof LivingEntity) {
-            if (!mgr.testState(Flags.MOB_DAMAGE, applicable, actor)) {
+            if (!mgr.testState(Flags.MOB_DAMAGE, applicable, actor) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.mob-denied")), true);
@@ -181,17 +227,17 @@ public final class EntityEventHandler {
         }
 
         if (target instanceof AbstractMinecart || target instanceof Boat) {
-            // World-wide protectVehicles: globally protect vehicles regardless of region flags.
-            // Useful for survival servers where griefing minecart networks is a problem.
-            // bypass was already checked at the top of this method, so no need to re-test here.
+            // World-wide protectVehicles: protect regardless of region flags.
             var ws = mod.config().worldOrGlobal(lvl);
             if (ws != null && ws.protectVehicles) {
-                e.setCanceled(true);
-                attacker.displayClientMessage(
-                        net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.vehicle-denied")), true);
+                if (!canBypass(attacker)) {
+                    e.setCanceled(true);
+                    attacker.displayClientMessage(
+                            net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.vehicle-denied")), true);
+                }
                 return;
             }
-            if (!mgr.testState(Flags.VEHICLE_DESTROY, applicable, actor)) {
+            if (!mgr.testState(Flags.VEHICLE_DESTROY, applicable, actor) && !canBypass(attacker)) {
                 e.setCanceled(true);
                 attacker.displayClientMessage(
                         net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.attack.vehicle-denied")), true);
@@ -199,18 +245,56 @@ public final class EntityEventHandler {
         }
     }
 
+    /** region.bypass holders skip protection. Queried lazily (only when an action would be denied). */
+    private boolean canBypass(ServerPlayer p) {
+        return mod.perms().has(p, "worldguardneo.region.bypass");
+    }
+
+    /* ---------------- Vehicle mounting (boats / minecarts) ---------------- */
+
+    /**
+     * Gate a player boarding a boat/minecart by the per-region {@code vehicle-enter} flag
+     * (default ALLOW). Only player→vehicle mounts; mob mounts and dismounts pass through.
+     */
+    @SubscribeEvent
+    public void onEntityMount(net.neoforged.neoforge.event.entity.EntityMountEvent e) {
+        if (!e.isMounting()) return;
+        if (!(e.getEntityMounting() instanceof ServerPlayer p)) return;
+        Entity vehicle = e.getEntityBeingMounted();
+        if (e.getLevel().isClientSide()) return;
+        if (!mod.isProtectionActive(e.getLevel())) return;
+        RegionManager mgr = mod.regions().get(p.serverLevel());
+        double vx = vehicle.getX(), vy = vehicle.getY(), vz = vehicle.getZ();
+        UUID actor = p.getUUID();
+        // Minecarts/boats are "vehicles" (vehicle-enter). Living rideable mobs use the ride flag AND
+        // the membership model (a stranger can't ride a claimed mob unless interact is re-allowed),
+        // mirroring how the decoration/villager/leash interactions are gated.
+        final boolean denied;
+        final String denyKey;
+        if (vehicle instanceof AbstractMinecart || vehicle instanceof Boat) {
+            denied = !mgr.testState(Flags.VEHICLE_ENTER, actor, vx, vy, vz);
+            denyKey = "msg.vehicle.enter-denied";
+        } else if (vehicle instanceof net.minecraft.world.entity.Mob) {
+            denied = !mgr.testState(Flags.RIDE, actor, vx, vy, vz)
+                  || !mgr.testBuildAccess(Flags.INTERACT, vx, vy, vz, actor);
+            denyKey = "msg.ride.denied";
+        } else {
+            return; // not a thing we gate
+        }
+        // Resolve the flag first; only consult region.bypass when it denies (lazy-bypass pattern).
+        if (denied && !canBypass(p)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw(denyKey)), true);
+        }
+    }
+
     /* ---------------- Right-click EXACTLY on an entity (armor stand armor swap) ---------------- */
 
     /**
-     * Armor stands swap their gear through {@code Entity#interactAt}, which in the interaction
-     * pipeline runs right AFTER {@link PlayerInteractEvent.EntityInteractSpecific} — NOT after
-     * the regular {@code EntityInteract} that {@link #onEntityInteract} hooks. So taking/placing
-     * armor on a stand never reaches our EntityInteract handler and slips through. We must cancel
-     * at EntityInteractSpecific: per NeoForge's pipeline, a server-side cancel here prevents
-     * {@code interactAt}, which is exactly the armor swap. Without this, a non-member can strip a
-     * claimed stand's diamond armor even though they can't break the stand itself.
-     *
-     * <p>Gated by the same build-access membership check as everything else.
+     * Armor stands swap gear via {@code interactAt}, which fires EntityInteractSpecific, not the
+     * regular EntityInteract that {@link #onEntityInteract} hooks — so swaps slip past it.
+     * Cancelling here blocks the swap. Gated by the same build-access check.
      */
     @SubscribeEvent
     public void onEntityInteractSpecific(PlayerInteractEvent.EntityInteractSpecific e) {
@@ -218,8 +302,7 @@ public final class EntityEventHandler {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         if (mod.perms().has(p, "worldguardneo.region.bypass")) return;
         Entity target = e.getTarget();
-        // Limit to decoration we protect; armor stands are the key case, item frames already
-        // go through EntityInteract but cancelling here too is harmless and closes any gap.
+        // Limit to protected decoration; armor stands are the key case.
         if (!(target instanceof net.minecraft.world.entity.decoration.ArmorStand)
                 && !(target instanceof net.minecraft.world.entity.decoration.HangingEntity)) {
             return;
@@ -228,6 +311,15 @@ public final class EntityEventHandler {
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
+        // Dedicated armor-stand-use toggle (default ALLOW): an explicit deny blocks even members,
+        // layered on top of the build-access gate below.
+        if (target instanceof net.minecraft.world.entity.decoration.ArmorStand
+                && !mgr.testState(Flags.ARMOR_STAND_USE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
+            return;
+        }
         if (!mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor)
                 || !mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)) {
             e.setCanceled(true);
@@ -239,18 +331,9 @@ public final class EntityEventHandler {
     /* ---------------- Right-click on entity (rotate item frame, swap armor stand gear, etc) ---------------- */
 
     /**
-     * Right-click interactions with decoration entities — item frames (place/rotate/remove
-     * an item), armor stands (swap armor). These don't fire {@link AttackEntityEvent},
-     * they fire {@code PlayerInteractEvent.EntityInteract} instead. Without this hook a
-     * non-owner could pop an item out of someone's claimed item frame just by right-clicking.
-     *
-     * <p>Gated under the same flags as left-click ({@code BUILD} + {@code INTERACT}). We
-     * use INTERACT here because it's logically a "use" action — adding an item to a frame
-     * is interaction, not breaking. BUILD doubles as the owner/member gate because most
-     * regions deny build to outsiders by default.
-     *
-     * <p>Mobs, players, vehicles fall through — those interactions (trading, mounting,
-     * riding) are gated by their own flags or vanilla rules.
+     * Right-click on decoration (item frames, armor stands). These fire {@code EntityInteract},
+     * not {@link AttackEntityEvent}; without this a non-owner could pop an item from a claimed
+     * frame. Gated on BUILD + INTERACT. Mobs/players/vehicles fall through to their own flags.
      */
     @SubscribeEvent
     public void onEntityInteract(PlayerInteractEvent.EntityInteract e) {
@@ -258,17 +341,56 @@ public final class EntityEventHandler {
         if (!(e.getEntity() instanceof ServerPlayer p)) return;
         if (mod.perms().has(p, "worldguardneo.region.bypass")) return;
         Entity target = e.getTarget();
-        if (!(target instanceof net.minecraft.world.entity.decoration.HangingEntity)
-                && !(target instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
-            return; // Not a decoration — let vanilla / other mods handle.
-        }
         if (!mod.isProtectionActive(p.serverLevel())) return;
         RegionManager mgr = mod.regions().get(p.serverLevel());
         double x = target.getX(), y = target.getY(), z = target.getZ();
         UUID actor = p.getUUID();
-        // INTERACT and BUILD both must allow — same gate as left-click but uses INTERACT
-        // (right-click is logically interaction, not destruction). Membership protection via
-        // testBuildAccess: owners/members pass, strangers are blocked when flags are unset.
+
+        // Leashing a mob (right-click with a lead). Vanilla applies the lead before any other
+        // interaction, so check this first. canBeLeashed() filters out non-leashable mobs. Denied by
+        // an explicit entity-leash=deny OR the membership model (a stranger can't leash a claimed mob).
+        if (target instanceof net.minecraft.world.entity.Mob mob && mob.canBeLeashed()
+                && p.getItemInHand(e.getHand()).is(net.minecraft.world.item.Items.LEAD)
+                && (!mgr.testState(Flags.ENTITY_LEASH, actor, x, y, z)
+                    || !mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor))) {
+            e.setCanceled(true);
+            BlockEventHandler.syncInventory(p); // lead is consumed client-side on the optimistic leash; resync it
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.entity-denied")), true);
+            return;
+        }
+        // Villager / wandering-trader trade GUI — explicit villager-trade=deny OR membership model.
+        if (target instanceof net.minecraft.world.entity.npc.AbstractVillager
+                && (!mgr.testState(Flags.VILLAGER_TRADE, actor, x, y, z)
+                    || !mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor))) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.entity-denied")), true);
+            return;
+        }
+
+        if (!(target instanceof net.minecraft.world.entity.decoration.HangingEntity)
+                && !(target instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
+            return; // not a decoration — let vanilla / other mods handle
+        }
+        // Dedicated decoration toggles (default ALLOW): an explicit deny blocks even members.
+        // item-frame-rotate only applies to a frame already holding an item; placing/removing
+        // falls under the build-access gate below.
+        if (target instanceof net.minecraft.world.entity.decoration.ItemFrame frame
+                && !frame.getItem().isEmpty()
+                && !mgr.testState(Flags.ITEM_FRAME_ROTATE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
+            return;
+        }
+        if (target instanceof net.minecraft.world.entity.decoration.ArmorStand
+                && !mgr.testState(Flags.ARMOR_STAND_USE, actor, x, y, z)) {
+            e.setCanceled(true);
+            p.displayClientMessage(
+                    net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
+            return;
+        }
         if (!mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor)
                 || !mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)) {
             e.setCanceled(true);
@@ -280,17 +402,9 @@ public final class EntityEventHandler {
     /* ---------------- Projectile hits decoration ---------------- */
 
     /**
-     * Stops arrows / snowballs / tridents / shulker bullets etc. from breaking item frames,
-     * paintings, and armor stands in regions where BUILD is denied. These projectile hits
-     * do NOT route through {@link AttackEntityEvent}, so without this handler a hostile
-     * player could destroy decorations from afar even when melee is blocked.
-     *
-     * <p>We mirror the left-click semantics: BUILD + BLOCK_BREAK must both allow. The shooter
-     * (when available) is used as the actor for group-resolution; for dispenser-fired or
-     * source-less projectiles we pass null and fall back to the global default.
-     *
-     * <p>Cancelling {@code ProjectileImpactEvent} makes the projectile pass through the entity
-     * without damage. The arrow keeps flying — which is exactly what we want (visual fairness).
+     * Stops projectiles from breaking decoration/vehicles where protection denies it; these don't
+     * route through {@link AttackEntityEvent}, so otherwise a player could destroy them from afar
+     * even when melee is blocked. Shooter (if any) is the actor; source-less projectiles pass null.
      */
     @SubscribeEvent
     public void onProjectileImpactEntity(ProjectileImpactEvent e) {
@@ -311,9 +425,8 @@ public final class EntityEventHandler {
         if (lvl.isClientSide()) return;
         if (!mod.isProtectionActive(lvl)) return;
 
-        // Identify the shooter (if any) so owner/member resolution can match group filters.
-        // A shooter with bypass walks through; null-shooter (e.g. dispenser) falls back to
-        // global flag defaults.
+        // Identify the shooter for owner/member resolution. A shooter with bypass walks through;
+        // null-shooter (e.g. dispenser) falls back to global flag defaults.
         UUID shooterId = null;
         Entity owner = e.getProjectile().getOwner();
         if (owner instanceof ServerPlayer sp) {
@@ -354,41 +467,43 @@ public final class EntityEventHandler {
         if (levelObj.isClientSide()) return;
         if (!mod.isProtectionActive(levelObj)) return;
 
-        // Cache the manager once for use across world-config and per-region paths below.
         RegionManager mgr = mod.regions().get(levelObj);
 
         // ---- player-sourced damage: melee AND ranged (arrows, tridents, potions, …) ----
-        // DamageSource#getEntity resolves to the CAUSING entity — the shooter for projectiles —
-        // so this closes the classic bypass where AttackEntityEvent gates melee but a bow shot
-        // sails through pvp=deny / mob-damage=deny untouched. Melee passes through both this
-        // and AttackEntityEvent with the same verdict, which is harmless.
-        // Victim's applicable regions, resolved at most once and shared between the player-attack
-        // gate and the environmental-damage cascade below (both at the victim's position). Lazy:
-        // the common mob-environmental-damage path returns before it's needed and never pays for it.
+        // DamageSource#getEntity resolves to the causing entity (shooter for projectiles), closing
+        // the bypass where AttackEntityEvent gates melee but a bow shot sails through pvp/mob-damage.
+        // applicable: victim's regions, resolved lazily at most once and shared with the
+        // environmental-damage cascade below (the common mob-damage path returns before it's needed).
         java.util.List<dev.thefather007.worldguardneo.region.ProtectedRegion> applicable = null;
 
         if (e.getSource().getEntity() instanceof ServerPlayer attacker && attacker != victim
                 && !(victim instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
-            // Armor stands are decoration: their BUILD/BLOCK_BREAK gating lives in the
-            // melee/projectile handlers, not under mob-damage.
+            // Armor stands are decoration; their gating lives in the melee/projectile handlers.
             if (!mod.perms().has(attacker, "worldguardneo.region.bypass")) {
                 applicable = mgr.getApplicable(victim.getX(), victim.getY(), victim.getZ());
                 StateFlag gate = victim instanceof Player ? Flags.PVP : Flags.MOB_DAMAGE;
                 if (!mgr.testState(gate, applicable, attacker.getUUID())) {
-                    e.setCanceled(true);
-                    attacker.displayClientMessage(
-                            net.minecraft.network.chat.Component.literal(mod.i18n().raw(
-                                    victim instanceof Player ? "msg.attack.pvp-denied"
-                                                             : "msg.attack.mob-denied")), true);
-                    return;
+                    // Public API override hook (see RegionFlagDeniedEvent) — a listener may permit.
+                    boolean overridden = !applicable.isEmpty()
+                            && dev.thefather007.worldguardneo.api.events.RegionFlagDeniedEvent.isOverridden(
+                                    mgr.denyingRegion(applicable, attacker.getUUID(), gate),
+                                    gate, attacker, victim instanceof Player ? "pvp" : "mob-damage");
+                    if (!overridden) {
+                        e.setCanceled(true);
+                        attacker.displayClientMessage(
+                                net.minecraft.network.chat.Component.literal(mod.i18n().raw(
+                                        victim instanceof Player ? "msg.attack.pvp-denied"
+                                                                 : "msg.attack.mob-denied")), true);
+                        return;
+                    }
                 }
             }
         }
 
         if (!(victim instanceof ServerPlayer sp)) return;
 
-        // World-wide config: invincibleRegions forces all-region invincibility, preventMobDamage
-        // blocks ALL mob-sourced damage across the world (regardless of regions).
+        // World-wide config: preventMobDamage blocks all mob-sourced damage; invincibleRegions
+        // makes a player inside any region take no damage.
         if (levelObj instanceof ServerLevel slvl) {
             var ws = mod.config().worldOrGlobal(slvl);
             if (ws != null) {
@@ -397,8 +512,7 @@ public final class EntityEventHandler {
                     e.setCanceled(true);
                     return;
                 }
-                // invincibleRegions: if the player is inside ANY region, take no damage.
-                // Cheap O(1) bucket lookup via the spatial index, no allocations.
+                // O(1) bucket lookup via the spatial index, no allocations.
                 if (ws.invincibleRegions
                         && mgr.hasAnyAt(victim.getX(), victim.getY(), victim.getZ())) {
                     e.setCanceled(true); return;
@@ -407,18 +521,14 @@ public final class EntityEventHandler {
         }
 
         double x = victim.getX(), y = victim.getY(), z = victim.getZ();
-        // Reuse the list already resolved by the player-attack gate above (same position) when
-        // present; otherwise resolve it once here for the environmental-damage cascade below.
+        // Reuse the list resolved by the player-attack gate above when present (same position).
         if (applicable == null) applicable = mgr.getApplicable(x, y, z);
         UUID id = sp.getUUID();
 
-        // Wilderness fast path: if there are no applicable regions AND the global region has
-        // no damage-related flags set, all testState calls below would return the flag default
-        // (allow) and we'd do nothing. Skip the cascade entirely. Most of the world is
-        // wilderness with vanilla damage rules, so this short-circuit fires often.
+        // Wilderness fast path: with no applicable regions and no damage-related flags on global,
+        // every testState below returns the allow default — skip the cascade entirely. Most of the
+        // world is wilderness with vanilla rules, so this fires often.
         if (applicable.isEmpty()) {
-            // Probe just one common damage-related flag on global — if unset, none of the
-            // others matter for cancellation (defaults allow damage). Cheap shortcut.
             var globalReg = mgr.globalRegion();
             if (globalReg.getFlag(Flags.INVINCIBLE) == null
                     && globalReg.getFlag(Flags.FALL_DAMAGE) == null
@@ -437,7 +547,7 @@ public final class EntityEventHandler {
         }
 
         DamageSource src = e.getSource();
-        // Typed damage-key references — robust to localization and mods adding new sources.
+        // Typed damage-key references — robust to localization and modded sources.
         if (src.is(DamageTypes.FALL)) {
             if (!mgr.testState(Flags.FALL_DAMAGE, applicable, id)) e.setCanceled(true);
         } else if (src.is(DamageTypes.IN_FIRE)

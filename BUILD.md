@@ -6,7 +6,7 @@
 
 **English** · [Русский](BUILD_RU.md)
 
-[🏠 Home](README.md) · **🔨 Building** · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [📋 Changelog](CHANGELOG.md)
+[🏠 Home](README.md) · **🔨 Building** · [🔑 Permissions](PERMISSIONS.md) · [🚩 Flags](FLAGS.md) · [⚙️ API](API.md) · [🧩 KubeJS](KUBEJS.md) · [📋 Changelog](CHANGELOG.md)
 
 </div>
 
@@ -17,7 +17,7 @@
 | Tool | Version |
 | --- | --- |
 | JDK | **21** (required) |
-| NeoForge | 21.1.233 (range `[21.1.0,)`) |
+| NeoForge | 21.1.234 (range `[21.1.0,)`) |
 | Minecraft | 1.21.1 |
 | Gradle | bundled wrapper (`./gradlew`) — no separate install needed |
 
@@ -42,7 +42,7 @@ worldguardneo/
 ├── settings.gradle.kts
 ├── gradlew / gradlew.bat     # Gradle wrapper
 └── src/main/
-    ├── java/                 # source (60 files)
+    ├── java/                 # source (69 files)
     └── resources/
         ├── META-INF/neoforge.mods.toml
         ├── assets/worldguardneo/lang/   # en_us, ru_ru
@@ -52,10 +52,9 @@ worldguardneo/
 
 ## Dependencies
 
-* **WorldEdit** (≥ 7.3) — **required at runtime**. Regions are created exclusively from WorldEdit selections (`//wand`, `//pos1`/`//pos2`, `//sel poly`). The server won't load without it. **WorldEdit is NOT needed to compile** — the mod talks to it purely through reflection, so it builds without WorldEdit on the classpath.
 * **LuckPerms** (≥ 5.4) — optional. Fine-grained permissions via groups/contexts + per-group region limits. Without it, all permissions map to OP levels.
 * **BlueMap** / **squaremap** — optional. Region rendering on the web map.
-* **WorldEditCUI** (client only) — selection highlighting. Provided by WorldEdit itself; nothing to install server-side.
+* **WorldEditCUI** (client only) — highlights the selection/region outline. The server speaks the `worldedit:cui` plugin-channel protocol directly; install WorldEditCUI client-side to see the box. (It's a standalone client mod — WorldEdit itself is not involved.)
 
 For alternative region storage (`storage-format`), the matching JDBC driver must be on the server classpath: **sqlite-jdbc** for `sqlite`, **H2** for `h2` (LuckPerms already ships H2), **mysql-connector-j** *or* the **MariaDB** driver for `mysql`. Drivers are located across classloaders and used directly (not via `DriverManager`), so a driver loaded by another mod still works. Without any driver the mod falls back to `json` automatically.
 
@@ -63,7 +62,6 @@ For alternative region storage (`storage-format`), the matching JDBC driver must
 
 The mod is deliberately designed to compile without any third-party mods on the classpath:
 
-- **WorldEdit** — reflection only (`Class.forName`), no direct imports.
 - **LuckPerms**, **night-config (TOML)**, **fastutil**, **Mixin** — declared `compileOnly` and provided at runtime by NeoForge or installed mods.
 - **JDBC drivers** (sqlite/H2/MySQL) — loaded reflectively at runtime, not part of the build.
 
@@ -71,14 +69,12 @@ So `./gradlew build` works out of the box with nothing to install manually.
 
 ## Installing the built mod
 
-1. Drop `worldguardneo-1.2.jar` into the server's `mods/` folder.
-2. *(Optional)* add **WorldEdit** (needed only to create regions via `/rg claim` and `/rg redefine`), LuckPerms, BlueMap, squaremap, or a JDBC driver.
+1. Drop `worldguardneo-1.3.jar` into the server's `mods/` folder.
+2. *(Optional)* add LuckPerms, BlueMap, squaremap, or a JDBC driver. For the client-side selection outline, players install **WorldEditCUI**.
 3. Start the server once to generate `config/worldguardneo/config.toml`.
 4. Adjust the config if needed and run `/rg reload`.
 
 ## Troubleshooting
-
-**`Could not find com.sk89q.worldedit:worldedit-neoforge:...`** — this shouldn't happen in the current version: WorldEdit was removed from build dependencies. If you hit it, make sure you're using the current `build.gradle.kts` (no `compileOnly("com.sk89q.worldedit...")` line).
 
 **Gradle can't find JDK 21** — install JDK 21 or let Gradle download it automatically (any Java is needed to start the wrapper).
 

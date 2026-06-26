@@ -6,7 +6,7 @@
 
 [English](FLAGS.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [🧩 KubeJS](KUBEJS.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -21,14 +21,15 @@
 - Каждый флаг защищён своим правом `worldguardneo.flag.<имя>` (по умолчанию OP 2). `region.flag.bypass` или `region.bypass` пропускает проверку.
 - `-g <группа>` перед значением ограничивает флаг группой `OWNERS` / `MEMBERS` / `NON_OWNERS` / `NON_MEMBERS` / `ALL` (нужно право `region.flag.group`).
 
-Два флага **объявлены, но пока не применяются** (сохранены ради совместимости формата): `receive-chat` и `allowed-enchants`.
+Флаги `on-entry` / `on-exit` выполняют консольную команду (плейсхолдеры `%player%`, `%region%`, `%world%`) при пересечении границы региона — задаются только администраторами, т.к. команда исполняется с правами консоли.
 
 ## Все флаги
 
 | Флаг | Тип | По умолчанию | Право | Описание |
 | --- | --- | --- | --- | --- |
 | `allowed-cmds` | список | — | `worldguardneo.flag.allowed-cmds` | Белый список разрешённых команд (имеет приоритет над blocked). |
-| `allowed-enchants` | список | — | `worldguardneo.flag.allowed-enchants` | Белый список разрешённых зачарований (ОБЪЯВЛЕН — пока не применяется). |
+| `on-entry` | текст | — | `worldguardneo.flag.on-entry` | Консольная команда при входе игрока (`%player%`/`%region%`/`%world%`). |
+| `on-exit` | текст | — | `worldguardneo.flag.on-exit` | Консольная команда при выходе игрока (`%player%`/`%region%`/`%world%`). |
 | `block-break` | состояние (allow/deny) | allow | `worldguardneo.flag.block-break` | Разрешить или запретить именно ломание блоков. |
 | `block-place` | состояние (allow/deny) | allow | `worldguardneo.flag.block-place` | Разрешить или запретить именно установку блоков. |
 | `blocked-cmds` | список | — | `worldguardneo.flag.blocked-cmds` | Команды, запрещённые в регионе. |
@@ -40,10 +41,12 @@
 | `crop-growth` | состояние (allow/deny) | allow | `worldguardneo.flag.crop-growth` | Разрешить или запретить рост культур (пшеница, свёкла и т.д.). |
 | `deny-message` | текст | — | `worldguardneo.flag.deny-message` | Своё сообщение при отказе защиты. |
 | `deny-spawn` | список | — | `worldguardneo.flag.deny-spawn` | ID сущностей, спавн которых запрещён. |
+| `spawn-limit` | список | — | `worldguardneo.flag.spawn-limit` | Лимиты на тип в виде `entity-id:max` (напр. `minecraft:zombie:5`); спавн типа запрещается, когда в регионе уже `max` таких сущностей. |
 | `dispenser-output` | состояние (allow/deny) | allow | `worldguardneo.flag.dispenser-output` | Разрешить или запретить выдачу из раздатчика/дропера (предметы, жидкости, снаряды). Также блокирует стрельбу через границу региона. |
 | `drown-damage` | состояние (allow/deny) | allow | `worldguardneo.flag.drown-damage` | Разрешить или запретить урон от утопления. |
 | `enderdragon` | состояние (allow/deny) | allow | `worldguardneo.flag.enderdragon` | Разрешить или запретить разрушение блоков драконом Края. |
 | `enderpearl` | состояние (allow/deny) | allow | `worldguardneo.flag.enderpearl` | Разрешить или запретить телепорт жемчугом Края. |
+| `entity-leash` | состояние (allow/deny) | allow | `worldguardneo.flag.entity-leash` | Разрешить или запретить привязывание поводка к мобу. В регионе не-участники блокируются через доступ `interact`; явный `deny` блокирует всех. |
 | `entry` | состояние (allow/deny) | allow | `worldguardneo.flag.entry` | Разрешить или запретить вход в регион (для игроков без bypass). |
 | `entry-deny-message` | текст | — | `worldguardneo.flag.entry-deny-message` | Своё сообщение при запрете входа. |
 | `entry-vehicle` | состояние (allow/deny) | allow | `worldguardneo.flag.entry-vehicle` | Разрешить или запретить вход в регион верхом на транспорте. |
@@ -95,8 +98,9 @@
 | `pistons` | состояние (allow/deny) | allow | `worldguardneo.flag.pistons` | Разрешить или запретить поршням двигать блоки через границу региона. |
 | `player-damage` | состояние (allow/deny) | allow | `worldguardneo.flag.player-damage` | Разрешить или запретить общий урон игрокам от не-игроков. |
 | `pvp` | состояние (allow/deny) | allow | `worldguardneo.flag.pvp` | Разрешить или запретить урон между игроками. |
-| `receive-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Разрешить или запретить получение чата внутри региона (ОБЪЯВЛЕН — пока не применяется). |
+| `receive-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.receive-chat` | Разрешить или запретить получение чужого чата внутри региона. |
 | `redstone` | состояние (allow/deny) | allow | `worldguardneo.flag.redstone` | Разрешить или запретить распространение редстоун-сигнала в регионе. |
+| `ride` | состояние (allow/deny) | allow | `worldguardneo.flag.ride` | Разрешить или запретить езду на мобах (лошадь, свинья, лавоход). В регионе не-участники блокируются через доступ `interact`; явный `deny` блокирует всех. Вагонетки/лодки — `vehicle-enter`. |
 | `send-chat` | состояние (allow/deny) | allow | `worldguardneo.flag.send-chat` | Разрешить или запретить отправку чата из региона. |
 | `sleep` | состояние (allow/deny) | allow | `worldguardneo.flag.sleep` | Разрешить или запретить сон в кроватях. |
 | `snow-fall` | состояние (allow/deny) | allow | `worldguardneo.flag.snow-fall` | Разрешить или запретить накопление снега. |
@@ -108,6 +112,16 @@
 | `tnt` | состояние (allow/deny) | allow | `worldguardneo.flag.tnt` | Разрешить или запретить урон блокам от взрыва ТНТ. |
 | `use` | состояние (allow/deny) | allow | `worldguardneo.flag.use` | Разрешить или запретить использование предметов (еда, зелья, двери). |
 | `vehicle-destroy` | состояние (allow/deny) | allow | `worldguardneo.flag.vehicle-destroy` | Разрешить или запретить уничтожение вагонеток и лодок. |
+| `vehicle-place` | состояние (allow/deny) | allow | `worldguardneo.flag.vehicle-place` | Разрешить или запретить установку вагонеток и лодок. |
+| `vehicle-enter` | состояние (allow/deny) | allow | `worldguardneo.flag.vehicle-enter` | Разрешить или запретить посадку игроков в вагонетки и лодки. |
+| `item-frame-rotate` | состояние (allow/deny) | allow | `worldguardneo.flag.item-frame-rotate` | Разрешить или запретить вращение предмета в заполненной рамке (установка/изъятие — по build-доступу). |
+| `sign-edit` | состояние (allow/deny) | allow | `worldguardneo.flag.sign-edit` | Разрешить или запретить редактирование табличек. |
+| `lectern-take` | состояние (allow/deny) | allow | `worldguardneo.flag.lectern-take` | Разрешить или запретить использование кафедры с книгой. |
+| `armor-stand-use` | состояние (allow/deny) | allow | `worldguardneo.flag.armor-stand-use` | Разрешить или запретить использование (смену экипировки) стоек для брони. |
+| `glide` | состояние (allow/deny) | allow | `worldguardneo.flag.glide` | Разрешить или запретить полёт на элитрах; запрет принудительно прерывает планирование в регионе. |
+| `bucket-fill` | состояние (allow/deny) | allow | `worldguardneo.flag.bucket-fill` | Разрешить или запретить наполнение вёдер (вода, лава, снег). |
+| `bucket-empty` | состояние (allow/deny) | allow | `worldguardneo.flag.bucket-empty` | Разрешить или запретить выливание вёдер (установку жидкостей). |
+| `villager-trade` | состояние (allow/deny) | allow | `worldguardneo.flag.villager-trade` | Разрешить или запретить открытие меню торговли жителей / странствующего торговца. В регионе не-участники блокируются через доступ `interact`; явный `deny` блокирует всех. |
 | `vine-growth` | состояние (allow/deny) | allow | `worldguardneo.flag.vine-growth` | Разрешить или запретить рост лиан. |
 | `water-flow` | состояние (allow/deny) | allow | `worldguardneo.flag.water-flow` | Разрешить или запретить течение воды. |
 | `weather-lock` | текст | — | `worldguardneo.flag.weather-lock` | Фиксация клиентской погоды (clear, rain, thunder). |

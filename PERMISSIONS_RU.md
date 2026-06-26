@@ -6,7 +6,7 @@
 
 [English](PERMISSIONS.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · **🔑 Права** · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · **🔑 Права** · [🚩 Флаги](FLAGS_RU.md) · [⚙️ API](API_RU.md) · [🧩 KubeJS](KUBEJS.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -30,14 +30,19 @@ WorldGuardNeo проверяет каждую команду и защищённ
 | `worldguardneo.region.claim` | OP 0 | `/rg claim` — создать регион. Применяются все лимиты (счётчики на игрока/группу, объём, площадь, оверлап). |
 | `worldguardneo.region.delete` | OP 0 | `/rg remove` — удалить **свой** регион. |
 | `worldguardneo.region.delete.others` | OP 3 | Удалить **любой** регион. |
+| `worldguardneo.region.undo` | OP 2 | `/rg undo` — восстановить последний удалённый регион в этом мире (сессионная корзина). |
 | `worldguardneo.region.redefine` | OP 2 | `/rg redefine` — изменить размер региона под выделение. |
+| `worldguardneo.region.rename` | OP 2 | `/rg rename` — изменить id региона, сохранив все его данные. |
+| `worldguardneo.region.audit` | OP 2 | `/rg audit` — просмотр последних административных изменений региона. |
+| `worldguardneo.region.select` | OP 2 | `/rg select` — загрузить геометрию региона в своё выделение. |
+| `worldguardneo.region.transfer` | OP 3 | `/rg transfer` — передать единоличное владение другому игроку. |
 | `worldguardneo.region.info` | OP 0 | `/rg info` — посмотреть видимый регион. |
 | `worldguardneo.region.info.others` | OP 2 | Просмотр чужих регионов. |
 | `worldguardneo.region.info.global` | OP 4 | Просмотр глобального региона (`__global__`). |
 | `worldguardneo.region.list` | OP 0 | `/rg list` — список своих регионов. |
 | `worldguardneo.region.list.others` | OP 2 | Список регионов другого игрока. |
 | `worldguardneo.region.lists.radius` | OP 2 | `/rg lists <радиус>` — список регионов рядом. |
-| `worldguardneo.region.teleport` | OP 0 | `/rg teleport` — телепорт к флагу `teleport` региона. |
+| `worldguardneo.region.teleport` | OP 2 | `/rg teleport` — телепорт к флагу `teleport` региона. |
 
 ## Узлы членства
 
@@ -66,11 +71,18 @@ WorldGuardNeo проверяет каждую команду и защищённ
 
 | Узел | По умолчанию | За что отвечает |
 | --- | --- | --- |
-| `worldguardneo.selection.use` | OP 0 | Получение кастомного WorldGuardNeo `//wand`. |
+| `worldguardneo.selection.use` | OP 0 | Использование самой палочки (клики по блокам для выбора углов/точек). |
+| `worldguardneo.selection.wand` | OP 0 | `/rg wand` — получить встроенную палочку выделения (одна на игрока). |
+| `worldguardneo.selection.mode` | OP 0 | `/rg sel <cuboid\|poly\|clear>` — смена режима выделения / сброс. |
+| `worldguardneo.selection.pos1` | OP 0 | `/rg pos1` — задать угол куба 1 по вашей позиции. |
+| `worldguardneo.selection.pos2` | OP 0 | `/rg pos2` — задать угол куба 2 по вашей позиции. |
+| `worldguardneo.selection.point` | OP 0 | `/rg point` — добавить вершину полигона по вашей позиции. |
+| `worldguardneo.selection.pos.coords` | OP 4 | `/rg pos1 <x y z>` / `pos2 <x y z>` — явные координаты (можно из консоли через `/execute as`). |
 | `worldguardneo.region.admin` | OP 3 | Административные операции с регионами. |
 | `worldguardneo.region.bypass` | **OP 5** | Полный обход защиты регионов. По OP не выдаётся — только LuckPerms. |
 | `worldguardneo.backup` | OP 4 | `/rg backup` — ручной бэкап. |
-| `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. |
+| `worldguardneo.migrate` | OP 4 | `/rg migrate <json\|sqlite\|h2\|mysql>` — перенос данных регионов в другой бэкенд (активируется после перезапуска). |
+| `worldguardneo.reload` | OP 4 | `/rg reload` — перезагрузка конфига и языка. Также даёт `/rg cleanup` (запуск истечения клеймов вручную). |
 | `worldguardneo.notify` | OP 2 | Получение оповещений, когда игроки пересекают регионы с флагами `notify-enter` / `notify-leave`. |
 
 ## Примеры LuckPerms
@@ -95,10 +107,11 @@ WorldGuardNeo проверяет каждую команду и защищённ
 /lp group admin permission set worldguardneo.region.bypass true
 ```
 
-Закрыть палочку WorldEdit от обычных игроков (см. [FAQ по правам в README](README_RU.md#права)):
+Закрыть палочку выделения от обычных игроков (см. [FAQ по правам в README](README_RU.md#права)):
 
 ```
 /lp group default permission set worldguardneo.selection.use false
+/lp group default permission set worldguardneo.selection.wand false
 ```
 
 ## Лицензия

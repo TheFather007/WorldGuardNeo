@@ -35,14 +35,8 @@ public final class Localization {
     }
 
     /**
-     * Re-load entries in place from the given config dir + locale. Used by /rg reload to
-     * pick up changes to {@code config/worldguardneo/lang/<tag>.json} without restarting
-     * the server. The {@code Localization} instance reference stays the same so existing
-     * cached references in other modules remain valid.
-     *
-     * <p>Safe to call multiple times; clears and rebuilds the entries map atomically from
-     * the server thread's perspective (read-during-reload would only see partial data, but
-     * /rg reload is rare and short, so we don't synchronize on the hot path).
+     * Reload entries in place (for /rg reload) keeping the same instance so cached references
+     * stay valid. Not synchronized — /rg reload is rare; the hot read path stays lock-free.
      */
     public void reload(Path configDir, Locale newLocale) {
         entries.clear();
@@ -98,15 +92,8 @@ public final class Localization {
     }
 
     /**
-     * Substitute {@code %name%} placeholders in the template.
-     *
-     * <p>Args are flat pairs: {@code "name1", value1, "name2", value2, ...}. Replacement
-     * uses single-pass StringBuilder scanning rather than chained {@link String#replace}
-     * — for a template with N placeholders the old implementation allocated 2N strings
-     * (the {@code "%key%"} search string and the new tmpl after each substitution).
-     *
-     * <p>This implementation does at most 1 allocation per template (the StringBuilder
-     * and the final toString()) regardless of placeholder count.
+     * Substitute {@code %name%} placeholders. Args are flat pairs ({@code "name", value, ...}).
+     * Single-pass StringBuilder scan: one allocation per template regardless of placeholder count.
      */
     public String format(String key, Object... args) {
         String tmpl = entries.getOrDefault(key, key);
@@ -117,10 +104,8 @@ public final class Localization {
             WorldGuardNeo.LOGGER.debug("Localization.format called with odd argument count for key '{}'", key);
         }
 
-        // Walk the template, copying literal chars to the output StringBuilder. When we hit
-        // '%', scan ahead for the closing '%' and look up the enclosed name in args. If
-        // found, append the value; otherwise leave the original "%name%" verbatim so admin
-        // typos in lang files don't silently vanish.
+        // Copy literals; at each %name% look the name up in args, else keep "%name%" verbatim
+        // so admin typos stay visible.
         StringBuilder out = new StringBuilder(tmpl.length() + 16);
         int n = tmpl.length();
         int i = 0;
@@ -137,10 +122,7 @@ public final class Localization {
                 out.append(tmpl, i, n);
                 break;
             }
-            // %% is NOT printf-style escape — kept verbatim to match the previous
-            // String.replace based implementation, which would leave "%%" untouched
-            // unless an arg literally named "" was provided (impossible). Just emit
-            // the first '%' and continue from the second.
+            // %% is not an escape — emit one '%' and continue from the second.
             if (end == i + 1) {
                 out.append('%');
                 i++;

@@ -6,7 +6,7 @@
 
 [English](API.md) · **Русский**
 
-[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · **⚙️ API** · [📋 История](CHANGELOG.md)
+[🏠 Главная](README_RU.md) · [🔨 Сборка](BUILD_RU.md) · [🔑 Права](PERMISSIONS_RU.md) · [🚩 Флаги](FLAGS_RU.md) · **⚙️ API** · [🧩 KubeJS](KUBEJS.md) · [📋 История](CHANGELOG.md)
 
 </div>
 
@@ -30,7 +30,7 @@ WorldGuardNeo — `optional` зависимость. Объяви это в `neo
 [[dependencies.yourmod]]
 modId = "worldguardneo"
 type = "optional"
-versionRange = "[1.2,)"
+versionRange = "[1.3,)"
 ordering = "AFTER"
 side = "BOTH"
 ```
@@ -79,6 +79,7 @@ List<ProtectedRegion> mine = WorldGuardNeoAPI.getOwnedRegions(level, player.getU
 boolean canBuild = WorldGuardNeoAPI.canBuild(player, pos);
 
 // Аналогично для других защит
+boolean canPlace        = WorldGuardNeoAPI.canPlace(player, pos);
 boolean canInteract     = WorldGuardNeoAPI.canInteract(player, pos);
 boolean canAccessChests = WorldGuardNeoAPI.canAccessChests(player, pos);
 boolean canPvP          = WorldGuardNeoAPI.canPvP(player, pos);
@@ -145,7 +146,7 @@ NeoForge.EVENT_BUS.register(new YourEventHandler());
 
 ### `RegionFlagDeniedEvent`
 
-Регион отменил **строительное действие** через флаг — ломание или установку блока (только эти два пути сейчас порождают событие). **Cancellable** — listener'ы могут вызвать `setCanceled(true)`, чтобы ПЕРЕОПРЕДЕЛИТЬ отказ и позволить действие.
+Регион отменил действие через флаг — покрываются **ломание/установка блока, interact, контейнеры (chest-access) и PvP** (чисто средовые отказы без действующей сущности — распространение огня/жидкостей, раздатчики — событие не порождают). **Cancellable** — listener'ы могут вызвать `setCanceled(true)`, чтобы ПЕРЕОПРЕДЕЛИТЬ отказ и позволить действие.
 
 **Поля:**
 - `getRegion()` — регион чьим флагом ограничено
@@ -166,7 +167,7 @@ public void onDenied(RegionFlagDeniedEvent e) {
 }
 ```
 
-**Сейчас событие фаерится только для `block-break` denial** (центральный case). Постепенно будет распространено на другие денайл-сайты в будущих версиях. Listener'ы должны быть готовы что для других флагов событие может не сработать.
+`reason` принимает значения `"block-break"`, `"block-place"`, `"interact"`, `"container"`, `"pvp"`. Чисто средовые отказы (огонь/жидкости/раздатчики) событие не порождают — для них подписывайтесь на соответствующие события NeoForge напрямую.
 
 ### `RegionModifyEvent`
 
@@ -252,7 +253,7 @@ public class MyMagicMod {
 }
 ```
 
-Теперь админ может запретить магию в регионе через `/rg flag spawn mymagicmod.no-magic deny`.
+Теперь админ может запретить магию в регионе через `/rg flag spawn mymagicmod-no-magic deny`.
 
 ### Пример 2: мод респаун-логирования
 

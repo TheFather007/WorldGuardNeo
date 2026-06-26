@@ -16,26 +16,14 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Dedicated, asynchronous logger for protection violations (a player trying to break, place,
- * or interact in a region where they lack permission).
+ * Asynchronous logger for protection violations (denied break/place/interact in a region), written
+ * to {@code logs/worldguardneo-violations.log}. Kept in its own file so routine griefing attempts
+ * don't bury important console messages.
  *
- * <p>Why a separate log: previously every denied action produced noise on the server console
- * (either our own logging or vanilla's "Mismatch in destroy block pos" warnings). On a busy
- * server that buries genuinely important messages. Violations are routine gameplay events, not
- * errors, so they belong in their own file — {@code logs/worldguardneo-violations.log} — where
- * admins can audit griefing attempts without scrolling past them constantly.
- *
- * <p>Design notes:
- * <ul>
- *   <li><b>Async single-writer.</b> A daemon thread drains a bounded queue and appends lines.
- *       Game-thread callers never touch disk — they just offer a pre-formatted string, so a
- *       slow disk can't stall the server tick.</li>
- *   <li><b>Bounded queue, drop-on-full.</b> If something floods violations faster than we can
- *       write (e.g. an auto-clicker in a denied region), we drop extras rather than grow the
- *       queue unboundedly. The action is still blocked in-game; only the log line is skipped.</li>
- *   <li><b>Best-effort.</b> Any I/O failure is swallowed after a single warning — logging must
- *       never crash or degrade the server.</li>
- * </ul>
+ * <p>Async single-writer: a daemon thread drains a bounded queue and appends lines; game-thread
+ * callers only offer a pre-formatted string, so a slow disk can't stall the tick. The queue is
+ * bounded and drops on overflow (the action is still blocked in-game; only the log line is skipped).
+ * Best-effort: any I/O failure is swallowed after a single warning.
  */
 public final class ViolationLog {
 
@@ -53,46 +41,38 @@ public final class ViolationLog {
         try {
             Files.createDirectories(logsDir);
         } catch (IOException ignored) {
-            // Directory likely exists; createDirectories is a no-op then. Real failures surface
-            // on first write and are handled there.
+            // Likely already exists; real failures surface on first write.
         }
-        // Rotate the previous session's log out of the way, mirroring how Minecraft archives
-        // latest.log into dated files. The current session always writes a fresh
-        // worldguardneo-violations.log; the prior one is renamed to
-        // worldguardneo-violations-<date>-<n>.log so history is preserved but not appended to.
+        // Rotate the previous session's log out of the way (gzipped, dated) so this session writes
+        // a fresh file, mirroring how Minecraft archives latest.log.
         rotateExisting(logsDir);
         this.worker = new Thread(this::drainLoop, "WGN-ViolationLog");
         this.worker.setDaemon(true);
         this.worker.start();
-        // Emit a startup marker so the file exists immediately (confirms the logger is live
-        // even before the first violation) and admins can see when the session began.
+        // Startup marker so the file exists immediately and the session start is visible.
         record0("=== WorldGuardNeo violation log started "
                 + TS.format(LocalDateTime.now()) + " ===");
     }
 
     /**
-     * If a violations log from a previous run exists, rename it to a dated archive so the new
-     * session starts clean. Picks a non-colliding suffix ({@code -YYYY-MM-DD-N.log}). Best
-     * effort: if rotation fails for any reason we fall back to appending to the existing file
-     * (the old behaviour), which is safe — we never lose data.
+     * Gzip a prior run's violations log to a dated archive ({@code -YYYY-MM-DD-N.log.gz}) so the new
+     * session starts clean. Best-effort: on failure we fall back to appending, never losing data.
      */
     private void rotateExisting(Path logsDir) {
         try {
             if (!Files.exists(file)) return;
-            // Use the file's last-modified date for the archive name (when the old session ran).
+            // Date the archive by the old file's last-modified (when that session ran).
             String date;
             try {
                 var ft = Files.getLastModifiedTime(file).toInstant()
                         .atZone(java.time.ZoneId.systemDefault()).toLocalDate();
-                date = ft.toString(); // YYYY-MM-DD
+                date = ft.toString();
             } catch (Exception ex) {
                 date = java.time.LocalDate.now().toString();
             }
             for (int n = 1; n < 1000; n++) {
                 Path archive = logsDir.resolve("worldguardneo-violations-" + date + "-" + n + ".log.gz");
                 if (!Files.exists(archive)) {
-                    // Gzip the old log into the archive (matches Minecraft's *.log.gz convention),
-                    // then remove the plaintext original so the new session starts fresh.
                     try (var in = Files.newInputStream(file);
                          var gz = new java.util.zip.GZIPOutputStream(Files.newOutputStream(archive))) {
                         in.transferTo(gz);
@@ -101,10 +81,10 @@ public final class ViolationLog {
                     return;
                 }
             }
-            // 999 archives for one day is absurd — just delete-and-restart rather than grow forever.
+            // 999 archives in one day — delete-and-restart rather than grow forever.
+            Files.delete(file);
         } catch (IOException ex) {
-            // Couldn't rotate (file locked, permissions). The writer will append to the existing
-            // file instead — no data lost, just not split per-session.
+            // Couldn't rotate (locked/permissions) — the writer appends to the existing file instead.
             dev.thefather007.worldguardneo.WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] Could not rotate violation log; appending instead.", ex);
         }
     }
@@ -115,8 +95,7 @@ public final class ViolationLog {
     }
 
     /**
-     * Record a violation. Called from the game thread; returns immediately. The line is
-     * formatted here (cheap) and handed to the writer thread.
+     * Record a violation. Called from the game thread; formats the line and hands it off, returns immediately.
      *
      * @param player the offending player
      * @param action short action key, e.g. "break", "place", "interact", "container"
@@ -137,12 +116,10 @@ public final class ViolationLog {
                 + " @ " + world + " " + x + "," + y + "," + z
                 + (region != null ? " region=" + region : "")
                 + (detail != null ? " " + detail : "");
-        // offer() — never block the game thread. Drop if the queue is saturated.
-        queue.offer(line);
+        queue.offer(line); // never blocks the game thread; drops if saturated
     }
 
     private void drainLoop() {
-        // Open in append mode so restarts keep history. Buffered writer flushed each batch.
         try (Writer w = new OutputStreamWriter(
                 Files.newOutputStream(file, StandardOpenOption.CREATE, StandardOpenOption.APPEND),
                 StandardCharsets.UTF_8)) {
@@ -151,7 +128,7 @@ public final class ViolationLog {
                 if (line == null) continue;
                 w.write(line);
                 w.write(System.lineSeparator());
-                // Drain any backlog before flushing, so bursts cost one flush, not N.
+                // Drain backlog before flushing so bursts cost one flush, not N.
                 String more;
                 while ((more = queue.poll()) != null) {
                     w.write(more);
@@ -174,11 +151,9 @@ public final class ViolationLog {
     /** Flush and stop the writer thread on server shutdown. */
     public void close() {
         running = false;
-        // Do NOT interrupt immediately: an interrupt lands inside queue.poll() and aborts the
-        // drain loop via its InterruptedException handler, dropping every line still queued.
-        // The loop exits on its own once running=false and the queue is empty (poll has a 1s
-        // timeout), so a plain join lets the backlog flush. Interrupt only as a last resort
-        // if the writer is genuinely stuck (e.g. disk hang).
+        // Don't interrupt immediately: an interrupt aborts the drain loop's queue.poll() and drops
+        // queued lines. The loop exits on its own (running=false + empty queue, 1s poll timeout), so
+        // a plain join flushes the backlog. Interrupt only as a last resort if the writer is stuck.
         try {
             worker.join(3000);
             if (worker.isAlive()) {

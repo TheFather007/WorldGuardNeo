@@ -36,6 +36,15 @@ public final class Flags {
     public static final StateFlag DROWN_DAMAGE      = new StateFlag("drown-damage",      true);
     public static final StateFlag SUFFOCATION_DAMAGE= new StateFlag("suffocation-damage",true);
     public static final StateFlag VEHICLE_DESTROY   = new StateFlag("vehicle-destroy",   true);
+    public static final StateFlag VEHICLE_PLACE     = new StateFlag("vehicle-place",     true);
+    public static final StateFlag VEHICLE_ENTER     = new StateFlag("vehicle-enter",     true);
+    public static final StateFlag ITEM_FRAME_ROTATE = new StateFlag("item-frame-rotate", true);
+    public static final StateFlag SIGN_EDIT         = new StateFlag("sign-edit",         true);
+    public static final StateFlag LECTERN_TAKE      = new StateFlag("lectern-take",      true);
+    public static final StateFlag ARMOR_STAND_USE   = new StateFlag("armor-stand-use",   true);
+    public static final StateFlag GLIDE             = new StateFlag("glide",             true);
+    public static final StateFlag BUCKET_FILL       = new StateFlag("bucket-fill",       true);
+    public static final StateFlag BUCKET_EMPTY      = new StateFlag("bucket-empty",      true);
     public static final StateFlag ITEM_PICKUP       = new StateFlag("item-pickup",       true);
     public static final StateFlag ITEM_DROP         = new StateFlag("item-drop",         true);
     public static final StateFlag ENDER_BUILD       = new StateFlag("enderpearl",        true);
@@ -89,8 +98,18 @@ public final class Flags {
     public static final SetFlag    BLOCKED_CMDS      = new SetFlag("blocked-cmds");
     public static final SetFlag    ALLOWED_CMDS      = new SetFlag("allowed-cmds");
     public static final SetFlag    DENY_SPAWN        = new SetFlag("deny-spawn");
-    public static final SetFlag    ALLOWED_ENCHANTS  = new SetFlag("allowed-enchants");
+    // Per-type spawn caps: each entry is "<entity-id>:<max>" (e.g. "minecraft:zombie:5"). When a
+    // region is at/over the cap for that type within its bounds, further spawns of it are cancelled.
+    public static final SetFlag    SPAWN_LIMIT       = new SetFlag("spawn-limit");
     public static final SetFlag    BLOCKED_EFFECTS   = new SetFlag("blocked-effects");
+
+    /**
+     * Command run (from the server console, elevated) when a player ENTERS / LEAVES the region.
+     * Placeholders: {@code %player%}, {@code %region%}, {@code %world%}. A leading '/' is optional.
+     * Settable only via the per-flag node (admins), since the command runs with console authority.
+     */
+    public static final StringFlag ON_ENTRY          = new StringFlag("on-entry");
+    public static final StringFlag ON_EXIT           = new StringFlag("on-exit");
 
     public static final StringFlag GAME_MODE         = new StringFlag("game-mode");
     public static final StringFlag TIME_LOCK         = new StringFlag("time-lock");
@@ -106,6 +125,12 @@ public final class Flags {
     public static final StateFlag  MOB_TELEPORT      = new StateFlag("mob-teleport",    true);
     /** DENY = mobs can't change blocks here (enderman pick/place, sheep eat grass, etc.). */
     public static final StateFlag  MOB_GRIEF         = new StateFlag("mob-grief",       true);
+    /** DENY = players can't open a villager / wandering-trader trade GUI here. */
+    public static final StateFlag  VILLAGER_TRADE    = new StateFlag("villager-trade",  true);
+    /** DENY = players can't mount rideable mobs (horse, pig, strider, …) here. Minecarts/boats use vehicle-enter. */
+    public static final StateFlag  RIDE              = new StateFlag("ride",            true);
+    /** DENY = players can't attach a lead to a mob here. */
+    public static final StateFlag  ENTITY_LEASH      = new StateFlag("entity-leash",    true);
 
     private static final Map<String, Flag<?>> REGISTRY = new LinkedHashMap<>();
 
@@ -124,7 +149,10 @@ public final class Flags {
         register(OTHER_EXPLOSION); register(FIRE_SPREAD); register(LAVA_FIRE); register(LIGHTNING);
         register(MOB_SPAWNING); register(MOB_DAMAGE); register(PLAYER_DAMAGE);
         register(FALL_DAMAGE); register(FIRE_DAMAGE); register(DROWN_DAMAGE); register(SUFFOCATION_DAMAGE);
-        register(VEHICLE_DESTROY); register(ITEM_PICKUP); register(ITEM_DROP);
+        register(VEHICLE_DESTROY); register(VEHICLE_PLACE); register(VEHICLE_ENTER);
+        register(ITEM_FRAME_ROTATE); register(SIGN_EDIT); register(LECTERN_TAKE);
+        register(ARMOR_STAND_USE); register(GLIDE); register(BUCKET_FILL); register(BUCKET_EMPTY);
+        register(ITEM_PICKUP); register(ITEM_DROP);
         register(ENDER_BUILD); register(CHORUS_FRUIT); register(ENTRY); register(EXIT);
         register(ENTRY_VEHICLE); register(EXIT_VEHICLE); register(PISTONS);
         register(REDSTONE); register(DISPENSER_OUTPUT);
@@ -141,12 +169,13 @@ public final class Flags {
         register(FEED_DELAY); register(FEED_AMOUNT); register(FEED_MAX); register(FEED_MIN);
         register(MAX_SPEED); register(NOTIFY_ENTER); register(NOTIFY_LEAVE);
 
-        register(BLOCKED_CMDS); register(ALLOWED_CMDS); register(DENY_SPAWN);
-        register(ALLOWED_ENCHANTS); register(BLOCKED_EFFECTS);
+        register(BLOCKED_CMDS); register(ALLOWED_CMDS); register(DENY_SPAWN); register(SPAWN_LIMIT);
+        register(BLOCKED_EFFECTS); register(ON_ENTRY); register(ON_EXIT);
 
         register(GAME_MODE); register(TIME_LOCK); register(WEATHER_LOCK);
         register(TELE_LOC); register(SPAWN_LOC);
         register(KEEP_INVENTORY); register(KEEP_XP); register(MOB_TELEPORT); register(MOB_GRIEF);
+        register(VILLAGER_TRADE); register(RIDE); register(ENTITY_LEASH);
     }
 
     public static <F extends Flag<?>> F register(F flag) {

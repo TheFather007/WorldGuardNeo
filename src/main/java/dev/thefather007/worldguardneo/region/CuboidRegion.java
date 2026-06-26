@@ -14,11 +14,8 @@ public final class CuboidRegion extends ProtectedRegion {
     }
 
     /**
-     * Mutates the cuboid's bounds. <b>WARNING</b>: if this region is registered in a
-     * {@link RegionManager}, the spatial index is NOT automatically updated. Callers must
-     * remove and re-add the region (or call {@code RegionManager.rebuildIndex()}) for
-     * lookups to reflect the new bounds. Prefer constructing a new region and using
-     * {@code /rg redefine}.
+     * Mutates the cuboid's bounds. WARNING: the spatial index is NOT auto-updated if this region
+     * is registered — callers must re-add it (or {@code rebuildIndex()}). Prefer {@code /rg redefine}.
      */
     public void setCorners(Vec3 a, Vec3 b) {
         this.min = a.min(b);
@@ -36,4 +33,6 @@ public final class CuboidRegion extends ProtectedRegion {
     @Override public String type()       { return "cuboid"; }
 
     @Override public long volume() { return min.volumeWith(max); }
+
+    @Override public ProtectedRegion withId(String newId) { return new CuboidRegion(newId, min, max); }
 }

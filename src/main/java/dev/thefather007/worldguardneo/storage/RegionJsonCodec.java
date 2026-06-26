@@ -20,13 +20,11 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Pure-in-memory codec between {@link RegionManager} and a JSON document.
+ * Pure-in-memory codec between {@link RegionManager} and a JSON document, so all backends share one
+ * on-the-wire shape without duplicating parser/writer code. No I/O here.
  *
- * Exists so the JSON file backend and the SQLite blob backend can share exactly the same
- * on-the-wire shape without duplicating parser/writer code. No I/O happens here.
- *
- * Robustness: malformed entries are logged and skipped rather than aborting the whole load.
- * This ensures that a single corrupt region in a save file does not erase all the others.
+ * <p>Robustness: malformed entries are logged and skipped rather than aborting the load, so one
+ * corrupt region doesn't erase the others.
  */
 public final class RegionJsonCodec {
 
@@ -76,6 +74,7 @@ public final class RegionJsonCodec {
                 }
                 fillOwnersMembers(region, obj);
                 fillFlags(region, obj);
+                fillMetadata(region, obj);
                 into.add(region);
             }
             // Resolve parent links once all regions exist.
@@ -96,6 +95,61 @@ public final class RegionJsonCodec {
         }
         if (root.has("global") && root.get("global").isJsonObject()) {
             fillFlags(into.globalRegion(), root.getAsJsonObject("global"));
+        }
+    }
+
+    /* ------------------ per-region (incremental storage) ------------------ */
+
+    /** JSON for a single region — identical shape to one entry of the whole-world document. */
+    public static JsonObject regionToJson(ProtectedRegion r) { return writeRegion(r); }
+
+    /** JSON holding just the global region's flags (the per-world {@code __global__} row). */
+    public static JsonObject globalToJson(ProtectedRegion global) { return writeFlagsOnly(global); }
+
+    /**
+     * Parse one region from its JSON (geometry, priority, owners/members, flags). The parent link
+     * is deferred into {@code parentOut} (childId → parentId) so the caller resolves it via
+     * {@link #linkParents} once all regions are loaded. Returns null on unusable JSON (logged).
+     */
+    public static ProtectedRegion readRegion(String id, JsonObject obj, Map<String, String> parentOut) {
+        ProtectedRegion region;
+        try {
+            region = parseRegion(id, obj);
+        } catch (Exception ex) {
+            WorldGuardNeo.LOGGER.warn("Skipping region '{}' due to parse error", id, ex);
+            return null;
+        }
+        if (region == null) return null;
+        if (obj.has("priority") && obj.get("priority").isJsonPrimitive()) {
+            try { region.setPriority(obj.get("priority").getAsInt()); } catch (Exception ignored) {}
+        }
+        if (obj.has("parent") && obj.get("parent").isJsonPrimitive()) {
+            parentOut.put(id, obj.get("parent").getAsString());
+        }
+        fillOwnersMembers(region, obj);
+        fillFlags(region, obj);
+        fillMetadata(region, obj);
+        return region;
+    }
+
+    /** Apply a per-row {@code __global__} flags payload onto the manager's global region. */
+    public static void applyGlobalJson(JsonObject obj, RegionManager into) {
+        fillFlags(into.globalRegion(), obj);
+    }
+
+    /** Resolve deferred parent links collected by {@link #readRegion}. */
+    public static void linkParents(Map<String, String> parentDeferred, RegionManager into) {
+        for (Map.Entry<String, String> e : parentDeferred.entrySet()) {
+            var child  = into.get(e.getKey()).orElse(null);
+            var parent = into.get(e.getValue()).orElse(null);
+            if (child == null || parent == null) {
+                WorldGuardNeo.LOGGER.warn("Dropping parent link {} → {}: target missing", e.getKey(), e.getValue());
+                continue;
+            }
+            try { child.setParent(parent); }
+            catch (IllegalStateException ex) {
+                WorldGuardNeo.LOGGER.warn("Dropping parent link {} → {}: would create a cycle", e.getKey(), e.getValue());
+            }
         }
     }
 
@@ -121,11 +175,17 @@ public final class RegionJsonCodec {
                 JsonArray pa = obj.getAsJsonArray("points");
                 List<PolygonalRegion.Point2> pts = new ArrayList<>(pa.size());
                 for (JsonElement pe : pa) {
-                    JsonObject po = pe.getAsJsonObject();
-                    pts.add(new PolygonalRegion.Point2(po.get("x").getAsInt(), po.get("z").getAsInt()));
+                    // Skip a malformed point rather than dropping the whole region; the <3 guard below
+                    // still rejects degenerate polygons.
+                    try {
+                        JsonObject po = pe.getAsJsonObject();
+                        pts.add(new PolygonalRegion.Point2(po.get("x").getAsInt(), po.get("z").getAsInt()));
+                    } catch (Exception ex) {
+                        WorldGuardNeo.LOGGER.warn("Polygonal '{}' has a malformed point — skipping that point", id);
+                    }
                 }
                 if (pts.size() < 3) {
-                    WorldGuardNeo.LOGGER.warn("Polygonal '{}' has fewer than 3 points — skipping", id);
+                    WorldGuardNeo.LOGGER.warn("Polygonal '{}' has fewer than 3 valid points — skipping", id);
                     yield null;
                 }
                 int minY = obj.get("min-y").getAsInt();
@@ -144,13 +204,28 @@ public final class RegionJsonCodec {
     }
 
     private static void fillOwnersMembers(ProtectedRegion r, JsonObject obj) {
-        // Only call the mutable getters (which lazy-allocate) if there's actual data to load.
-        // Regions without owners/members in JSON keep their lazy collections null, saving
-        // 4 collections × ~40 bytes per region on large servers.
+        // Only call the lazy-allocating getters if there's data to load, so empty regions keep their
+        // collections null (saves ~4 collections per region on large servers).
         if (hasArray(obj, "owners"))        addUuids(obj,   "owners",        r.owners());
         if (hasArray(obj, "owner-groups"))  addStrings(obj, "owner-groups",  r.ownerGroups());
         if (hasArray(obj, "members"))       addUuids(obj,   "members",       r.members());
         if (hasArray(obj, "member-groups")) addStrings(obj, "member-groups", r.memberGroups());
+    }
+
+    /** Restore lifecycle metadata. Must run AFTER fillFlags/fillOwnersMembers/setPriority, since
+     *  those touch modifiedAt; here we overwrite it with the persisted value. Missing keys are left
+     *  at their constructor defaults (now), which is the right behaviour for legacy save files. */
+    private static void fillMetadata(ProtectedRegion r, JsonObject obj) {
+        if (obj.has("created-at") && obj.get("created-at").isJsonPrimitive()) {
+            try { r.setCreatedAt(obj.get("created-at").getAsLong()); } catch (Exception ignored) {}
+        }
+        if (obj.has("modified-at") && obj.get("modified-at").isJsonPrimitive()) {
+            try { r.setModifiedAt(obj.get("modified-at").getAsLong()); } catch (Exception ignored) {}
+        }
+        if (obj.has("created-by") && obj.get("created-by").isJsonPrimitive()) {
+            try { r.setCreatedBy(UUID.fromString(obj.get("created-by").getAsString())); }
+            catch (Exception ex) { WorldGuardNeo.LOGGER.warn("Invalid created-by UUID on '{}'", r.id()); }
+        }
     }
 
     private static boolean hasArray(JsonObject obj, String key) {
@@ -225,15 +300,19 @@ public final class RegionJsonCodec {
             obj.addProperty("max-y", p.maxY());
         }
 
-        // Use *View() reads which return Collections.emptySet() when the underlying set is
-        // null — avoids allocating empty collections on save for regions that have no
-        // owners/members. Real data still gets serialized correctly.
+        // *View() reads return emptySet() for null underlying sets — no empty-collection allocation
+        // for regions with no owners/members.
         writeUuidArray(obj, "owners",        r.ownersView());
         writeStringArray(obj, "owner-groups", r.ownerGroupsView());
         writeUuidArray(obj, "members",       r.membersView());
         writeStringArray(obj, "member-groups", r.memberGroupsView());
 
         obj.add("flags", writeFlags(r));
+
+        // Lifecycle metadata. createdBy is omitted when unknown (legacy/console-created regions).
+        obj.addProperty("created-at",  r.createdAt());
+        obj.addProperty("modified-at", r.modifiedAt());
+        if (r.createdBy() != null) obj.addProperty("created-by", r.createdBy().toString());
         return obj;
     }
 

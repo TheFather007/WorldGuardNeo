@@ -8,35 +8,10 @@ import net.neoforged.bus.api.ICancellableEvent;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Fired when a region flag denies a block-break action.
- *
- * <p>NOTE: As of current implementation, this event fires only on {@code BLOCK_BREAK} /
- * {@code BUILD} denials in {@link dev.thefather007.worldguardneo.listeners.BlockEventHandler}.
- * Other denial paths (place, interact, PVP, mob damage, fire spread, etc.) do NOT
- * currently fire this event — they cancel the underlying NeoForge event directly.
- * Listeners that want to grant exceptions on those paths should subscribe to the
- * NeoForge events directly with a HIGH priority and uncancel as needed.
- *
- * <p>Future versions may extend coverage to other denial paths. The event signature
- * is stable; what changes is the set of triggers.
- *
- * <p>Implements {@link ICancellableEvent} — listeners can call {@code setCanceled(true)}
- * to OVERRIDE the denial and let the action proceed. This is the integration point for
- * mods that want to grant special exceptions (e.g. "creative mode players bypass all
- * region restrictions in their own claim"). Use cautiously — bypassing protection
- * defeats its purpose.
- *
- * <p>Cancellation semantics:
- * <ul>
- *   <li>{@code setCanceled(false)} (default) — the denial stands; the action stays blocked</li>
- *   <li>{@code setCanceled(true)} — the denial is overridden; the action is permitted</li>
- * </ul>
- *
- * <p>Fired SYNCHRONOUSLY from the protection-check call site, so the underlying
- * Minecraft event isn't yet cancelled when listeners run. WorldGuardNeo will check
- * this event's {@code isCanceled()} state after dispatch.
- *
- * <p>The actor may be null for non-player triggers (mob attacks, explosions, dispensers).
+ * Fired (synchronously, cancellable) when a region flag denies an action, letting other mods
+ * OVERRIDE the denial: {@code setCanceled(true)} permits the action. Covers block-break/place,
+ * interact, chest-access and PvP denials; purely environmental ones (spread, ticks, dispensers)
+ * don't fire it. The actor may be null for non-player triggers.
  */
 public final class RegionFlagDeniedEvent extends Event implements ICancellableEvent {
 
@@ -52,6 +27,18 @@ public final class RegionFlagDeniedEvent extends Event implements ICancellableEv
         this.flag = flag;
         this.actor = actor;
         this.reason = reason;
+    }
+
+    /**
+     * Post a denial event for {@code region} and return whether a listener OVERRODE it
+     * ({@code setCanceled(true)} → the caller should permit the action). Central helper used by
+     * every denial path so coverage stays consistent.
+     */
+    public static boolean isOverridden(ProtectedRegion region, Flag<?> flag,
+                                       @Nullable Entity actor, String reason) {
+        RegionFlagDeniedEvent e = new RegionFlagDeniedEvent(region, flag, actor, reason);
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(e);
+        return e.isCanceled();
     }
 
     /** The region whose flag caused the denial. */
