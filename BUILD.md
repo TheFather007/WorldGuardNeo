@@ -17,7 +17,7 @@
 | Tool | Version |
 | --- | --- |
 | JDK | **21** (required) |
-| NeoForge | 21.1.233 (range `[21.1.0,)`) |
+| NeoForge | 21.1.234 (range `[21.1.0,)`) |
 | Minecraft | 1.21.1 |
 | Gradle | bundled wrapper (`./gradlew`) — no separate install needed |
 
