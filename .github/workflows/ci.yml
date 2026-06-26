@@ -54,7 +54,7 @@ jobs:
       # newer event ctor. Keep entries to actually-released 21.1.x builds at or above the floor.
       fail-fast: false
       matrix:
-        neo: ['21.1.209', '21.1.221', '21.1.233']
+        neo: ['21.1.209', '21.1.221', '21.1.234']
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 21
