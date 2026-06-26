@@ -45,11 +45,16 @@ jobs:
     strategy:
       # Run the full battery against several NeoForge 21.1.x releases so a loader-side change in the
       # series (event/mixin signature, registry tweak) is caught. fail-fast:false → one version going
-      # red doesn't cancel the others, so we see exactly which version regressed. Keep this list to
-      # ACTUALLY RELEASED 21.1.x builds; -Pneo_version overrides the gradle.properties default.
+      # red doesn't cancel the others, so we see exactly which version regressed. -Pneo_version
+      # overrides the gradle.properties default.
+      #
+      # Floor is 21.1.209: the GAMETEST battery posts MobEffectEvent.Applicable, whose constructor
+      # gained its `source` parameter after 21.1.172, so the tests don't COMPILE below ~209. The mod
+      # itself still compiles on the full declared range ([21.1.0,)); only the test harness needs the
+      # newer event ctor. Keep entries to actually-released 21.1.x builds at or above the floor.
       fail-fast: false
       matrix:
-        neo: ['21.1.172', '21.1.209', '21.1.233']
+        neo: ['21.1.209', '21.1.221', '21.1.233']
     steps:
       - uses: actions/checkout@v4
       - name: Set up JDK 21
