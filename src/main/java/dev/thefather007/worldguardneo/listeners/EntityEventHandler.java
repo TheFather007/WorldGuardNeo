@@ -374,26 +374,28 @@ public final class EntityEventHandler {
                 && !(target instanceof net.minecraft.world.entity.decoration.ArmorStand)) {
             return; // not a decoration — let vanilla / other mods handle
         }
+        // One lookup for the decoration toggles + build gate (only reached for decoration targets).
+        var applicable = mgr.getApplicable(x, y, z);
         // Dedicated decoration toggles (default ALLOW): an explicit deny blocks even members.
         // item-frame-rotate only applies to a frame already holding an item; placing/removing
         // falls under the build-access gate below.
         if (target instanceof net.minecraft.world.entity.decoration.ItemFrame frame
                 && !frame.getItem().isEmpty()
-                && !mgr.testState(Flags.ITEM_FRAME_ROTATE, actor, x, y, z)) {
+                && !mgr.testState(Flags.ITEM_FRAME_ROTATE, applicable, actor)) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
             return;
         }
         if (target instanceof net.minecraft.world.entity.decoration.ArmorStand
-                && !mgr.testState(Flags.ARMOR_STAND_USE, actor, x, y, z)) {
+                && !mgr.testState(Flags.ARMOR_STAND_USE, applicable, actor)) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
             return;
         }
-        if (!mgr.testBuildAccess(Flags.INTERACT, x, y, z, actor)
-                || !mgr.testBuildAccess(Flags.BUILD, x, y, z, actor)) {
+        if (!mgr.testBuildAccess(Flags.INTERACT, applicable, actor)
+                || !mgr.testBuildAccess(Flags.BUILD, applicable, actor)) {
             e.setCanceled(true);
             p.displayClientMessage(
                     net.minecraft.network.chat.Component.literal(mod.i18n().raw("msg.interact.decoration-denied")), true);
