@@ -38,10 +38,4 @@ public final class RegionTrash {
         Deque<ProtectedRegion> bin = bins.get(world);
         return (bin == null || bin.isEmpty()) ? null : bin.removeFirst();
     }
-
-    /** Peek the most recently deleted region's id for {@code world}, or null if empty. */
-    public String peekId(ResourceKey<Level> world) {
-        Deque<ProtectedRegion> bin = bins.get(world);
-        return (bin == null || bin.isEmpty()) ? null : bin.peekFirst().id();
-    }
 }
