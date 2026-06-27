@@ -29,7 +29,7 @@ for T in FlagLogicTest StorageRoundTripTest FlagScenarioTest FlagResolutionEdgeT
          RegionMechanicsTest PerRegionCodecTest LocalizationTest FuzzCodecTest \
          FlagSerializationTest FlagRegistryTest GeometryCrossCheckTest ParentChainTest \
          GetApplicableOrderingTest SpatialIndexFuzzTest ResolutionFuzzTest \
-         JsonStorageTest ConfigTest NewFlagsTest; do
+         JsonStorageTest ConfigTest NewFlagsTest MarkerGeometryTest; do
   printf '%-24s ' "$T:"
   java -cp "$OUT:$CP" "$T" | tail -1 || rc=1
 done
