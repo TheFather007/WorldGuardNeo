@@ -224,6 +224,16 @@
   "flag.weather-lock.desc": "Verrouiller la météo côté client (clear, rain, thunder).",
   "flag.teleport.desc": "Destination pour /rg teleport, format x,y,z.",
   "flag.spawn.desc": "Coordonnées de réapparition pour les joueurs liés à la région.",
+  "flag.armor-stand-use.desc": "Autoriser ou interdire l'utilisation des porte-armures (changer leur équipement).",
+  "flag.bucket-empty.desc": "Autoriser ou interdire le vidage des seaux (placer de l'eau/lave).",
+  "flag.bucket-fill.desc": "Autoriser ou interdire le remplissage des seaux (récupérer de l'eau/lave).",
+  "flag.glide.desc": "Autoriser ou interdire le vol plané avec des élytres.",
+  "flag.item-frame-rotate.desc": "Autoriser ou interdire la rotation des objets dans les cadres.",
+  "flag.lectern-take.desc": "Autoriser ou interdire de prendre le livre d'un pupitre.",
+  "flag.sign-edit.desc": "Autoriser ou interdire la modification du texte des pancartes.",
+  "flag.spawn-limit.desc": "Limites d'apparition par type, p. ex. « minecraft:zombie:5 » (id-entité:max).",
+  "flag.vehicle-enter.desc": "Autoriser ou interdire de monter dans les wagonnets et les bateaux.",
+  "flag.vehicle-place.desc": "Autoriser ou interdire de placer des wagonnets et des bateaux.",
 
   "item.wand.name": "§6§lWorldGuardNeo §r§6Baguette"
 }

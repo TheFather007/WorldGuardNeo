@@ -5,7 +5,6 @@ import dev.thefather007.worldguardneo.region.CuboidRegion;
 import dev.thefather007.worldguardneo.region.PolygonalRegion;
 import dev.thefather007.worldguardneo.region.ProtectedRegion;
 import dev.thefather007.worldguardneo.region.RegionManager;
-import dev.thefather007.worldguardneo.util.Vec3;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.fml.ModList;
@@ -13,9 +12,7 @@ import net.neoforged.fml.ModList;
 import java.awt.Color;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Soft-dependency Squaremap integration.
@@ -76,12 +73,6 @@ public final class SquaremapIntegration {
 
     /** Layer key used everywhere — same Key namespace for register/lookup. */
     private Object layerKey;
-
-    /**
-     * Per-dimension-id → SimpleLayerProvider cache. We re-use one layer per world rather
-     * than recreating it on every update. Cleared on disable.
-     */
-    private final Map<String, Object> layerByWorld = new HashMap<>();
 
     public boolean isActive() { return active; }
 
@@ -203,12 +194,16 @@ public final class SquaremapIntegration {
 
     /* ----------------- internals ----------------- */
 
-    /** Get-or-create the SimpleLayerProvider for the given server level. */
+    /**
+     * Resolve the SimpleLayerProvider for the given server level straight from Squaremap's layer
+     * registry (the source of truth) — reuse the existing one, or build+register a new one. We do NOT
+     * cache it on our side: a stale cache would survive a {@code /squaremap reload} (which rebuilds
+     * Squaremap's registries) and leave us writing markers into an orphaned layer that never renders.
+     * ensureLayer runs only on publish/update/remove (cold paths), so the extra reflective lookups are
+     * negligible, and resolving from the registry self-heals after a reload.
+     */
     private Object ensureLayer(ServerLevel lvl) throws Exception {
         String dimId = lvl.dimension().location().toString();
-        Object cached = layerByWorld.get(dimId);
-        if (cached != null) return cached;
-
         Object squaremap = providerGet.invoke(null);
         if (squaremap == null) return null;
         Object worldId = worldIdentifierParse.invoke(null, dimId);
@@ -231,7 +226,6 @@ public final class SquaremapIntegration {
             layer = builderBuild.invoke(builder);
             registryRegister.invoke(registry, layerKey, layer);
         }
-        layerByWorld.put(dimId, layer);
         return layer;
     }
 
@@ -239,18 +233,18 @@ public final class SquaremapIntegration {
     private void putMarker(Object layer, ProtectedRegion r) throws Exception {
         Object marker;
         if (r instanceof CuboidRegion c) {
-            Vec3 min = c.minimumBound();
-            Vec3 max = c.maximumBound();
-            // Add 1 to max so the rectangle covers the full block range — block (10,10,10)
-            // really extends from (10,10,10) to (11,11,11) in world coords.
-            Object p1 = pointOf.invoke(null, (double) min.x(),        (double) min.z());
-            Object p2 = pointOf.invoke(null, (double) max.x() + 1.0,  (double) max.z() + 1.0);
+            // Rectangle from the min corner to max+1 so it covers the full block range — block
+            // (10,10,10) really extends to (11,11,11) in world coords. cuboidCorners()[0]=min,
+            // [2]=max+1 (the opposite corners), shared with BlueMap so the +1 math lives in one place.
+            double[][] corners = MarkerGeometry.cuboidCorners(c.minimumBound(), c.maximumBound());
+            Object p1 = pointOf.invoke(null, corners[0][0], corners[0][1]);
+            Object p2 = pointOf.invoke(null, corners[2][0], corners[2][1]);
             marker = markerRectangle.invoke(null, p1, p2);
         } else if (r instanceof PolygonalRegion poly) {
-            var pts = poly.points();
-            List<Object> points = new ArrayList<>(pts.size());
-            for (var p : pts) {
-                points.add(pointOf.invoke(null, (double) p.x(), (double) p.z()));
+            double[][] pp = MarkerGeometry.polygonPoints(poly.points());
+            List<Object> points = new ArrayList<>(pp.length);
+            for (double[] xz : pp) {
+                points.add(pointOf.invoke(null, xz[0], xz[1]));
             }
             marker = markerPolygon.invoke(null, points);
         } else {

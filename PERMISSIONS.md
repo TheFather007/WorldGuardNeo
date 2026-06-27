@@ -21,6 +21,15 @@ WorldGuardNeo checks every command and protected action against a permission nod
 
 The admin/mod tiers are configurable in `config.toml` (`default-op-level-admin` = 3, `default-op-level-mod` = 2 by default) and re-read on `/rg reload`.
 
+**Per-command overrides.** To change the OP level of a *single* command without touching the tiers, add it to the `[command-op-levels]` table in `config.toml` (node → level). The `worldguardneo.` prefix is optional; dotted keys must be quoted; levels are `0`–`5`. This wins over the admin/mod defaults and is re-read on `/rg reload`:
+
+```toml
+[command-op-levels]
+"region.teleport" = 0   # everyone may use /rg teleport
+"region.claim"    = 2   # require op 2 to claim
+"reload"          = 4
+```
+
 > **OP 5 = never by OP.** Minecraft's max OP level is 4, so a node mapped to 5 (`region.bypass`) can **only** be granted explicitly via LuckPerms — it's never satisfied by OP level alone.
 
 ## Region nodes

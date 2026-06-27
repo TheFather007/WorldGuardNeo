@@ -23,7 +23,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 
 ## Возможности
 
-- **Встроенная палочка выделения** — `/rg wand` выдаёт предмет для выделения (по умолчанию палка, настраивается). ЛКМ/ПКМ по двум углам для куба либо полигон по точкам. Контур рисуется на клиенте у игроков с [WorldEditCUI](https://modrinth.com/mod/worldeditcui).
+- **Встроенная палочка выделения** — `/rg wand` выдаёт предмет для выделения (по умолчанию палка, настраивается). ЛКМ/ПКМ по двум углам для куба либо полигон по точкам. Контур рисуется на клиенте у игроков с [WorldEditCUI](https://modrinth.com/mod/worldeditcui-forge).
 - **90+ флагов** — build, block-break/place, interact, use, chest-access, pvp, спавн и урон мобов, взрывы (tnt/creeper/прочие), распространение огня, поджог лавой, молнии, редстоун, поршни, выпуск из диспенсеров, жидкости, рост, вход/выход, приветствия, блокировки режима/времени/погоды, сохранение инвентаря/опыта и другое.
 - **На регион и на мир** — флаги на каждый регион; общемировые переключатели на измерение через файлы-переопределения.
 - **Модель участников** — владельцы и участники; build-флаги их учитывают (WorldGuard «приватно по умолчанию»).
@@ -55,7 +55,7 @@ WorldGuardNeo приносит защиту территорий в стиле W
 | [**LuckPerms**](https://luckperms.net) 5.4+ | Узлы прав + лимиты регионов на группу (иначе уровни OP) |
 | [**BlueMap**](https://modrinth.com/mod/bluemap) | Отображение регионов на 3D веб-карте |
 | [**squaremap**](https://modrinth.com/mod/squaremap) | Отображение регионов на 2D веб-карте |
-| [**WorldEditCUI**](https://modrinth.com/mod/worldeditcui) (клиент) | Отрисовка контура выделения/региона на клиенте |
+| [**WorldEditCUI**](https://modrinth.com/mod/worldeditcui-forge) (клиент) | Отрисовка контура выделения/региона на клиенте |
 | [**sqlite-jdbc**](https://github.com/xerial/sqlite-jdbc) jar | `storage-format = "sqlite"` |
 | [**H2**](https://www.h2database.com) jar | `storage-format = "h2"` (H2 уже поставляет LuckPerms) |
 | [**mysql-connector-j**](https://dev.mysql.com/downloads/connector/j/) or [**MariaDB**](https://mariadb.com/downloads/connectors/) jar | `storage-format = "mysql"` |

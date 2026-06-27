@@ -224,6 +224,16 @@
   "flag.weather-lock.desc": "Fixiert das clientseitige Wetter (clear, rain, thunder).",
   "flag.teleport.desc": "Ziel für /rg teleport, Format x,y,z.",
   "flag.spawn.desc": "Wiederbelebungskoordinaten für regionsgebundene Spieler.",
+  "flag.armor-stand-use.desc": "Erlaubt oder verbietet das Benutzen von Rüstungsständern (Ausrüstung wechseln).",
+  "flag.bucket-empty.desc": "Erlaubt oder verbietet das Leeren von Eimern (Wasser/Lava platzieren).",
+  "flag.bucket-fill.desc": "Erlaubt oder verbietet das Füllen von Eimern (Wasser/Lava aufnehmen).",
+  "flag.glide.desc": "Erlaubt oder verbietet das Gleiten mit Elytren.",
+  "flag.item-frame-rotate.desc": "Erlaubt oder verbietet das Drehen von Gegenständen in Rahmen.",
+  "flag.lectern-take.desc": "Erlaubt oder verbietet das Nehmen des Buches vom Lesepult.",
+  "flag.sign-edit.desc": "Erlaubt oder verbietet das Bearbeiten von Schildtext.",
+  "flag.spawn-limit.desc": "Spawn-Obergrenzen pro Typ, z. B. \"minecraft:zombie:5\" (Entity-ID:Max).",
+  "flag.vehicle-enter.desc": "Erlaubt oder verbietet das Einsteigen in Loren und Boote.",
+  "flag.vehicle-place.desc": "Erlaubt oder verbietet das Platzieren von Loren und Booten.",
 
   "item.wand.name": "§6§lWorldGuardNeo §r§6Werkzeug"
 }
