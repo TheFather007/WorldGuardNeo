@@ -224,6 +224,16 @@
   "flag.weather-lock.desc": "Bloquear el clima del lado del cliente (clear, rain, thunder).",
   "flag.teleport.desc": "Destino para /rg teleport, formato x,y,z.",
   "flag.spawn.desc": "Coordenadas de reaparición para los jugadores vinculados a la región.",
+  "flag.armor-stand-use.desc": "Permitir o denegar el uso de soportes de armadura (cambiar su equipo).",
+  "flag.bucket-empty.desc": "Permitir o denegar vaciar cubos (colocar agua/lava).",
+  "flag.bucket-fill.desc": "Permitir o denegar llenar cubos (recoger agua/lava).",
+  "flag.glide.desc": "Permitir o denegar el planeo con élitros.",
+  "flag.item-frame-rotate.desc": "Permitir o denegar girar objetos en marcos.",
+  "flag.lectern-take.desc": "Permitir o denegar tomar el libro de un atril.",
+  "flag.sign-edit.desc": "Permitir o denegar editar el texto de los letreros.",
+  "flag.spawn-limit.desc": "Límites de aparición por tipo, p. ej. \"minecraft:zombie:5\" (id-entidad:máx).",
+  "flag.vehicle-enter.desc": "Permitir o denegar subir a vagonetas y botes.",
+  "flag.vehicle-place.desc": "Permitir o denegar colocar vagonetas y botes.",
 
   "item.wand.name": "§6§lWorldGuardNeo §r§6Varita"
 }

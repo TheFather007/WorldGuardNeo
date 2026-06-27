@@ -224,6 +224,16 @@
   "flag.weather-lock.desc": "Lock client-side weather (clear, rain, thunder).",
   "flag.teleport.desc": "Destination for /rg teleport, format x,y,z.",
   "flag.spawn.desc": "Respawn coordinates for region-bound players.",
+  "flag.armor-stand-use.desc": "Allow or deny using armor stands (swapping their gear).",
+  "flag.bucket-empty.desc": "Allow or deny emptying buckets (placing water/lava).",
+  "flag.bucket-fill.desc": "Allow or deny filling buckets (picking up water/lava).",
+  "flag.glide.desc": "Allow or deny elytra gliding.",
+  "flag.item-frame-rotate.desc": "Allow or deny rotating items in item frames.",
+  "flag.lectern-take.desc": "Allow or deny taking the book from a lectern.",
+  "flag.sign-edit.desc": "Allow or deny editing sign text.",
+  "flag.spawn-limit.desc": "Per-type spawn caps, e.g. \"minecraft:zombie:5\" (entity-id:max).",
+  "flag.vehicle-enter.desc": "Allow or deny boarding minecarts and boats.",
+  "flag.vehicle-place.desc": "Allow or deny placing minecarts and boats.",
 
   "item.wand.name": "§6§lWorldGuardNeo §r§6Wand"
 }

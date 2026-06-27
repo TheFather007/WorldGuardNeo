@@ -224,6 +224,16 @@
   "flag.weather-lock.desc": "锁定客户端天气（clear、rain、thunder）。",
   "flag.teleport.desc": "/rg teleport 的目的地，格式 x,y,z。",
   "flag.spawn.desc": "区域绑定玩家的重生坐标。",
+  "flag.armor-stand-use.desc": "允许或拒绝使用盔甲架（更换其装备）。",
+  "flag.bucket-empty.desc": "允许或拒绝清空桶（放置水/熔岩）。",
+  "flag.bucket-fill.desc": "允许或拒绝装满桶（收集水/熔岩）。",
+  "flag.glide.desc": "允许或拒绝使用鞘翅滑翔。",
+  "flag.item-frame-rotate.desc": "允许或拒绝旋转物品展示框中的物品。",
+  "flag.lectern-take.desc": "允许或拒绝从讲台取书。",
+  "flag.sign-edit.desc": "允许或拒绝编辑告示牌文字。",
+  "flag.spawn-limit.desc": "按类型的生成上限，例如 \"minecraft:zombie:5\"（实体id:上限）。",
+  "flag.vehicle-enter.desc": "允许或拒绝进入矿车和船。",
+  "flag.vehicle-place.desc": "允许或拒绝放置矿车和船。",
 
   "item.wand.name": "§6§lWorldGuardNeo §r§6选区工具"
 }
