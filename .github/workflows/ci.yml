@@ -13,6 +13,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Static lint — codifies the manual-audit scans (unused imports, lang-key parity, referenced-key
+  # existence, flag-description coverage, mixin registration, placeholder URLs). Catches regressions
+  # in the non-executable layers that the JVM suite and GameTests can't see. Seconds, no build.
+  lint:
+    name: Static lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run static lint
+        run: python3 tests/lint.py
+
   # Fast, deterministic engine tests — the primary gate. ~500k assertions, no Minecraft runtime.
   jvm-tests:
     name: JVM engine tests

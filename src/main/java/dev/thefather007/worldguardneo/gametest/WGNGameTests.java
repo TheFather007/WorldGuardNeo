@@ -1,14 +1,9 @@
 package dev.thefather007.worldguardneo.gametest;
 
 import dev.thefather007.worldguardneo.WorldGuardNeo;
-import dev.thefather007.worldguardneo.flags.BooleanFlag;
-import dev.thefather007.worldguardneo.flags.DoubleFlag;
 import dev.thefather007.worldguardneo.flags.Flag;
 import dev.thefather007.worldguardneo.flags.Flags;
-import dev.thefather007.worldguardneo.flags.IntegerFlag;
-import dev.thefather007.worldguardneo.flags.SetFlag;
 import dev.thefather007.worldguardneo.flags.StateFlag;
-import dev.thefather007.worldguardneo.flags.StringFlag;
 import dev.thefather007.worldguardneo.mixinsupport.MixinFlagBridge;
 import dev.thefather007.worldguardneo.region.CuboidRegion;
 import dev.thefather007.worldguardneo.region.RegionGroup;
