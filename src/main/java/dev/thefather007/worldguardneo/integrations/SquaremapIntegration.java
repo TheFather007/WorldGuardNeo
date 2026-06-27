@@ -13,9 +13,7 @@ import net.neoforged.fml.ModList;
 import java.awt.Color;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * Soft-dependency Squaremap integration.
@@ -76,12 +74,6 @@ public final class SquaremapIntegration {
 
     /** Layer key used everywhere — same Key namespace for register/lookup. */
     private Object layerKey;
-
-    /**
-     * Per-dimension-id → SimpleLayerProvider cache. We re-use one layer per world rather
-     * than recreating it on every update. Cleared on disable.
-     */
-    private final Map<String, Object> layerByWorld = new HashMap<>();
 
     public boolean isActive() { return active; }
 
@@ -203,12 +195,16 @@ public final class SquaremapIntegration {
 
     /* ----------------- internals ----------------- */
 
-    /** Get-or-create the SimpleLayerProvider for the given server level. */
+    /**
+     * Resolve the SimpleLayerProvider for the given server level straight from Squaremap's layer
+     * registry (the source of truth) — reuse the existing one, or build+register a new one. We do NOT
+     * cache it on our side: a stale cache would survive a {@code /squaremap reload} (which rebuilds
+     * Squaremap's registries) and leave us writing markers into an orphaned layer that never renders.
+     * ensureLayer runs only on publish/update/remove (cold paths), so the extra reflective lookups are
+     * negligible, and resolving from the registry self-heals after a reload.
+     */
     private Object ensureLayer(ServerLevel lvl) throws Exception {
         String dimId = lvl.dimension().location().toString();
-        Object cached = layerByWorld.get(dimId);
-        if (cached != null) return cached;
-
         Object squaremap = providerGet.invoke(null);
         if (squaremap == null) return null;
         Object worldId = worldIdentifierParse.invoke(null, dimId);
@@ -231,7 +227,6 @@ public final class SquaremapIntegration {
             layer = builderBuild.invoke(builder);
             registryRegister.invoke(registry, layerKey, layer);
         }
-        layerByWorld.put(dimId, layer);
         return layer;
     }
 
