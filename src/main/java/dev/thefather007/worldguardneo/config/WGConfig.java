@@ -139,6 +139,7 @@ public final class WGConfig {
             g.mysqlProperties        = readStrList(toml, "mysql.properties", g.mysqlProperties);
 
             g.groupRegionLimits = readIntMap(toml, "group-region-limits", g.groupRegionLimits);
+            g.commandOpLevels   = readNodeLevelMap(toml, "command-op-levels", g.commandOpLevels);
 
             g.defaults.useRegions                     = bool(toml, "defaults.use-regions", g.defaults.useRegions);
             g.defaults.protectVehicles                = bool(toml, "defaults.protect-vehicles", g.defaults.protectVehicles);
@@ -216,6 +217,29 @@ public final class WGConfig {
         }
         return out;
     }
+    /**
+     * Read a permission-node → OP-level map ({@code [command-op-levels]}). Accepts BOTH the quoted
+     * literal-key form ({@code "region.claim" = 2}) that we write AND a hand-edited nested-table form
+     * ({@code [command-op-levels.region] claim = 2}), flattening nested tables back into dotted keys
+     * so either style an admin types works. Non-numeric leaves are skipped.
+     */
+    private static Map<String, Integer> readNodeLevelMap(Config c, String path, Map<String, Integer> def) {
+        Object v = c.get(path);
+        if (!(v instanceof Config sub)) return def;
+        Map<String, Integer> out = new LinkedHashMap<>();
+        flattenLevels(sub, "", out);
+        return out;
+    }
+
+    private static void flattenLevels(Config sub, String prefix, Map<String, Integer> out) {
+        for (Config.Entry e : sub.entrySet()) {
+            String key = prefix.isEmpty() ? e.getKey() : prefix + "." + e.getKey();
+            Object val = e.getValue();
+            if (val instanceof Number n)      out.put(key, n.intValue());
+            else if (val instanceof Config c) flattenLevels(c, key, out);
+        }
+    }
+
     private static Map<String, String> readStrMap(Config c, String path, Map<String, String> def) {
         Object v = c.get(path);
         if (!(v instanceof Config sub)) return def;
@@ -326,6 +350,25 @@ public final class WGConfig {
                 " Op level (0-4) for moderator nodes (info.others, list.others, lists.radius,\n" +
                 " flag.others, redefine, addowner, ...). Picked up by /rg reload.");
         c.set("default-op-level-mod", g.defaultOpLevelMod);
+
+        c.setComment("command-op-levels",
+                " Per-command OP-level overrides. Map a permission node to the OP level required for it\n" +
+                " when LuckPerms isn't used (and for nodes LuckPerms leaves undefined). This wins over the\n" +
+                " admin/mod defaults above, so you can tune any single command without touching the rest.\n" +
+                "   0 = everyone   1-4 = that op level   5 = never via op alone (grant explicitly in LuckPerms)\n" +
+                " The \"worldguardneo.\" prefix is optional. Keys with a dot must be quoted. Examples:\n" +
+                "   \"region.teleport\" = 0   # let everyone use /rg teleport\n" +
+                "   \"region.claim\"    = 2   # require op 2 to claim\n" +
+                "   \"reload\"          = 4\n" +
+                " Empty by default — the built-in defaults apply. See PERMISSIONS.md for every node.\n" +
+                " Picked up by /rg reload.");
+        CommentedConfig cmdLevels = CommentedConfig.inMemory();
+        // List.of(node) sets a SINGLE literal key — without it night-config would split a dotted
+        // node into nested tables. The TOML writer quotes the key because it contains dots.
+        for (Map.Entry<String, Integer> e : g.commandOpLevels.entrySet()) {
+            cmdLevels.set(java.util.List.of(e.getKey()), e.getValue());
+        }
+        c.set("command-op-levels", cmdLevels);
 
         /* ───────────────────────── REGION LIMITS ───────────────────────── */
         c.setComment("max-regions-per-player",
@@ -574,8 +617,10 @@ public final class WGConfig {
 
     /* ------------------------------- sections ------------------------------ */
 
-    /** Bump when config keys are renamed/restructured, and add the rename in {@link #migrateGlobal}. */
-    public static final int CONFIG_VERSION = 1;
+    /** Bump when config keys are renamed/restructured, and add the rename in {@link #migrateGlobal}.
+     *  v2: added the {@code [command-op-levels]} section (purely additive — the bump just makes the new
+     *  section get written into existing config files on upgrade). */
+    public static final int CONFIG_VERSION = 2;
 
     public static final class GlobalSection {
         /** Version stamp of the loaded file; 0 means a legacy unversioned file (pre-versioning). */
@@ -589,6 +634,8 @@ public final class WGConfig {
         public int     maxRegionVolume       = 50_000_000;      // hard cap to avoid abuse
         public int     maxClaimableArea      = 1_000_000;
         public Map<String,Integer> groupRegionLimits = new LinkedHashMap<>();
+        /** Per-command OP-level overrides: permission-node → required OP level. Empty = built-in defaults. */
+        public Map<String,Integer> commandOpLevels   = new LinkedHashMap<>();
         public int     minRegionVolume       = 27;
         public int     wandItemSelectionTicks = 200;            // visual selection retention
         public boolean announceGreetings      = true;

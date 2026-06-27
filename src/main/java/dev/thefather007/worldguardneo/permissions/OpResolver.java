@@ -89,6 +89,26 @@ public final class OpResolver implements PermissionResolver {
         nodeToLevel.put("worldguardneo.backup",               4);
         nodeToLevel.put("worldguardneo.migrate",              4);   // /rg migrate — convert storage backend
         nodeToLevel.put("worldguardneo.notify",               mod);
+
+        // Per-command overrides from config ([command-op-levels]). Applied LAST so an admin can
+        // re-tune any single node's required op level on top of the admin/mod defaults above.
+        // The "worldguardneo." prefix is optional in config; levels are clamped to 0..5
+        // (5 = never granted by op alone, must come from LuckPerms).
+        try {
+            var modInst = dev.thefather007.worldguardneo.WorldGuardNeo.get();
+            if (modInst != null && modInst.config() != null && modInst.config().global() != null) {
+                var overrides = modInst.config().global().commandOpLevels;
+                if (overrides != null) {
+                    for (java.util.Map.Entry<String, Integer> e : overrides.entrySet()) {
+                        if (e.getKey() == null || e.getValue() == null) continue;
+                        String node = e.getKey().trim();
+                        if (node.isEmpty()) continue;
+                        if (!node.startsWith("worldguardneo.")) node = "worldguardneo." + node;
+                        nodeToLevel.put(node, Math.max(0, Math.min(5, e.getValue())));
+                    }
+                }
+            }
+        } catch (Throwable ignored) { /* config not ready yet — overrides apply on next reload */ }
     }
 
     public void setLevel(String node, int level) { nodeToLevel.put(node, level); }
