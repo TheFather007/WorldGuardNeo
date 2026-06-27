@@ -5,7 +5,6 @@ import dev.thefather007.worldguardneo.region.CuboidRegion;
 import dev.thefather007.worldguardneo.region.PolygonalRegion;
 import dev.thefather007.worldguardneo.region.ProtectedRegion;
 import dev.thefather007.worldguardneo.region.RegionManager;
-import dev.thefather007.worldguardneo.util.Vec3;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.neoforged.fml.ModList;
@@ -226,27 +225,19 @@ public final class BluemapIntegration {
         float displayY;
         if (r instanceof CuboidRegion c) {
             // Display at the lower Y bound so the flat marker hugs the terrain rather than floats.
-            Vec3 min = c.minimumBound();
-            Vec3 max = c.maximumBound();
-            displayY = min.y();
-            Object[] corners = {
-                vec2dCtor.newInstance((double) min.x(), (double) min.z()),
-                vec2dCtor.newInstance((double) max.x() + 1.0, (double) min.z()),
-                vec2dCtor.newInstance((double) max.x() + 1.0, (double) max.z() + 1.0),
-                vec2dCtor.newInstance((double) min.x(), (double) max.z() + 1.0)
-            };
+            displayY = c.minimumBound().y();
+            double[][] corners = MarkerGeometry.cuboidCorners(c.minimumBound(), c.maximumBound());
             // Shape constructor takes a Vector2d[].
             Object arr = java.lang.reflect.Array.newInstance(vec2dCls, corners.length);
-            for (int i = 0; i < corners.length; i++) java.lang.reflect.Array.set(arr, i, corners[i]);
+            for (int i = 0; i < corners.length; i++)
+                java.lang.reflect.Array.set(arr, i, vec2dCtor.newInstance(corners[i][0], corners[i][1]));
             shape = shapeCtor.newInstance(arr);
         } else if (r instanceof PolygonalRegion poly) {
             displayY = poly.minY();
-            var points = poly.points();
-            Object arr = java.lang.reflect.Array.newInstance(vec2dCls, points.size());
-            for (int i = 0; i < points.size(); i++) {
-                var p = points.get(i);
-                java.lang.reflect.Array.set(arr, i, vec2dCtor.newInstance((double) p.x(), (double) p.z()));
-            }
+            double[][] pts = MarkerGeometry.polygonPoints(poly.points());
+            Object arr = java.lang.reflect.Array.newInstance(vec2dCls, pts.length);
+            for (int i = 0; i < pts.length; i++)
+                java.lang.reflect.Array.set(arr, i, vec2dCtor.newInstance(pts[i][0], pts[i][1]));
             shape = shapeCtor.newInstance(arr);
         } else {
             // Global region — no geometry to render on a map.
