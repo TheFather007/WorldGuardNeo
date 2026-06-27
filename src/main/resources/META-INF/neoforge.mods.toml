@@ -1,7 +1,7 @@
 modLoader="javafml"
 loaderVersion="${loader_version_range}"
 license="${mod_license}"
-issueTrackerURL="https://example.com/worldguardneo/issues"
+issueTrackerURL="https://github.com/TheFather007/WorldGuardNeo/issues"
 
 # Mixin configuration. Loads WorldGuardNeo's random-tick gating mixins for ice/snow/grass/etc.
 [[mixins]]
@@ -13,7 +13,7 @@ version="${mod_version}"
 displayName="${mod_name}"
 authors="${mod_authors}"
 description='''${mod_description}'''
-displayURL="https://example.com/worldguardneo"
+displayURL="https://github.com/TheFather007/WorldGuardNeo"
 
 # NeoForge + Minecraft — server-side mod, so SERVER side.
 [[dependencies.${mod_id}]]
