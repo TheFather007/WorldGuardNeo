@@ -120,7 +120,14 @@ public final class BluemapIntegration {
                 WorldGuardNeo.LOGGER.warn("[WorldGuardNeo] Bluemap onEnable failed", t);
             }
         };
-        Consumer<Object> onDisable = api -> serverLevelToBmWorld.clear();
+        // Bluemap fires onDisable from its own thread too; route the clear back onto the server
+        // thread so it can't race a concurrent ensureMarkerSet/publishAll on the (non-thread-safe)
+        // serverLevelToBmWorld map.
+        Consumer<Object> onDisable = api -> {
+            MinecraftServer srv = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
+            if (srv != null) srv.execute(serverLevelToBmWorld::clear);
+            else serverLevelToBmWorld.clear();
+        };
 
         apiOnEnable.invoke(null, onEnable);
         apiOnDisable.invoke(null, onDisable);
