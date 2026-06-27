@@ -33,6 +33,11 @@ for T in FlagLogicTest StorageRoundTripTest FlagScenarioTest FlagResolutionEdgeT
   printf '%-24s ' "$T:"
   java -cp "$OUT:$CP" "$T" | tail -1 || rc=1
 done
+# Hot-path throughput benchmark: prints Mops/s for getApplicable/testState/hasAnyAt/resolveValue and
+# gates on a loose wall-clock ceiling (catches algorithmic regressions, not slow CI). Show the
+# throughput line too, not just the pass/fail tail.
+printf '%-24s\n' "BenchHotPaths:"
+java -cp "$OUT:$CP" BenchHotPaths | sed 's/^/    /' || rc=1
 # Per-flag battery → writes the detailed report file.
 printf '%-24s ' "PerFlagReport:"
 java -cp "$OUT:$CP" PerFlagReport "$ROOT/tests/FLAG_REPORT.txt" | tail -1 || rc=1
