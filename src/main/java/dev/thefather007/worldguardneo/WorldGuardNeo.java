@@ -150,6 +150,10 @@ public final class WorldGuardNeo {
      * messages from the client, we only push the current selection out.
      */
     private void onRegisterPayloads(RegisterPayloadHandlersEvent event) {
+        if (ModList.get().isLoaded("worldedit")) {
+            LOGGER.info("[WorldGuardNeo] WorldEdit detected; reusing its worldedit:cui payload channel.");
+            return;
+        }
         PayloadRegistrar registrar = event.registrar("1").optional();
         registrar.playToClient(CuiPayload.TYPE, CuiPayload.CODEC, (payload, context) -> { /* send-only */ });
     }
