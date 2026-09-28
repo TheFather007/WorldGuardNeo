@@ -5,10 +5,13 @@ import dev.thefather007.worldguardneo.region.CuboidRegion;
 import dev.thefather007.worldguardneo.region.PolygonalRegion;
 import dev.thefather007.worldguardneo.region.ProtectedRegion;
 import dev.thefather007.worldguardneo.util.Vec3;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.ModList;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,6 +27,13 @@ import java.util.UUID;
  * <p>All access is from the server thread, so a plain {@link HashMap} suffices — no sync needed.
  */
 public final class SelectionStore {
+
+    private static final String WORLDEDIT_MOD_ID = "worldedit";
+    private static final String WORLDEDIT_CUI_PACKET_CLASS =
+            "com.sk89q.worldedit.neoforge.net.handler.WECUIPacketHandler$CuiPacket";
+
+    private static volatile Constructor<? extends CustomPacketPayload> worldEditCuiPacketConstructor;
+    private static volatile boolean worldEditCuiBridgeFailed;
 
     public enum Mode { CUBOID, POLYGON }
 
@@ -204,10 +214,39 @@ public final class SelectionStore {
      */
     private static void send(ServerPlayer p, String command) {
         if (!p.connection.hasChannel(CuiPayload.TYPE)) return;
+        CustomPacketPayload payload = payload(command);
+        if (payload == null) return;
         try {
-            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, new CuiPayload(command));
+            net.neoforged.neoforge.network.PacketDistributor.sendToPlayer(p, payload);
         } catch (Throwable t) {
             WorldGuardNeo.LOGGER.debug("[WorldGuardNeo] CUI send failed ({})", t.toString());
+        }
+    }
+
+    private static CustomPacketPayload payload(String command) {
+        if (!ModList.get().isLoaded(WORLDEDIT_MOD_ID)) {
+            return new CuiPayload(command);
+        }
+        return worldEditCuiPayload(command);
+    }
+
+    private static CustomPacketPayload worldEditCuiPayload(String command) {
+        if (worldEditCuiBridgeFailed) return null;
+        try {
+            Constructor<? extends CustomPacketPayload> constructor = worldEditCuiPacketConstructor;
+            if (constructor == null) {
+                constructor = Class.forName(WORLDEDIT_CUI_PACKET_CLASS)
+                        .asSubclass(CustomPacketPayload.class)
+                        .getDeclaredConstructor(String.class);
+                worldEditCuiPacketConstructor = constructor;
+            }
+            return constructor.newInstance(command);
+        } catch (ReflectiveOperationException | LinkageError ex) {
+            worldEditCuiBridgeFailed = true;
+            WorldGuardNeo.LOGGER.warn(
+                    "[WorldGuardNeo] WorldEdit owns worldedit:cui, but its NeoForge CUI packet bridge is unavailable; selection outlines will be disabled. ({})",
+                    ex.toString());
+            return null;
         }
     }
 }
